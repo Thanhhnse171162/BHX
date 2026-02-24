@@ -74,11 +74,11 @@ export default function RegisterPage() {
     try {
       // Gọi backend IAM microservice thông qua authService
       const data = await authService.register({
-        fullName: formData.fullName,
-        email: formData.email,
-        phone: formData.phone || '', // Backend require Phone
-        password: formData.password,
-        confirmPassword: formData.confirmPassword,
+        FullName: formData.fullName,
+        Email: formData.email,
+        Phone: formData.phone || '', // Backend require Phone
+        Password: formData.password,
+        ConfirmPassword: formData.confirmPassword,
       })
 
       setSuccess(true)

@@ -35,19 +35,11 @@ interface LoginResponse {
 }
 
 interface RegisterRequest {
-  FullName?: string
-  Name?: string
+  FullName: string
   Email: string
-  Phone: string // Backend require Phone
+  Phone: string
   Password: string
   ConfirmPassword?: string
-  // Lowercase cho FE
-  fullName?: string
-  name?: string
-  email?: string
-  phone?: string
-  password?: string
-  confirmPassword?: string
 }
 
 interface RegisterResponse {
@@ -90,13 +82,13 @@ export const authService = {
    */
   register: async (data: RegisterRequest): Promise<RegisterResponse> => {
     try {
-      // Transform camelCase to PascalCase for backend
+      // Convert PascalCase to camelCase for local API route
       const payload = {
-        FullName: data.fullName || data.FullName,
-        Email: data.email || data.Email,
-        Phone: data.phone || data.Phone,
-        Password: data.password || data.Password,
-        ConfirmPassword: data.confirmPassword || data.ConfirmPassword,
+        fullName: data.FullName,
+        email: data.Email,
+        phone: data.Phone,
+        password: data.Password,
+        confirmPassword: data.ConfirmPassword,
       }
       
       console.log('🔵 Register Request:', {
