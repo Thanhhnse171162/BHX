@@ -266,3 +266,38 @@ export const getCustomerNavigation = (): NavItem[] => {
     },
   ]
 }
+
+export const getStaffNavigation = (): NavItem[] => {
+  return [
+    {
+      label: 'Dashboard',
+      href: '/staff',
+      icon: 'Home',
+    },
+    {
+      label: 'Attendance',
+      href: '/staff/attendance',
+      icon: 'Calendar',
+    },
+    {
+      label: 'Tasks',
+      href: '/staff/tasks',
+      icon: 'CheckSquare',
+    },
+    {
+      label: 'Schedule',
+      href: '/staff/schedule',
+      icon: 'Clock',
+    },
+    {
+      label: 'KPI',
+      href: '/staff/kpi',
+      icon: 'BarChart3',
+    },
+    {
+      label: 'Announcements',
+      href: '/staff/announcements',
+      icon: 'Bell',
+    },
+  ]
+}

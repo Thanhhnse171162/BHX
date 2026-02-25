@@ -44,7 +44,12 @@ export const rolePermissions: Record<UserRole, Permission[]> = {
     'REPORT_READ',
   ],
 
-  STAFF: [],
+  STAFF: [
+    'ORDER_POS_READ',
+    'ORDER_POS_WRITE',
+    'SHIFT_READ',
+    'INVENTORY_READ',
+  ],
 
   CUSTOMER: [],
 }

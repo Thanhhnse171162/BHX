@@ -9,6 +9,7 @@ import { Checkbox } from '@/shared/ui/Checkbox'
 import { useAuth } from '@/shared/hooks/useAuth'
 import { rolePermissions } from '@/shared/auth/permission-map'
 import { authService } from '@/services/auth.service'
+import { getRoleFromId, getRedirectPath, isStaffUser, resolveRole } from '@/shared/utils/role'
 import type { User, UserRole } from '@/shared/types'
 
 export default function LoginPage() {
@@ -27,19 +28,8 @@ export default function LoginPage() {
     router.prefetch('/admin/dashboard')
     router.prefetch('/ops')
     router.prefetch('/customer')
+    router.prefetch('/staff')
   }, [router])
-
-  // Map roleId sang role name
-  const getRoleFromRoleId = useCallback((roleId: number): UserRole => {
-    switch (roleId) {
-      case 1: return 'ADMIN'
-      case 2: return 'STORE_MANAGER'
-      case 3: return 'WAREHOUSE_MANAGER'
-      case 4: return 'STAFF'
-      case 5: return 'CUSTOMER'
-      default: return 'CUSTOMER'
-    }
-  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -79,8 +69,9 @@ export default function LoginPage() {
         throw new Error('Không nhận được token từ server')
       }
 
-      const userRole = getRoleFromRoleId(responseData.roleId || 5)
+      const roleId = responseData.roleId || 4
       const userEmail = responseData.email || emailOrPhone.trim()
+      const userRole = resolveRole(roleId, userEmail)
 
       // Tạo user object và login song song
       const user: User = {
@@ -88,6 +79,7 @@ export default function LoginPage() {
         name: responseData.fullName || responseData.name || 'User',
         email: userEmail,
         role: userRole,
+        roleId: roleId,
         permissions: rolePermissions[userRole as keyof typeof rolePermissions] ?? rolePermissions.CUSTOMER,
         createdAt: responseData.createdAt || new Date().toISOString(),
         updatedAt: responseData.updatedAt || new Date().toISOString(),
@@ -96,13 +88,13 @@ export default function LoginPage() {
       // Update auth state
       login(user, token)
 
-      // Route based on user role (router.push with replace để tránh back)
-      if (userRole === 'ADMIN') {
-        router.replace('/admin/dashboard')
-      } else if (userRole === 'STORE_MANAGER' || userRole === 'WAREHOUSE_MANAGER' || userRole === 'STAFF') {
-        router.replace('/ops')
+      // Kiểm tra nếu là STAFF với email @company.com thì redirect đến /staff
+      if (isStaffUser(roleId, userEmail)) {
+        router.replace('/staff')
       } else {
-        router.replace('/customer')
+        // Sử dụng helper function để redirect
+        const redirectPath = getRedirectPath(userRole)
+        router.replace(redirectPath)
       }
     } catch (err: any) {
       console.error('Login error:', err)
