@@ -1,5 +1,15 @@
 export type UserRole = 'CUSTOMER' | 'STAFF' | 'STORE_MANAGER' | 'WAREHOUSE_MANAGER' | 'ADMIN'
 
+// Role ID mapping theo database IdentityDB
+export const ROLE_ID_MAP: Record<number, UserRole> = {
+  1: 'ADMIN',                    // Admin - System Administrator
+  2: 'WAREHOUSE_MANAGER',        // WareHouse Manager - Manage WareHouse operations
+  3: 'STORE_MANAGER',            // Store Manager - Manage store operations
+  4: 'WAREHOUSE_MANAGER',        // Warehouse Staff - Manage inventory (dùng chung WAREHOUSE_MANAGER)
+  5: 'STAFF',                    // Store Staff - Process sales transactions (STAFF PORTAL)
+  6: 'CUSTOMER',                 // Customer - Online shopping
+}
+
 export type Permission =
   | 'IAM_READ'
   | 'IAM_WRITE'
@@ -28,6 +38,7 @@ export interface User {
   name: string
   email: string
   role: UserRole
+  roleId?: number
   permissions: Permission[]
   storeId?: string
   warehouseId?: string

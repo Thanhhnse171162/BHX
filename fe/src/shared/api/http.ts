@@ -71,9 +71,10 @@ export default axiosInstance
 // ========================================
 // IAM Service Client
 // ========================================
-// Instance riêng cho IAM microservice (http://localhost:5000)
+// Gọi qua Next.js proxy (/iam/*) để tránh CORS
+// next.config.js sẽ rewrite /iam/* -> http://localhost:5000/*
 export const iamClient: AxiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_IAM_URL || 'http://localhost:5000',
+  baseURL: '/iam',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
