@@ -9,7 +9,7 @@ import { Checkbox } from '@/shared/ui/Checkbox'
 import { useAuth } from '@/shared/hooks/useAuth'
 import { rolePermissions } from '@/shared/auth/permission-map'
 import { authService } from '@/services/auth.service'
-import { getRoleFromId, getRedirectPath, isStaffUser, resolveRole } from '@/shared/utils/role'
+import { getRoleFromId, getRedirectPath, isStaffUser, isWarehouseStaffUser, resolveRole } from '@/shared/utils/role'
 import type { User, UserRole } from '@/shared/types'
 
 export default function LoginPage() {
@@ -29,6 +29,7 @@ export default function LoginPage() {
     router.prefetch('/ops')
     router.prefetch('/customer')
     router.prefetch('/staff')
+    router.prefetch('/warehouse')
   }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -88,8 +89,12 @@ export default function LoginPage() {
       // Update auth state
       login(user, token)
 
+      // Kiểm tra nếu là WAREHOUSE_STAFF với email @company.com thì redirect đến /warehouse
+      if (isWarehouseStaffUser(roleId, userEmail)) {
+        router.replace('/warehouse')
+      } 
       // Kiểm tra nếu là STAFF với email @company.com thì redirect đến /staff
-      if (isStaffUser(roleId, userEmail)) {
+      else if (isStaffUser(roleId, userEmail)) {
         router.replace('/staff')
       } else {
         // Sử dụng helper function để redirect

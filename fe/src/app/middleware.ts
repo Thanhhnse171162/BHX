@@ -6,6 +6,7 @@ const protectedPaths = {
   ops: '/ops',
   customer: '/customer',
   staff: '/staff',
+  warehouse: '/warehouse',
 }
 
 const authPaths = ['/login', '/register', '/forgot-password']
@@ -41,6 +42,12 @@ export function middleware(request: NextRequest) {
 
   if (pathname.startsWith(protectedPaths.staff)) {
     if (!token || userRole !== 'STAFF') {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+  }
+
+  if (pathname.startsWith(protectedPaths.warehouse)) {
+    if (!token || userRole !== 'WAREHOUSE_STAFF') {
       return NextResponse.redirect(new URL('/login', request.url))
     }
   }
