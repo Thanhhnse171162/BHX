@@ -29,6 +29,13 @@ export function isStaffUser(roleId: number, email: string): boolean {
 }
 
 /**
+ * Kiểm tra user có phải là warehouse staff không
+ */
+export function isWarehouseStaffUser(roleId: number, email: string): boolean {
+  return roleId === 4 && isCompanyEmail(email)
+}
+
+/**
  * Xác định role thực tế: nếu email không có đuôi @company.com thì chỉ là CUSTOMER
  */
 export function resolveRole(roleId: number, email: string): UserRole {
@@ -46,6 +53,7 @@ export function getRedirectPath(role: UserRole): string {
     ADMIN: '/admin/dashboard',
     STORE_MANAGER: '/ops',
     WAREHOUSE_MANAGER: '/ops',
+    WAREHOUSE_STAFF: '/warehouse',
     STAFF: '/staff',
     CUSTOMER: '/customer',
   }

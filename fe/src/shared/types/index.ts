@@ -1,11 +1,11 @@
-export type UserRole = 'CUSTOMER' | 'STAFF' | 'STORE_MANAGER' | 'WAREHOUSE_MANAGER' | 'ADMIN'
+export type UserRole = 'CUSTOMER' | 'STAFF' | 'STORE_MANAGER' | 'WAREHOUSE_MANAGER' | 'WAREHOUSE_STAFF' | 'ADMIN'
 
 // Role ID mapping theo database IdentityDB
 export const ROLE_ID_MAP: Record<number, UserRole> = {
   1: 'ADMIN',                    // Admin - System Administrator
   2: 'WAREHOUSE_MANAGER',        // WareHouse Manager - Manage WareHouse operations
   3: 'STORE_MANAGER',            // Store Manager - Manage store operations
-  4: 'WAREHOUSE_MANAGER',        // Warehouse Staff - Manage inventory (dùng chung WAREHOUSE_MANAGER)
+  4: 'WAREHOUSE_STAFF',          // Warehouse Staff - Manage inventory
   5: 'STAFF',                    // Store Staff - Process sales transactions (STAFF PORTAL)
   6: 'CUSTOMER',                 // Customer - Online shopping
 }
