@@ -1,4 +1,4 @@
-import { iamClient } from '@/shared/api/http'
+import { localApiClient } from '@/shared/api/http'
 import { iamEndpoints } from '@/shared/api/endpoints'
 
 interface LoginRequest {
@@ -73,11 +73,11 @@ interface ApiErrorResponse {
  */
 export const authService = {
   /**
-   * Login - Đăng nhập qua backend IAM service
+   * Login - Đăng nhập qua local API route (kết nối trực tiếp database)
    */
   login: async (data: LoginRequest): Promise<LoginResponse> => {
     try {
-      const response = await iamClient.post<LoginResponse>(iamEndpoints.auth.login, data)
+      const response = await localApiClient.post<LoginResponse>('/auth/login', data)
       return response.data
     } catch (error: any) {
       const apiError = error.response?.data as ApiErrorResponse
@@ -86,7 +86,7 @@ export const authService = {
   },
 
   /**
-   * Register - Đăng ký tài khoản qua backend IAM service
+   * Register - Đăng ký tài khoản qua local API route
    */
   register: async (data: RegisterRequest): Promise<RegisterResponse> => {
     try {
@@ -100,11 +100,11 @@ export const authService = {
       }
       
       console.log('🔵 Register Request:', {
-        url: iamEndpoints.auth.register,
+        url: '/auth/register',
         payload
       })
       
-      const response = await iamClient.post<RegisterResponse>(iamEndpoints.auth.register, payload)
+      const response = await localApiClient.post<RegisterResponse>('/auth/register', payload)
       
       console.log('✅ Register Response:', response.data)
       return response.data

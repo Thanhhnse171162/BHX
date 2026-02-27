@@ -185,21 +185,6 @@ export const getAdminNavigation = (): NavGroup[] => {
       ],
     },
     {
-      label: 'Giao vận',
-      items: [
-        {
-          label: 'Delivery Management',
-          href: '/admin/delivery',
-          icon: 'Truck',
-        },
-        {
-          label: 'Pickup & Shipping',
-          href: '/admin/delivery/status',
-          icon: 'PackageSearch',
-        },
-      ],
-    },
-    {
       label: 'Báo cáo',
       items: [
         {
@@ -290,7 +275,7 @@ export const getStaffNavigation = (): NavItem[] => {
       icon: 'Clock',
     },
     {
-      label: 'KPI',
+      label: 'My Performance',
       href: '/staff/kpi',
       icon: 'BarChart3',
     },

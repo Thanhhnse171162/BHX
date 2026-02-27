@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDbConnection, executeQuery } from '@/lib/db/config'
-import bcrypt from 'bcryptjs'
-import { rolePermissions } from '@/shared/auth/permission-map'
 
 interface LoginRequest {
   email: string
   password: string
 }
+
+const IDENTITY_SERVICE_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://127.0.0.1:5000'
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,106 +22,33 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Query user from database
-    const emailLower = email.toLowerCase().trim()
-    const query = `
-      SELECT 
-        u.id,
-        u.email,
-        u.password_hash,
-        u.full_name,
-        u.status,
-        u.role_id,
-        r.name as role_name
-      FROM users u
-      LEFT JOIN roles r ON u.role_id = r.id
-      WHERE LOWER(u.email) = @email
-    `
+    console.log('🔍 Forwarding login request to backend:', IDENTITY_SERVICE_URL)
 
-    const users = await executeQuery<{
-      id: string
-      email: string
-      password_hash: string | null
-      full_name: string | null
-      status: string
-      role_id: number
-      role_name: string
-    }>(query, { email: emailLower })
-
-    console.log('🔍 Login attempt:', {
-      email: emailLower,
-      found: users.length > 0,
-      status: users[0]?.status,
-      hasPasswordHash: !!users[0]?.password_hash
+    // Forward request to backend IdentityService
+    const response = await fetch(`${IDENTITY_SERVICE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
     })
 
-    if (users.length === 0) {
-      return NextResponse.json(
-        { 
-          success: false,
-          message: 'Sai tài khoản hoặc mật khẩu. Vui lòng kiểm tra lại.' 
-        },
-        { status: 401 }
-      )
-    }
+    const data = await response.json()
 
-    const user = users[0]
-
-    // Check if user is active
-    if (user.status !== 'ACTIVE') {
-      return NextResponse.json(
-        { 
-          success: false,
-          message: 'Tài khoản đã bị vô hiệu hóa' 
-        },
-        { status: 403 }
-      )
-    }
-
-    // Verify password
-    if (!user.password_hash) {
-      return NextResponse.json(
-        { 
-          success: false,
-          message: 'Tài khoản chưa được thiết lập mật khẩu' 
-        },
-        { status: 401 }
-      )
-    }
-
-    const isValidPassword = await bcrypt.compare(password, user.password_hash)
-    
-    console.log('🔐 Password verification:', {
-      email: user.email,
-      passwordMatch: isValidPassword,
-      passwordLength: password.length
+    console.log('🔐 Backend response:', {
+      status: response.status,
+      success: data.success,
     })
-    
-    if (!isValidPassword) {
-      return NextResponse.json(
-        { 
-          success: false,
-          message: 'Sai tài khoản hoặc mật khẩu. Vui lòng kiểm tra lại.' 
-        },
-        { status: 401 }
-      )
-    }
 
-    // Return user data in BE format
-    return NextResponse.json({
-      success: true,
-      message: 'login successful',
-      data: {
-        id: user.id,
-        accessToken: `Bearer-${user.id}-${Date.now()}`, // TODO: Generate proper JWT
-        fullName: user.full_name || user.email,
-        roleId: user.role_id,
-      }
-    })
+    // Return backend response to client
+    return NextResponse.json(data, { status: response.status })
   } catch (error) {
     console.error('Login error:', error)
     return NextResponse.json(
-      { error: 'Đã xảy ra lỗi khi đăng nhập' },
+      { 
+        success: false,
+        error: 'Không thể kết nối đến server. Vui lòng thử lại sau.' 
+      },
       { status: 500 }
     )
   }

@@ -1,5 +1,5 @@
 /**
- * Script để reset password cho admin
+ * Script để reset password cho cashier
  * Chạy: node scripts/reset-admin-password.js
  */
 
@@ -24,9 +24,9 @@ async function resetAdminPassword() {
     await sql.connect(config);
     console.log('✅ Connected to database');
 
-    // Password mới
-    const newPassword = 'Password123!';
-    const email = 'admin@company.com';
+    // Password mới cho Cashier
+    const newPassword = 'Cashier123!';
+    const email = 'cashier1@company.com';
 
     // Hash password
     console.log('🔐 Hashing password...');
@@ -47,7 +47,7 @@ async function resetAdminPassword() {
     // Verify
     console.log('🔍 Verifying...');
     const user = await sql.query`
-      SELECT email, password_hash FROM users 
+      SELECT email, password_hash, full_name, role_id FROM users 
       WHERE LOWER(email) = ${email.toLowerCase()}
     `;
 
@@ -57,8 +57,10 @@ async function resetAdminPassword() {
       
       if (isValid) {
         console.log('\n🎉 Password đã được reset thành công!');
+        console.log('� Họ tên:', user.recordset[0].full_name);
         console.log('📧 Email:', email);
         console.log('🔑 Password:', newPassword);
+        console.log('🏷️  Role ID:', user.recordset[0].role_id);
       }
     }
 

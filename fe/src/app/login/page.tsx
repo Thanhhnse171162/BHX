@@ -121,7 +121,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex">
       {/* Left Panel - Brand Section */}
       <div 
-        className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-[#4a8e34] via-[#5a9e3e] to-[#6db84d]"
+        className="hidden lg:flex lg:w-1/2 relative overflow-hidden"
         style={{
           backgroundImage: 'url(/backgrpng.png)',
           backgroundSize: 'cover',
@@ -130,7 +130,7 @@ export default function LoginPage() {
         }}
       >
         {/* Overlay để làm tối background image một chút */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#4a8e34]/70 via-[#5a9e3e]/70 to-[#6db84d]/70" />
+        <div className="absolute inset-0" />
         
         {/* Decorative Background Elements */}
         <div className="absolute inset-0 opacity-10">

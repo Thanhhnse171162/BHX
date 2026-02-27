@@ -1,7 +1,7 @@
 'use client'
 
-import InventoryLogsPage from '@/app/(admin)/inventory-admin/logs/page'
+import InventoryOverviewPage from '@/app/(admin)/inventory-admin/page'
 
 export default function OpsInventoryAlias() {
-  return <InventoryLogsPage />
+  return <InventoryOverviewPage />
 }

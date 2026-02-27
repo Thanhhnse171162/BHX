@@ -136,3 +136,39 @@ iamClient.interceptors.response.use(
     return Promise.reject(error)
   }
 )
+
+// ========================================
+// Local API Client (Next.js API Routes)
+// ========================================
+export const localApiClient: AxiosInstance = axios.create({
+  baseURL: '/api',
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+// Request interceptor cho local API client
+localApiClient.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem(process.env.NEXT_PUBLIC_TOKEN_KEY || 'auth_token')
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`
+      }
+    }
+    return config
+  },
+  (error: AxiosError) => {
+    return Promise.reject(error)
+  }
+)
+
+// Response interceptor cho local API client
+localApiClient.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError) => {
+    return Promise.reject(error)
+  }
+)
+
