@@ -1,45 +1,71 @@
 'use client'
 
-import { useState } from 'react'
-import { Search, Download } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/shared/ui/Button'
 import { Input } from '@/shared/ui/Input'
-
-// Mock data
-const inventoryData = [
-  { id: 1, name: 'Apple Fuji', sku: 'APL123', category: 'Fresh Produce', quantity: 150, unit: 'kg', status: 'in-stock', lastUpdated: '2024-02-25' },
-  { id: 2, name: 'Instant Noodles', sku: 'NDL456', category: 'Dry Goods', quantity: 20, unit: 'boxes', status: 'low-stock', lastUpdated: '2024-02-24' },
-  { id: 3, name: 'Fresh Milk 1L', sku: 'MLK789', category: 'Dairy', quantity: 0, unit: 'liters', status: 'out-of-stock', lastUpdated: '2024-02-23' },
-  { id: 4, name: 'Bottled Water 500ml', sku: 'WTR555', category: 'Beverages', quantity: 500, unit: 'bottles', status: 'in-stock', lastUpdated: '2024-02-26' },
-  { id: 5, name: 'Cooking Oil 1L', sku: 'OIL678', category: 'Cooking Essentials', quantity: 75, unit: 'liters', status: 'in-stock', lastUpdated: '2024-02-25' },
-  { id: 6, name: 'Rice 5kg', sku: 'RIC901', category: 'Dry Goods', quantity: 120, unit: 'bags', status: 'in-stock', lastUpdated: '2024-02-26' },
-  { id: 7, name: 'Eggs Pack', sku: 'EGG234', category: 'Dairy', quantity: 8, unit: 'cartons', status: 'low-stock', lastUpdated: '2024-02-24' },
-  { id: 8, name: 'Sugar 1kg', sku: 'SUG567', category: 'Cooking Essentials', quantity: 15, unit: 'kg', status: 'low-stock', lastUpdated: '2024-02-25' }
-]
+import { inventoryData } from '@/data/inventory-data'
 
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'in-stock' | 'low-stock' | 'out-of-stock'>('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
-  const filteredInventory = inventoryData.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.sku.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesFilter = filterStatus === 'all' || item.status === filterStatus
-    return matchesSearch && matchesFilter
-  })
+  const filteredInventory = useMemo(() => {
+    return inventoryData.filter(item => {
+      const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           item.sku.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesFilter = filterStatus === 'all' || item.status === filterStatus
+      return matchesSearch && matchesFilter
+    })
+  }, [searchTerm, filterStatus])
+
+  // Pagination
+  const totalPages = Math.ceil(filteredInventory.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedInventory = filteredInventory.slice(startIndex, endIndex)
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, filterStatus])
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Inventory List</h1>
-          <p className="text-gray-600 mt-1">Manage and track all warehouse inventory</p>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Inventory List</h1>
+        <p className="text-gray-600 mt-1">Manage and track all warehouse inventory</p>
+      </div>
+
+      {/* Summary */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="text-center">
+            <p className="text-gray-600 text-sm mb-1">Total Items</p>
+            <p className="text-2xl font-bold text-gray-900">{inventoryData.length}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-gray-600 text-sm mb-1">In Stock</p>
+            <p className="text-2xl font-bold text-green-600">
+              {inventoryData.filter(i => i.status === 'in-stock').length}
+            </p>
+          </div>
+          <div className="text-center">
+            <p className="text-gray-600 text-sm mb-1">Low Stock</p>
+            <p className="text-2xl font-bold text-orange-600">
+              {inventoryData.filter(i => i.status === 'low-stock').length}
+            </p>
+          </div>
+          <div className="text-center">
+            <p className="text-gray-600 text-sm mb-1">Out of Stock</p>
+            <p className="text-2xl font-bold text-red-600">
+              {inventoryData.filter(i => i.status === 'out-of-stock').length}
+            </p>
+          </div>
         </div>
-        <Button className="bg-[#2d6e3e] hover:bg-[#255931] flex items-center gap-2">
-          <Download size={18} />
-          Export
-        </Button>
       </div>
 
       {/* Filters */}
@@ -108,7 +134,7 @@ export default function InventoryPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredInventory.map((item) => (
+              {paginatedInventory.map((item) => (
                 <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="py-4 px-6 font-medium text-gray-900">{item.name}</td>
                   <td className="py-4 px-6 text-gray-600">{item.sku}</td>
@@ -141,34 +167,77 @@ export default function InventoryPage() {
             </tbody>
           </table>
         </div>
-      </div>
 
-      {/* Summary */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center">
-            <p className="text-gray-600 text-sm mb-1">Total Items</p>
-            <p className="text-2xl font-bold text-gray-900">{inventoryData.length}</p>
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between">
+              {/* Pagination Info */}
+              <div className="text-sm text-gray-600">
+                Showing <span className="font-medium text-gray-900">{startIndex + 1}</span> to{' '}
+                <span className="font-medium text-gray-900">{Math.min(endIndex, filteredInventory.length)}</span> of{' '}
+                <span className="font-medium text-gray-900">{filteredInventory.length}</span> items
+              </div>
+
+              {/* Pagination Buttons */}
+              <div className="flex items-center gap-2">
+                {/* Previous Button */}
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className={`p-2 rounded-lg border transition-colors ${
+                    currentPage === 1
+                      ? 'border-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <ChevronLeft size={20} />
+                </button>
+
+                {/* Page Numbers */}
+                <div className="flex gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    if (
+                      page === 1 ||
+                      page === totalPages ||
+                      (page >= currentPage - 1 && page <= currentPage + 1)
+                    ) {
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                            currentPage === page
+                              ? 'bg-[#2d6e3e] text-white'
+                              : 'text-gray-700 hover:bg-gray-100 border border-gray-300'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      )
+                    } else if (page === currentPage - 2 || page === currentPage + 2) {
+                      return <span key={page} className="px-2 text-gray-400">...</span>
+                    }
+                    return null
+                  })}
+                </div>
+
+                {/* Next Button */}
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`p-2 rounded-lg border transition-colors ${
+                    currentPage === totalPages
+                      ? 'border-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            </div>
           </div>
-          <div className="text-center">
-            <p className="text-gray-600 text-sm mb-1">In Stock</p>
-            <p className="text-2xl font-bold text-green-600">
-              {inventoryData.filter(i => i.status === 'in-stock').length}
-            </p>
-          </div>
-          <div className="text-center">
-            <p className="text-gray-600 text-sm mb-1">Low Stock</p>
-            <p className="text-2xl font-bold text-orange-600">
-              {inventoryData.filter(i => i.status === 'low-stock').length}
-            </p>
-          </div>
-          <div className="text-center">
-            <p className="text-gray-600 text-sm mb-1">Out of Stock</p>
-            <p className="text-2xl font-bold text-red-600">
-              {inventoryData.filter(i => i.status === 'out-of-stock').length}
-            </p>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   )

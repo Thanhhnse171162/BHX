@@ -1,4 +1,4 @@
-import { localApiClient } from '@/shared/api/http'
+import { localApiClient, iamClient } from '@/shared/api/http'
 import { iamEndpoints } from '@/shared/api/endpoints'
 
 interface LoginRequest {
