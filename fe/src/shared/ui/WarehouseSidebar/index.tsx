@@ -8,8 +8,8 @@ import {
   List, 
   AlertTriangle, 
   ClipboardCheck,
-  Users,
-  ArrowDownUp
+  ArrowDownUp,
+  XCircle
 } from 'lucide-react'
 
 interface SidebarItem {
@@ -40,14 +40,14 @@ const sidebarItems: SidebarItem[] = [
     icon: <AlertTriangle size={20} />
   },
   {
+    label: 'Out of Stock',
+    href: '/warehouse/out-of-stock',
+    icon: <XCircle size={20} />
+  },
+  {
     label: 'Inventory Checks',
     href: '/warehouse/checks',
     icon: <ClipboardCheck size={20} />
-  },
-  {
-    label: 'Staff Attendance',
-    href: '/warehouse/attendance',
-    icon: <Users size={20} />
   }
 ]
 

@@ -30,14 +30,13 @@ export function Providers({ children }: { children: ReactNode }) {
     setMounted(true)
   }, [setHydrated])
 
-  // Prevent hydration mismatch by not rendering until mounted
-  if (!mounted) {
-    return null
-  }
-
   return (
     <QueryClientProvider client={queryClient}>
-      {children}
+      {mounted ? children : (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2d6e3e]"></div>
+        </div>
+      )}
     </QueryClientProvider>
   )
 }
