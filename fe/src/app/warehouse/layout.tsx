@@ -3,7 +3,7 @@
 import { useAuth } from '@/shared/hooks/useAuth'
 import { WarehouseSidebar } from '@/shared/ui/WarehouseSidebar'
 import { WarehouseHeader } from '@/shared/ui/WarehouseHeader'
-import { redirect } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 
 export default function WarehouseLayout({
@@ -12,19 +12,22 @@ export default function WarehouseLayout({
   children: React.ReactNode
 }) {
   const { user, isAuthenticated, isLoading } = useAuth()
+  const router = useRouter()
 
   useEffect(() => {
     if (!isLoading) {
       if (!isAuthenticated) {
-        redirect('/login')
+        router.push('/login')
+        return
       }
       
       // Kiểm tra role_id phải là 4 (Warehouse Staff) và email có @company.com
       if (user && (user.roleId !== 4 || !user.email?.endsWith('@company.com'))) {
-        redirect('/')
+        router.push('/')
+        return
       }
     }
-  }, [isAuthenticated, isLoading, user])
+  }, [isAuthenticated, isLoading, user, router])
 
   if (isLoading) {
     return (

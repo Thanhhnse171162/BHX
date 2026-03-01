@@ -97,7 +97,7 @@ export default function InventoryPage() {
             <Button
               variant={filterStatus === 'in-stock' ? 'primary' : 'outline'}
               onClick={() => setFilterStatus('in-stock')}
-              className={filterStatus === 'in-stock' ? 'bg-green-600' : ''}
+              className={filterStatus === 'in-stock' ? 'bg-[#2d6e3e]' : ''}
             >
               In Stock
             </Button>

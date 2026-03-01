@@ -72,50 +72,58 @@ export default function WarehouseDashboard() {
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Products */}
-        <div className="bg-gradient-to-br from-teal-500 to-teal-600 rounded-xl p-6 text-white shadow-lg">
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-[#2d6e3e] p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-teal-100 text-sm font-medium mb-1">Total Products</p>
-              <p className="text-xs text-teal-100 mb-2">Tổng số loại sản phẩm (SKU)</p>
-              <p className="text-4xl font-bold">{statsData.totalProducts}</p>
+              <p className="text-gray-600 text-sm font-medium mb-1">Total Products</p>
+              <p className="text-xs text-gray-500 mb-2">Tổng số loại sản phẩm (SKU)</p>
+              <p className="text-3xl font-bold text-gray-900">{statsData.totalProducts}</p>
             </div>
-            <Package size={48} className="opacity-80" />
+            <div className="w-14 h-14 bg-[#e8f5e9] rounded-xl flex items-center justify-center">
+              <Package className="text-[#2d6e3e]" size={28} />
+            </div>
           </div>
         </div>
 
         {/* Products In Stock */}
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg">
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-green-600 p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-green-100 text-sm font-medium mb-1">Products In Stock</p>
-              <p className="text-xs text-green-100 mb-2">Số loại còn hàng (bao gồm sắp hết)</p>
-              <p className="text-4xl font-bold">{statsData.inStockCount}</p>
+              <p className="text-gray-600 text-sm font-medium mb-1">Products In Stock</p>
+              <p className="text-xs text-gray-500 mb-2">Số loại còn hàng (bao gồm sắp hết)</p>
+              <p className="text-3xl font-bold text-green-600">{statsData.inStockCount}</p>
             </div>
-            <CheckCircle size={48} className="opacity-80" />
+            <div className="w-14 h-14 bg-green-50 rounded-xl flex items-center justify-center">
+              <CheckCircle className="text-green-600" size={28} />
+            </div>
           </div>
         </div>
 
         {/* Low Stock Items */}
-        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white shadow-lg">
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-orange-600 p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-orange-100 text-sm font-medium mb-1">Low Stock Alerts</p>
-              <p className="text-xs text-orange-100 mb-2">Số loại sắp hết (trong {statsData.inStockCount} loại còn hàng)</p>
-              <p className="text-4xl font-bold">{statsData.lowStockCount}</p>
+              <p className="text-gray-600 text-sm font-medium mb-1">Low Stock Alerts</p>
+              <p className="text-xs text-gray-500 mb-2">Số loại sắp hết (trong {statsData.inStockCount} loại còn hàng)</p>
+              <p className="text-3xl font-bold text-orange-600">{statsData.lowStockCount}</p>
             </div>
-            <AlertTriangle size={48} className="opacity-80" />
+            <div className="w-14 h-14 bg-orange-50 rounded-xl flex items-center justify-center">
+              <AlertTriangle className="text-orange-600" size={28} />
+            </div>
           </div>
         </div>
 
         {/* Out of Stock */}
-        <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white shadow-lg">
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-red-600 p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-red-100 text-sm font-medium mb-1">Out of Stock</p>
-              <p className="text-xs text-red-100 mb-2">Số loại hết hàng hoàn toàn</p>
-              <p className="text-4xl font-bold">{statsData.outOfStockCount}</p>
+              <p className="text-gray-600 text-sm font-medium mb-1">Out of Stock</p>
+              <p className="text-xs text-gray-500 mb-2">Số loại hết hàng hoàn toàn</p>
+              <p className="text-3xl font-bold text-red-600">{statsData.outOfStockCount}</p>
             </div>
-            <XCircle size={48} className="opacity-80" />
+            <div className="w-14 h-14 bg-red-50 rounded-xl flex items-center justify-center">
+              <XCircle className="text-red-600" size={28} />
+            </div>
           </div>
         </div>
       </div>

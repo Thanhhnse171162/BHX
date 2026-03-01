@@ -61,8 +61,8 @@ export default function OutOfStockPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg">
-            <XCircle className="text-white" size={24} />
+          <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+            <XCircle className="text-red-600" size={24} />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Out of Stock Items</h1>

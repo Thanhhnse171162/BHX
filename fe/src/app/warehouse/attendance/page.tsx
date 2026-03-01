@@ -89,53 +89,63 @@ export default function AttendancePage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-gray-400 p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm mb-1">Total Staff</p>
+              <p className="text-gray-600 text-sm font-medium mb-1">Total Staff</p>
               <p className="text-3xl font-bold text-gray-900">{stats.totalStaff}</p>
             </div>
-            <Users className="text-gray-400" size={36} />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm mb-1">Check-ins</p>
-              <p className="text-3xl font-bold text-green-600">{stats.present}</p>
+            <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center">
+              <Users className="text-gray-600" size={24} />
             </div>
-            <UserCheck className="text-green-500" size={36} />
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-[#2d6e3e] p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm mb-1">Check-outs</p>
+              <p className="text-gray-600 text-sm font-medium mb-1">Check-ins</p>
+              <p className="text-3xl font-bold text-[#2d6e3e]">{stats.present}</p>
+            </div>
+            <div className="w-12 h-12 bg-[#e8f5e9] rounded-xl flex items-center justify-center">
+              <UserCheck className="text-[#2d6e3e]" size={24} />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-green-600 p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm font-medium mb-1">Check-outs</p>
               <p className="text-3xl font-bold text-green-600">{stats.present - 1}</p>
             </div>
-            <UserCheck className="text-green-500" size={36} />
+            <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
+              <UserCheck className="text-green-600" size={24} />
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-red-600 p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm mb-1">Absent</p>
+              <p className="text-gray-600 text-sm font-medium mb-1">Absent</p>
               <p className="text-3xl font-bold text-red-600">{stats.absent}</p>
             </div>
-            <UserX className="text-red-500" size={36} />
+            <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center">
+              <UserX className="text-red-600" size={24} />
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-blue-600 p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm mb-1">Avg. Hours</p>
+              <p className="text-gray-600 text-sm font-medium mb-1">Avg. Hours</p>
               <p className="text-3xl font-bold text-blue-600">{stats.avgHoursWorked}</p>
             </div>
-            <Clock className="text-blue-500" size={36} />
+            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+              <Clock className="text-blue-600" size={24} />
+            </div>
           </div>
         </div>
       </div>

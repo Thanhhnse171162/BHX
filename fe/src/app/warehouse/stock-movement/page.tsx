@@ -1,145 +1,268 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { ArrowDownUp, TrendingUp, TrendingDown, Search, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { 
+  ArrowDownUp, 
+  TrendingUp, 
+  TrendingDown, 
+  Search, 
+  Filter,
+  Plus,
+  Eye,
+  CheckCircle,
+  Clock,
+  XCircle,
+  X,
+  FileText,
+  Upload,
+  Download
+} from 'lucide-react'
 import { Button } from '@/shared/ui/Button'
 import { Input } from '@/shared/ui/Input'
+import type { MovementStatus, MovementTypeCode } from '@/shared/types/warehouse.types'
 
-// Mock data - 15 years of historical transactions (2011-2026)
-const stockMovements = [
-  // 2026 (Recent)
-  { id: 1, type: 'in', product: 'Fresh Milk 1L', sku: 'MLK789', quantity: 200, unit: 'liters', date: '2026-02-26', time: '10:30', reason: 'Supplier Delivery', staff: 'Nguyen Van A', notes: 'Morning delivery from supplier ABC' },
-  { id: 2, type: 'out', product: 'Bottled Water 500ml', sku: 'WTR555', quantity: 50, unit: 'bottles', date: '2026-02-25', time: '14:20', reason: 'Store Transfer', staff: 'Tran Thi B', notes: 'Transfer to Store Branch 01' },
-  { id: 3, type: 'in', product: 'Cooking Oil 1L', sku: 'OIL678', quantity: 100, unit: 'liters', date: '2026-02-20', time: '09:15', reason: 'Supplier Delivery', staff: 'Le Van C', notes: 'Regular weekly delivery' },
-  { id: 4, type: 'in', product: 'Rice 5kg', sku: 'RIC901', quantity: 150, unit: 'bags', date: '2026-01-15', time: '11:00', reason: 'Purchase Order', staff: 'Nguyen Van A', notes: 'New stock arrival' },
-  { id: 5, type: 'out', product: 'Apple Fuji', sku: 'APL123', quantity: 30, unit: 'kg', date: '2026-01-10', time: '16:45', reason: 'Damaged Items', staff: 'Pham Thi D', notes: 'Items damaged during storage' },
-  
-  // 2025
-  { id: 6, type: 'in', product: 'Sugar 1kg', sku: 'SGR234', quantity: 80, unit: 'kg', date: '2025-12-10', time: '08:00', reason: 'Supplier Delivery', staff: 'Le Van C', notes: 'Year-end stock' },
-  { id: 7, type: 'out', product: 'Instant Noodles', sku: 'NDL456', quantity: 120, unit: 'boxes', date: '2025-10-05', time: '13:30', reason: 'Customer Order', staff: 'Tran Thi B', notes: 'Large bulk order' },
-  { id: 8, type: 'in', product: 'Eggs', sku: 'EGG345', quantity: 200, unit: 'cartons', date: '2025-08-22', time: '07:30', reason: 'Supplier Delivery', staff: 'Nguyen Van A', notes: 'Fresh morning delivery' },
-  { id: 9, type: 'out', product: 'Cooking Oil 1L', sku: 'OIL678', quantity: 45, unit: 'liters', date: '2025-06-15', time: '15:00', reason: 'Store Transfer', staff: 'Pham Thi D', notes: 'Branch 02 transfer' },
-  { id: 10, type: 'in', product: 'Bottled Water 500ml', sku: 'WTR555', quantity: 500, unit: 'bottles', date: '2025-04-08', time: '10:00', reason: 'Purchase Order', staff: 'Le Van C', notes: 'Summer preparation' },
-  
-  // 2024
-  { id: 11, type: 'out', product: 'Fresh Milk 1L', sku: 'MLK789', quantity: 30, unit: 'liters', date: '2024-11-20', time: '09:45', reason: 'Expired Items', staff: 'Tran Thi B', notes: 'Past expiration' },
-  { id: 12, type: 'in', product: 'Rice 5kg', sku: 'RIC901', quantity: 300, unit: 'bags', date: '2024-09-10', time: '14:15', reason: 'Supplier Delivery', staff: 'Nguyen Van A', notes: 'Large shipment' },
-  { id: 13, type: 'in', product: 'Apple Fuji', sku: 'APL123', quantity: 100, unit: 'kg', date: '2024-07-05', time: '08:30', reason: 'Supplier Delivery', staff: 'Le Van C', notes: 'Harvest season' },
-  { id: 14, type: 'out', product: 'Sugar 1kg', sku: 'SGR234', quantity: 60, unit: 'kg', date: '2024-05-18', time: '11:20', reason: 'Store Transfer', staff: 'Pham Thi D', notes: 'Branch 03 restocking' },
-  
-  // 2023
-  { id: 15, type: 'in', product: 'Instant Noodles', sku: 'NDL456', quantity: 200, unit: 'boxes', date: '2023-12-12', time: '09:00', reason: 'Purchase Order', staff: 'Nguyen Van A', notes: 'Popular item restock' },
-  { id: 16, type: 'out', product: 'Eggs', sku: 'EGG345', quantity: 50, unit: 'cartons', date: '2023-10-20', time: '16:00', reason: 'Customer Order', staff: 'Tran Thi B', notes: 'Wholesale order' },
-  { id: 17, type: 'in', product: 'Cooking Oil 1L', sku: 'OIL678', quantity: 150, unit: 'liters', date: '2023-08-08', time: '10:45', reason: 'Supplier Delivery', staff: 'Le Van C', notes: 'Regular supply' },
-  { id: 18, type: 'out', product: 'Rice 5kg', sku: 'RIC901', quantity: 80, unit: 'bags', date: '2023-06-15', time: '14:30', reason: 'Damaged Items', staff: 'Pham Thi D', notes: 'Water damage' },
-  
-  // 2022
-  { id: 19, type: 'in', product: 'Bottled Water 500ml', sku: 'WTR555', quantity: 300, unit: 'bottles', date: '2022-11-25', time: '08:15', reason: 'Purchase Order', staff: 'Nguyen Van A', notes: 'Year-end stock up' },
-  { id: 20, type: 'out', product: 'Fresh Milk 1L', sku: 'MLK789', quantity: 25, unit: 'liters', date: '2022-09-10', time: '12:00', reason: 'Expired Items', staff: 'Tran Thi B', notes: 'Expiration clearance' },
-  { id: 21, type: 'in', product: 'Sugar 1kg', sku: 'SGR234', quantity: 120, unit: 'kg', date: '2022-07-18', time: '09:30', reason: 'Supplier Delivery', staff: 'Le Van C', notes: 'Mid-year supply' },
-  
-  // 2021
-  { id: 22, type: 'in', product: 'Apple Fuji', sku: 'APL123', quantity: 75, unit: 'kg', date: '2021-10-20', time: '07:45', reason: 'Supplier Delivery', staff: 'Nguyen Van A', notes: 'Fall harvest' },
-  { id: 23, type: 'out', product: 'Instant Noodles', sku: 'NDL456', quantity: 100, unit: 'boxes', date: '2021-08-12', time: '15:20', reason: 'Store Transfer', staff: 'Pham Thi D', notes: 'New branch opening' },
-  { id: 24, type: 'in', product: 'Rice 5kg', sku: 'RIC901', quantity: 200, unit: 'bags', date: '2021-05-05', time: '11:30', reason: 'Purchase Order', staff: 'Le Van C', notes: 'Bulk discount purchase' },
-  
-  // 2020
-  { id: 25, type: 'in', product: 'Eggs', sku: 'EGG345', quantity: 150, unit: 'cartons', date: '2020-12-22', time: '06:50', reason: 'Supplier Delivery', staff: 'Nguyen Van A', notes: 'Holiday season stock' },
-  { id: 26, type: 'out', product: 'Cooking Oil 1L', sku: 'OIL678', quantity: 35, unit: 'liters', date: '2020-09-08', time: '13:45', reason: 'Customer Order', staff: 'Tran Thi B', notes: 'Corporate order' },
-  
-  // 2019
-  { id: 27, type: 'in', product: 'Bottled Water 500ml', sku: 'WTR555', quantity: 250, unit: 'bottles', date: '2019-11-15', time: '10:20', reason: 'Supplier Delivery', staff: 'Le Van C', notes: 'Regular delivery' },
-  { id: 28, type: 'in', product: 'Fresh Milk 1L', sku: 'MLK789', quantity: 180, unit: 'liters', date: '2019-08-30', time: '07:15', reason: 'Supplier Delivery', staff: 'Nguyen Van A', notes: 'Fresh dairy delivery' },
-  
-  // 2018
-  { id: 29, type: 'out', product: 'Sugar 1kg', sku: 'SGR234', quantity: 40, unit: 'kg', date: '2018-10-14', time: '14:00', reason: 'Store Transfer', staff: 'Pham Thi D', notes: 'Store restocking' },
-  { id: 30, type: 'in', product: 'Rice 5kg', sku: 'RIC901', quantity: 180, unit: 'bags', date: '2018-07-03', time: '09:40', reason: 'Purchase Order', staff: 'Le Van C', notes: 'Summer restock' },
-  
-  // 2017-2016
-  { id: 31, type: 'in', product: 'Apple Fuji', sku: 'APL123', quantity: 90, unit: 'kg', date: '2017-12-12', time: '08:20', reason: 'Supplier Delivery', staff: 'Nguyen Van A', notes: 'Year-end delivery' },
-  { id: 32, type: 'out', product: 'Instant Noodles', sku: 'NDL456', quantity: 85, unit: 'boxes', date: '2017-09-25', time: '15:30', reason: 'Customer Order', staff: 'Tran Thi B', notes: 'Large order' },
-  { id: 33, type: 'in', product: 'Eggs', sku: 'EGG345', quantity: 140, unit: 'cartons', date: '2016-11-08', time: '07:00', reason: 'Supplier Delivery', staff: 'Le Van C', notes: 'Morning delivery' },
-  { id: 34, type: 'in', product: 'Cooking Oil 1L', sku: 'OIL678', quantity: 130, unit: 'liters', date: '2016-08-18', time: '10:15', reason: 'Purchase Order', staff: 'Nguyen Van A', notes: 'Quarterly stock' },
-  
-  // 2015-2014
-  { id: 35, type: 'out', product: 'Bottled Water 500ml', sku: 'WTR555', quantity: 60, unit: 'bottles', date: '2015-10-30', time: '12:45', reason: 'Store Transfer', staff: 'Pham Thi D', notes: 'Branch transfer' },
-  { id: 36, type: 'in', product: 'Fresh Milk 1L', sku: 'MLK789', quantity: 170, unit: 'liters', date: '2015-07-20', time: '07:30', reason: 'Supplier Delivery', staff: 'Le Van C', notes: 'Summer supply' },
-  { id: 37, type: 'in', product: 'Sugar 1kg', sku: 'SGR234', quantity: 110, unit: 'kg', date: '2014-12-05', time: '09:00', reason: 'Purchase Order', staff: 'Nguyen Van A', notes: 'End of year stock' },
-  { id: 38, type: 'out', product: 'Rice 5kg', sku: 'RIC901', quantity: 70, unit: 'bags', date: '2014-09-15', time: '14:20', reason: 'Customer Order', staff: 'Tran Thi B', notes: 'Customer bulk order' },
-  
-  // 2013-2012
-  { id: 39, type: 'in', product: 'Apple Fuji', sku: 'APL123', quantity: 85, unit: 'kg', date: '2013-11-22', time: '08:40', reason: 'Supplier Delivery', staff: 'Le Van C', notes: 'Late season harvest' },
-  { id: 40, type: 'in', product: 'Instant Noodles', sku: 'NDL456', quantity: 190, unit: 'boxes', date: '2013-08-10', time: '10:30', reason: 'Supplier Delivery', staff: 'Nguyen Van A', notes: 'Regular supply' },
-  { id: 41, type: 'out', product: 'Eggs', sku: 'EGG345', quantity: 45, unit: 'cartons', date: '2012-10-18', time: '13:15', reason: 'Store Transfer', staff: 'Pham Thi D', notes: 'Store restocking' },
-  { id: 42, type: 'in', product: 'Cooking Oil 1L', sku: 'OIL678', quantity: 140, unit: 'liters', date: '2012-07-25', time: '09:20', reason: 'Purchase Order', staff: 'Le Van C', notes: 'Mid-year purchase' },
-  
-  // 2011 (Early history)
-  { id: 43, type: 'in', product: 'Bottled Water 500ml', sku: 'WTR555', quantity: 220, unit: 'bottles', date: '2011-12-15', time: '08:30', reason: 'Supplier Delivery', staff: 'Nguyen Van A', notes: 'Initial warehouse setup' },
-  { id: 44, type: 'in', product: 'Fresh Milk 1L', sku: 'MLK789', quantity: 160, unit: 'liters', date: '2011-11-03', time: '07:45', reason: 'Supplier Delivery', staff: 'Le Van C', notes: 'Opening inventory' },
-  { id: 45, type: 'in', product: 'Rice 5kg', sku: 'RIC901', quantity: 180, unit: 'bags', date: '2011-11-03', time: '09:00', reason: 'Purchase Order', staff: 'Nguyen Van A', notes: 'Initial warehouse stocking' }
+// Enterprise-level stock movements with approval workflow
+const mockStockMovements = [
+  { 
+    id: 1, 
+    movementNumber: 'SM-20260301-00001',
+    type: 'PURCHASE' as MovementTypeCode, 
+    status: 'APPROVED' as MovementStatus,
+    product: 'Fresh Milk 1L', 
+    sku: 'MLK789', 
+    quantity: 200, 
+    unit: 'liters', 
+    date: '2026-03-01', 
+    time: '10:30',
+    poNumber: 'PO-20260225-001',
+    supplier: 'Vinamilk JSC',
+    totalValue: 18000000,
+    createdBy: 'Nguyen Van A',
+    approvedBy: 'Manager Tran B',
+    hasAttachment: true
+  },
+  { 
+    id: 2, 
+    movementNumber: 'SM-20260228-00015',
+    type: 'TRANSFER_OUT' as MovementTypeCode, 
+    status: 'COMPLETED' as MovementStatus,
+    product: 'Bottled Water 500ml', 
+    sku: 'WTR555', 
+    quantity: 50, 
+    unit: 'bottles', 
+    date: '2026-02-28', 
+    time: '14:20',
+    transferTo: 'Store Branch 01',
+    totalValue: 250000,
+    createdBy: 'Tran Thi B',
+    approvedBy: 'Manager Le C',
+    hasAttachment: false
+  },
+  { 
+    id: 3, 
+    movementNumber: 'SM-20260228-00014',
+    type: 'TRANSFER_IN' as MovementTypeCode, 
+    status: 'PENDING_APPROVAL' as MovementStatus,
+    product: 'Rice 5kg', 
+    sku: 'RIC901', 
+    quantity: 100, 
+    unit: 'bags', 
+    date: '2026-02-28', 
+    time: '09:15',
+    transferFrom: 'Central Warehouse',
+    totalValue: 3500000,
+    createdBy: 'Le Van C',
+    approvedBy: null,
+    hasAttachment: true
+  },
+  { 
+    id: 4, 
+    movementNumber: 'SM-20260227-00008',
+    type: 'DAMAGE' as MovementTypeCode, 
+    status: 'APPROVED' as MovementStatus,
+    product: 'Apple Fuji', 
+    sku: 'APL123', 
+    quantity: 30, 
+    unit: 'kg', 
+    date: '2026-02-27', 
+    time: '16:45',
+    reason: 'Physical damage during handling',
+    totalValue: -900000,
+    createdBy: 'Pham Thi D',
+    approvedBy: 'Manager Tran B',
+    hasAttachment: true
+  },
+  { 
+    id: 5, 
+    movementNumber: 'SM-20260227-00007',
+    type: 'EXPIRED' as MovementTypeCode, 
+    status: 'PENDING_APPROVAL' as MovementStatus,
+    product: 'Fresh Milk 1L', 
+    sku: 'MLK789', 
+    quantity: 15, 
+    unit: 'liters', 
+    date: '2026-02-27', 
+    time: '08:00',
+    batchNumber: 'BATCH-20260115',
+    expiryDate: '2026-02-26',
+    totalValue: -1350000,
+    createdBy: 'Nguyen Van A',
+    approvedBy: null,
+    hasAttachment: false
+  },
+  { 
+    id: 6, 
+    movementNumber: 'SM-20260226-00003',
+    type: 'ADJUSTMENT' as MovementTypeCode, 
+    status: 'CREATED' as MovementStatus,
+    product: 'Cooking Oil 1L', 
+    sku: 'OIL678', 
+    quantity: -5, 
+    unit: 'liters', 
+    date: '2026-02-26', 
+    time: '15:30',
+    reason: 'Cycle count variance',
+    checkNumber: 'IC-20260226-001',
+    totalValue: -175000,
+    createdBy: 'Le Van C',
+    approvedBy: null,
+    hasAttachment: false
+  },
+  { 
+    id: 7, 
+    movementNumber: 'SM-20260226-00002',
+    type: 'PURCHASE' as MovementTypeCode, 
+    status: 'REJECTED' as MovementStatus,
+    product: 'Sugar 1kg', 
+    sku: 'SGR234', 
+    quantity: 200, 
+    unit: 'kg', 
+    date: '2026-02-26', 
+    time: '10:00',
+    poNumber: 'PO-20260220-005',
+    supplier: 'Thai Roosmalt Co.',
+    totalValue: 4000000,
+    createdBy: 'Pham Thi D',
+    approvedBy: null,
+    rejectionReason: 'Incorrect PO reference',
+    hasAttachment: false
+  },
 ]
+
+const movementTypeLabels: Record<MovementTypeCode, { label: string; color: string; icon: JSX.Element }> = {
+  PURCHASE: { label: 'Purchase', color: 'blue', icon: <TrendingUp size={16} /> },
+  TRANSFER_IN: { label: 'Transfer In', color: 'green', icon: <TrendingUp size={16} /> },
+  TRANSFER_OUT: { label: 'Transfer Out', color: 'orange', icon: <TrendingDown size={16} /> },
+  DAMAGE: { label: 'Damage', color: 'red', icon: <XCircle size={16} /> },
+  EXPIRED: { label: 'Expired', color: 'purple', icon: <Clock size={16} /> },
+  ADJUSTMENT: { label: 'Adjustment', color: 'gray', icon: <FileText size={16} /> },
+  RETURN_SUPPLIER: { label: 'Return to Supplier', color: 'yellow', icon: <TrendingDown size={16} /> },
+  SALE_DEDUCTION: { label: 'Sale', color: 'cyan', icon: <TrendingDown size={16} /> },
+  PRODUCTION: { label: 'Production', color: 'teal', icon: <TrendingUp size={16} /> },
+  SAMPLE: { label: 'Sample', color: 'pink', icon: <TrendingDown size={16} /> },
+}
+
+const statusConfig: Record<MovementStatus, { label: string; color: string; bgColor: string }> = {
+  CREATED: { label: 'Draft', color: 'text-gray-700', bgColor: 'bg-gray-100' },
+  PENDING_APPROVAL: { label: 'Pending Approval', color: 'text-yellow-700', bgColor: 'bg-yellow-100' },
+  APPROVED: { label: 'Approved', color: 'text-green-700', bgColor: 'bg-green-100' },
+  REJECTED: { label: 'Rejected', color: 'text-red-700', bgColor: 'bg-red-100' },
+  COMPLETED: { label: 'Completed', color: 'text-blue-700', bgColor: 'bg-blue-100' },
+  CANCELLED: { label: 'Cancelled', color: 'text-gray-700', bgColor: 'bg-gray-200' },
+}
 
 export default function StockMovementPage() {
   const [activeTab, setActiveTab] = useState<'all' | 'in' | 'out'>('all')
-  const [showForm, setShowForm] = useState(false)
-  const [movementType, setMovementType] = useState<'in' | 'out'>('in')
+  const [statusFilter, setStatusFilter] = useState<MovementStatus | 'all'>('all')
+  const [typeFilter, setTypeFilter] = useState<MovementTypeCode | 'all'>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [movementType, setMovementType] = useState<'in' | 'out'>('in')
   const itemsPerPage = 10
 
   const filteredMovements = useMemo(() => {
-    let filtered = stockMovements
+    let filtered = mockStockMovements
 
-    // Filter by tab (all/in/out)
-    if (activeTab !== 'all') {
-      filtered = filtered.filter(m => m.type === activeTab)
+    // Filter by active tab (In/Out/All)
+    if (activeTab === 'in') {
+      const inboundTypes: MovementTypeCode[] = ['PURCHASE', 'TRANSFER_IN', 'PRODUCTION']
+      filtered = filtered.filter(m => inboundTypes.includes(m.type))
+    } else if (activeTab === 'out') {
+      const outboundTypes: MovementTypeCode[] = ['SALE', 'TRANSFER_OUT', 'DAMAGE', 'EXPIRED', 'RETURN_TO_SUPPLIER', 'SAMPLE']
+      filtered = filtered.filter(m => outboundTypes.includes(m.type))
     }
 
-    // Filter by search term (product name or SKU)
+    // Filter by status
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(m => m.status === statusFilter)
+    }
+
+    // Filter by type
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter(m => m.type === typeFilter)
+    }
+
+    // Search
     if (searchTerm) {
+      const term = searchTerm.toLowerCase()
       filtered = filtered.filter(m => 
-        m.product.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.sku.toLowerCase().includes(searchTerm.toLowerCase())
+        m.product.toLowerCase().includes(term) ||
+        m.sku.toLowerCase().includes(term) ||
+        m.movementNumber.toLowerCase().includes(term) ||
+        m.poNumber?.toLowerCase().includes(term)
       )
     }
 
-    // Filter by date range
-    if (startDate || endDate) {
-      // User has specified date range - use their filters
-      if (startDate) {
-        filtered = filtered.filter(m => m.date >= startDate)
-      }
-      if (endDate) {
-        filtered = filtered.filter(m => m.date <= endDate)
-      }
-    } else if (!searchTerm) {
-      // No filters applied - show only recent transactions (last 30 days)
-      const thirtyDaysAgo = new Date()
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-      const defaultStartDate = thirtyDaysAgo.toISOString().split('T')[0]
-      filtered = filtered.filter(m => m.date >= defaultStartDate)
+    // Date range
+    if (startDate) {
+      filtered = filtered.filter(m => m.date >= startDate)
+    }
+    if (endDate) {
+      filtered = filtered.filter(m => m.date <= endDate)
     }
 
     return filtered
-  }, [activeTab, searchTerm, startDate, endDate])
+  }, [activeTab, statusFilter, typeFilter, searchTerm, startDate, endDate])
 
-  const totalInTransactions = filteredMovements.filter(m => m.type === 'in').length
-  const totalOutTransactions = filteredMovements.filter(m => m.type === 'out').length
+  // Summary stats
+  const summaryStats = useMemo(() => {
+    const inboundTypes: MovementTypeCode[] = ['PURCHASE', 'TRANSFER_IN', 'PRODUCTION']
+    const outboundTypes: MovementTypeCode[] = ['SALE', 'TRANSFER_OUT', 'DAMAGE', 'EXPIRED', 'RETURN_TO_SUPPLIER', 'SAMPLE']
+    
+    const pendingApprovals = mockStockMovements.filter(m => m.status === 'PENDING_APPROVAL').length
+    const approvedToday = mockStockMovements.filter(m => m.status === 'APPROVED' && m.date === '2026-03-01').length
+    const totalValueIn = mockStockMovements
+      .filter(m => m.totalValue && m.totalValue > 0)
+      .reduce((sum, m) => sum + (m.totalValue || 0), 0)
+    
+    const totalInTransactions = mockStockMovements.filter(m => inboundTypes.includes(m.type)).length
+    const totalOutTransactions = mockStockMovements.filter(m => outboundTypes.includes(m.type)).length
+
+    return { pendingApprovals, approvedToday, totalValueIn, totalInTransactions, totalOutTransactions }
+  }, [])
+
+  const clearFilters = () => {
+    setActiveTab('all')
+    setStatusFilter('all')
+    setTypeFilter('all')
+    setSearchTerm('')
+    setStartDate('')
+    setEndDate('')
+    setCurrentPage(1)
+  }
+
+  // Destructure summary stats
+  const { pendingApprovals, approvedToday, totalValueIn, totalInTransactions, totalOutTransactions } = summaryStats
 
   // Pagination
   const totalPages = Math.ceil(filteredMovements.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
   const paginatedMovements = filteredMovements.slice(startIndex, endIndex)
-
-  const clearFilters = () => {
-    setSearchTerm('')
-    setStartDate('')
-    setEndDate('')
-    setCurrentPage(1)
-  }
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -156,7 +279,7 @@ export default function StockMovementPage() {
         </div>
         <div className="flex gap-3">
           <Button 
-            className="bg-green-600 hover:bg-green-700 flex items-center gap-2"
+            className="bg-[#2d6e3e] hover:bg-[#255931] flex items-center gap-2"
             onClick={() => {
               setMovementType('in')
               setShowForm(true)
@@ -180,38 +303,44 @@ export default function StockMovementPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-[#2d6e3e] p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm mb-1">Total Stock In</p>
-              <p className="text-3xl font-bold text-green-600">+{totalInTransactions}</p>
+              <p className="text-gray-600 text-sm font-medium mb-1">Total Stock In</p>
+              <p className="text-3xl font-bold text-[#2d6e3e]">+{totalInTransactions}</p>
               <p className="text-xs text-gray-500 mt-1">transactions</p>
             </div>
-            <TrendingUp className="text-green-500" size={36} />
+            <div className="w-12 h-12 bg-[#e8f5e9] rounded-xl flex items-center justify-center">
+              <TrendingUp className="text-[#2d6e3e]" size={24} />
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-red-600 p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm mb-1">Total Stock Out</p>
+              <p className="text-gray-600 text-sm font-medium mb-1">Total Stock Out</p>
               <p className="text-3xl font-bold text-red-600">-{totalOutTransactions}</p>
               <p className="text-xs text-gray-500 mt-1">transactions</p>
             </div>
-            <TrendingDown className="text-red-500" size={36} />
+            <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center">
+              <TrendingDown className="text-red-600" size={24} />
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-gray-400 p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm mb-1">Net Movement</p>
-              <p className={`text-3xl font-bold ${totalInTransactions - totalOutTransactions >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <p className="text-gray-600 text-sm font-medium mb-1">Net Movement</p>
+              <p className={`text-3xl font-bold ${totalInTransactions - totalOutTransactions >= 0 ? 'text-[#2d6e3e]' : 'text-red-600'}`}>
                 {totalInTransactions - totalOutTransactions >= 0 ? '+' : ''}{totalInTransactions - totalOutTransactions}
               </p>
               <p className="text-xs text-gray-500 mt-1">transactions</p>
             </div>
-            <ArrowDownUp className="text-gray-500" size={36} />
+            <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center">
+              <ArrowDownUp className="text-gray-600" size={24} />
+            </div>
           </div>
         </div>
       </div>

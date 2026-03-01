@@ -129,7 +129,7 @@ export default function InventoryChecksPage() {
             </div>
             <p className="text-white/80 text-sm mt-2">Assigned to: Nguyen Van A</p>
           </div>
-          <Button className="bg-white text-[#2d6e3e] hover:bg-gray-100">
+          <Button className="bg-white/20 text-white border-2 border-white/30 hover:bg-white/30 hover:border-white/50">
             Reschedule
           </Button>
         </div>
@@ -188,45 +188,53 @@ export default function InventoryChecksPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-[#2d6e3e] p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm mb-1">Total Checks</p>
+              <p className="text-gray-600 text-sm font-medium mb-1">Total Checks</p>
               <p className="text-3xl font-bold text-gray-900">{filteredChecks.length}</p>
             </div>
-            <CheckCircle className="text-green-500" size={36} />
+            <div className="w-12 h-12 bg-[#e8f5e9] rounded-xl flex items-center justify-center">
+              <CheckCircle className="text-[#2d6e3e]" size={24} />
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-blue-600 p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm mb-1">Last Check</p>
+              <p className="text-gray-600 text-sm font-medium mb-1">Last Check</p>
               <p className="text-xl font-bold text-gray-900">{filteredChecks[0]?.date || 'N/A'}</p>
             </div>
-            <Calendar className="text-blue-500" size={36} />
+            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+              <Calendar className="text-blue-600" size={24} />
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-orange-600 p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm mb-1">Avg. Duration</p>
+              <p className="text-gray-600 text-sm font-medium mb-1">Avg. Duration</p>
               <p className="text-xl font-bold text-gray-900">2h 20m</p>
             </div>
-            <Clock className="text-orange-500" size={36} />
+            <div className="w-12 h-12 bg-orange-50 rounded-xl flex items-center justify-center">
+              <Clock className="text-orange-600" size={24} />
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-red-600 p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm mb-1">Total Discrepancies</p>
+              <p className="text-gray-600 text-sm font-medium mb-1">Total Discrepancies</p>
               <p className="text-3xl font-bold text-red-600">
                 {filteredChecks.reduce((sum, check) => sum + check.discrepancies, 0)}
               </p>
             </div>
-            <div className="text-3xl">⚠️</div>
+            <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center text-2xl">
+              ⚠️
+            </div>
           </div>
         </div>
       </div>

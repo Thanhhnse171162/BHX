@@ -98,9 +98,14 @@ export default function LowStockPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Low Stock Alerts</h1>
-          <p className="text-gray-600 mt-1">Monitor items that need to be restocked</p>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
+            <AlertTriangle className="text-orange-600" size={24} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Low Stock Alerts</h1>
+            <p className="text-gray-600 text-sm mt-1">Monitor items that need to be restocked</p>
+          </div>
         </div>
         <Button 
           variant="outline" 
@@ -317,25 +322,29 @@ export default function LowStockPage() {
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-orange-600 p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm mb-1">Total Alerts</p>
+              <p className="text-gray-600 text-sm font-medium mb-1">Total Alerts</p>
               <p className="text-3xl font-bold text-orange-600">{lowStockItems.length}</p>
             </div>
-            <AlertTriangle className="text-orange-400" size={40} />
+            <div className="w-12 h-12 bg-orange-50 rounded-xl flex items-center justify-center">
+              <AlertTriangle className="text-orange-600" size={24} />
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-red-600 p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm mb-1">Urgent Items</p>
+              <p className="text-gray-600 text-sm font-medium mb-1">Urgent Items</p>
               <p className="text-3xl font-bold text-red-600">
                 {lowStockItems.filter(i => i.daysUntilReorder <= 2).length}
               </p>
             </div>
-            <AlertTriangle className="text-red-400 animate-pulse" size={40} />
+            <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center">
+              <AlertTriangle className="text-red-600 animate-pulse" size={24} />
+            </div>
           </div>
         </div>
       </div>
