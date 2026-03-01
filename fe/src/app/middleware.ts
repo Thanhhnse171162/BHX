@@ -1,6 +1,17 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+// Middleware is disabled because auth is now handled client-side only (in-memory, no persistence)
+// Client-side RouteGuard components handle route protection
+export function middleware(request: NextRequest) {
+  return NextResponse.next()
+}
+
+export const config = {
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+}
+
+/* Previous middleware code (disabled):
 const protectedPaths = {
   admin: '/admin',
   ops: '/ops',
@@ -54,7 +65,4 @@ export function middleware(request: NextRequest) {
 
   return NextResponse.next()
 }
-
-export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
-}
+*/

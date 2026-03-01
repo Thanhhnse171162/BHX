@@ -21,11 +21,28 @@ export function Providers({ children }: { children: ReactNode }) {
       })
   )
 
-  // Hydrate auth state from localStorage on mount
+  // Clear any old auth data from localStorage/sessionStorage on mount
+  // (since we now use in-memory storage only)
   const setHydrated = useAuthStore((state) => state.setHydrated)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    // Clean up old auth data from previous implementation
+    if (typeof window !== 'undefined') {
+      const keysToRemove = [
+        'auth-storage',
+        'auth_token',
+        'refresh_token',
+        'access_token',
+        'user',
+        'token',
+      ]
+      keysToRemove.forEach(key => {
+        localStorage.removeItem(key)
+        sessionStorage.removeItem(key)
+      })
+    }
+    
     setHydrated()
     setMounted(true)
   }, [setHydrated])

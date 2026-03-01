@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios'
+import { useAuthStore } from '@/store/auth.store'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'
 
@@ -10,11 +11,12 @@ const axiosInstance: AxiosInstance = axios.create({
   },
 })
 
-// Request interceptor to attach token
+// Request interceptor to attach token from zustand store (in-memory)
 axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     if (typeof window !== 'undefined') {
-      const token = localStorage.getItem(process.env.NEXT_PUBLIC_TOKEN_KEY || 'auth_token')
+      // Get token from zustand store instead of localStorage
+      const token = useAuthStore.getState().token
       if (token) {
         config.headers.Authorization = `Bearer ${token}`
       }
@@ -44,9 +46,8 @@ axiosInstance.interceptors.response.use(
             !currentPath.includes('/register') && 
             !currentPath.includes('/forgot-password') &&
             !currentPath.includes('/reset-password')) {
-          // Clear auth state and redirect to login
-          localStorage.removeItem(process.env.NEXT_PUBLIC_TOKEN_KEY || 'auth_token')
-          localStorage.removeItem(process.env.NEXT_PUBLIC_REFRESH_TOKEN_KEY || 'refresh_token')
+          // Clear auth state from zustand store
+          useAuthStore.getState().logout()
           window.location.href = '/login'
         }
       }
@@ -85,7 +86,8 @@ export const iamClient: AxiosInstance = axios.create({
 iamClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     if (typeof window !== 'undefined') {
-      const token = localStorage.getItem(process.env.NEXT_PUBLIC_TOKEN_KEY || 'auth_token')
+      // Get token from zustand store instead of localStorage
+      const token = useAuthStore.getState().token
       if (token) {
         config.headers.Authorization = `Bearer ${token}`
       }
@@ -115,9 +117,8 @@ iamClient.interceptors.response.use(
             !currentPath.includes('/register') && 
             !currentPath.includes('/forgot-password') &&
             !currentPath.includes('/reset-password')) {
-          // Clear auth state and redirect to login
-          localStorage.removeItem(process.env.NEXT_PUBLIC_TOKEN_KEY || 'auth_token')
-          localStorage.removeItem(process.env.NEXT_PUBLIC_REFRESH_TOKEN_KEY || 'refresh_token')
+          // Clear auth state from zustand store
+          useAuthStore.getState().logout()
           window.location.href = '/login'
         }
       }
@@ -152,7 +153,8 @@ export const localApiClient: AxiosInstance = axios.create({
 localApiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     if (typeof window !== 'undefined') {
-      const token = localStorage.getItem(process.env.NEXT_PUBLIC_TOKEN_KEY || 'auth_token')
+      // Get token from zustand store instead of localStorage
+      const token = useAuthStore.getState().token
       if (token) {
         config.headers.Authorization = `Bearer ${token}`
       }
