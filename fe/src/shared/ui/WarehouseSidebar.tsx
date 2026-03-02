@@ -42,8 +42,8 @@ const inventorySection: NavSection = {
       icon: BarChart3
     },
     {
-      label: 'Backroom Stock',
-      href: '/warehouse/inventory/backroom',
+      label: 'Batch-Level Inventory',
+      href: '/warehouse/inventory/batch-movements',
       icon: Warehouse
     },
     {

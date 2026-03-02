@@ -4,22 +4,36 @@ import { useState, useMemo } from 'react'
 import { Search, Package, ArrowRight, Edit, Warehouse, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Input } from '@/shared/ui/Input'
 import { Button } from '@/shared/ui/Button'
-import { inventoryData, InventoryItem } from '@/data/inventory-data'
 
-// Extend inventory data with backroom-specific info
-interface BackroomStock extends InventoryItem {
-  backroomQty: number
-  expiryDate?: string
+// Batch-level inventory interface matching database structure
+interface BatchInventoryItem {
+  id: string
+  batch_code: string
+  product_name: string
+  product_sku: string
+  warehouse_name: string
+  warehouse_location: string
+  slot_code: string
+  quantity: number
+  manufacture_date: string
+  expiration_date: string
+  created_at: string
 }
 
-// Mock backroom data (in production, this would come from API)
-const backroomData: BackroomStock[] = inventoryData.map(item => ({
-  ...item,
-  backroomQty: Math.floor(item.quantity * 0.7), // 70% in backroom
-  expiryDate: item.category === 'Dairy' || item.category === 'Fresh Produce' 
-    ? new Date(Date.now() + Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-    : undefined
-}))
+// Mock batch-level data from database (in production, this would come from API)
+const batchInventory: BatchInventoryItem[] = [
+  { id: '0014D6EF-226C-4284-BA59-132DA01793EC', batch_code: 'BATCH-PRODUCT1-20250110', product_name: 'Cải Thảo', product_sku: 'RAU-002', warehouse_name: 'Central Warehouse', warehouse_location: 'District 1, HCMC', slot_code: 'A-01-02', quantity: 350, manufacture_date: '2025-01-15', expiration_date: '2027-01-15', created_at: '2025-07-02 03:22:39.9266667' },
+  { id: '8AB8F86E-D5D8-40FD-BDB0-1F56C0E19000', batch_code: 'BATCH-PRODUCT2-20250310', product_name: 'Cải Xanh', product_sku: 'RAU-001', warehouse_name: 'Central Warehouse', warehouse_location: 'District 1, HCMC', slot_code: 'A-03-01', quantity: 500, manufacture_date: '2025-03-10', expiration_date: '2026-10-10', created_at: '2026-01-02 03:22:39.9300000' },
+  { id: 'E060DEB4-CF16-4CB5-A137-CAAF261F3D3A', batch_code: 'BATCH-PRODUCT3-20250315', product_name: 'Rau Muống', product_sku: 'RAU-001', warehouse_name: 'North Warehouse', warehouse_location: 'Cau Giay, Hanoi', slot_code: 'B-02-02', quantity: 200, manufacture_date: '2025-03-15', expiration_date: '2027-03-15', created_at: '2026-02-02 03:22:39.9300000' },
+  { id: '3C6F1A5C-1E63-4E61-9B76-6DB81C1BFCW00', batch_code: 'BATCH-PRODUCT8-20250320', product_name: 'Sữa TH True Milk', product_sku: 'SUA-002', warehouse_name: 'Coastal Warehouse', warehouse_location: 'Hai Phong City', slot_code: 'C-01-01', quantity: 450, manufacture_date: '2025-03-20', expiration_date: '2026-09-20', created_at: '2026-03-02 03:22:39.9300000' },
+  { id: 'EBD4C5E-7697-4CA5-BD97-E98CFC9063A8', batch_code: 'BATCH-PRODUCT2-20250215', product_name: 'Cam Sành', product_sku: 'TC-001', warehouse_name: 'North Warehouse', warehouse_location: 'Cau Giay, Hanoi', slot_code: 'B-01-01', quantity: 280, manufacture_date: '2025-02-15', expiration_date: '2027-02-15', created_at: '2025-10-02 03:22:39.9266667' },
+  { id: '2BB52011-EA29-4C8C-BDC1-F086E5A1010E', batch_code: 'BATCH-PRODUCT7-20250301', product_name: 'Gạo Jasmine', product_sku: 'GAO-002', warehouse_name: 'Central Warehouse', warehouse_location: 'District 1, HCMC', slot_code: 'A-02-01', quantity: 800, manufacture_date: '2025-03-01', expiration_date: '2026-03-01', created_at: '2025-12-02 03:22:39.9300000' },
+  { id: '16D39B8A-E196-44B7-8CF5-81FD838024TD', batch_code: 'BATCH-PRODUCT1-20250110-S2', product_name: 'Cải Thảo', product_sku: 'RAU-002', warehouse_name: 'North Warehouse', warehouse_location: 'Cau Giay, Hanoi', slot_code: 'B-03-01', quantity: 220, manufacture_date: '2025-01-10', expiration_date: '2027-01-10', created_at: '2026-01-15 03:22:39.9266667' },
+  { id: 'B223E599-FD5E-464F-91FB-CEC87B521B39', batch_code: 'BATCH-PRODUCT5-20250220', product_name: 'Coca Cola 330ml', product_sku: 'BEV-001', warehouse_name: 'Central Warehouse', warehouse_location: 'District 1, HCMC', slot_code: 'A-05-02', quantity: 600, manufacture_date: '2025-02-20', expiration_date: '2026-08-20', created_at: '2025-11-20 03:22:39.9300000' },
+  { id: '1B98D37-FB4A-4E5C-9A7B-2A9C79CD5A90', batch_code: 'BATCH-PRODUCT6-20250225', product_name: 'Pepsi 330ml', product_sku: 'BEV-002', warehouse_name: 'Coastal Warehouse', warehouse_location: 'Hai Phong City', slot_code: 'C-02-01', quantity: 550, manufacture_date: '2025-02-25', expiration_date: '2026-08-25', created_at: '2025-11-25 03:22:39.9300000' },
+  { id: '6DAB994E-9FEB-456D-8153-DCE111A025C5', batch_code: 'BATCH-PRODUCT4-20250305', product_name: 'Trứng gà', product_sku: 'EGG-001', warehouse_name: 'Central Warehouse', warehouse_location: 'District 1, HCMC', slot_code: 'A-04-01', quantity: 360, manufacture_date: '2025-03-05', expiration_date: '2026-04-05', created_at: '2025-09-15 03:22:39.9300000' },
+  { id: '0AA913D3-E41A-4B54-81AE-F2B74D7D13F7', batch_code: 'BATCH-PRODUCT9-20250118', product_name: 'Bánh mì sandwich', product_sku: 'BRD-003', warehouse_name: 'North Warehouse', warehouse_location: 'Cau Giay, Hanoi', slot_code: 'B-04-02', quantity: 180, manufacture_date: '2025-01-18', expiration_date: '2026-02-18', created_at: '2025-08-05 03:22:39.9300000' },
+]
 
 export default function BackroomStockPage() {
   const [searchTerm, setSearchTerm] = useState('')
@@ -28,11 +42,12 @@ export default function BackroomStockPage() {
 
   // Filter data
   const filteredData = useMemo(() => {
-    return backroomData.filter(item => {
+    return batchInventory.filter(item => {
       const matchesSearch = 
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.category.toLowerCase().includes(searchTerm.toLowerCase())
+        item.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.product_sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.batch_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.warehouse_name.toLowerCase().includes(searchTerm.toLowerCase())
       
       return matchesSearch
     })
@@ -53,32 +68,48 @@ export default function BackroomStockPage() {
   }, [searchTerm])
 
   // Handle transfer to shelf
-  const handleTransferToShelf = (itemId: number) => {
-    console.log('Transfer to shelf:', itemId)
-    // In production, this would call an API
-    alert(`Transfer item ${itemId} to shelf - API integration needed`)
+  const handleTransferToShelf = (batchCode: string) => {
+    console.log('Transfer to shelf:', batchCode)
+    alert(`Transfer batch ${batchCode} to shelf - API integration needed`)
   }
 
   // Handle stock adjustment
-  const handleAdjustStock = (itemId: number) => {
-    console.log('Adjust stock:', itemId)
-    // In production, this would open a modal
-    alert(`Adjust stock for item ${itemId} - Modal integration needed`)
+  const handleAdjustStock = (batchCode: string) => {
+    console.log('Adjust stock:', batchCode)
+    alert(`Adjust stock for batch ${batchCode} - Modal integration needed`)
+  }
+  
+  // Format date
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    })
   }
 
-  // Check if expiry is near (within 7 days)
-  const isExpiryNear = (expiryDate?: string) => {
-    if (!expiryDate) return false
-    const days = Math.floor((new Date(expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-    return days <= 7
+  // Check if expiry is near (within 30 days)
+  const isExpiryNear = (expiryDate: string) => {
+    const expDate = new Date(expiryDate)
+    const today = new Date()
+    const days = Math.floor((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    return days <= 30 && days >= 0
+  }
+  
+  // Check if expired
+  const isExpired = (expiryDate: string) => {
+    const expDate = new Date(expiryDate)
+    const today = new Date()
+    return expDate < today
   }
 
   // Status badge for stock level
-  const StockStatusBadge = ({ qty, status }: { qty: number, status: InventoryItem['status'] }) => {
-    if (qty === 0) {
-      return <span className="px-2.5 py-1 rounded-full text-xs font-medium border bg-red-100 text-red-800 border-red-200">Empty</span>
+  const StockStatusBadge = ({ expiryDate }: { expiryDate: string }) => {
+    if (isExpired(expiryDate)) {
+      return <span className="px-2.5 py-1 rounded-full text-xs font-medium border bg-red-100 text-red-800 border-red-200">Expired</span>
     }
-    if (status === 'low-stock') {
+    if (isExpiryNear(expiryDate)) {
       return <span className="px-2.5 py-1 rounded-full text-xs font-medium border bg-orange-100 text-orange-800 border-orange-200">Low</span>
     }
     return <span className="px-2.5 py-1 rounded-full text-xs font-medium border bg-green-100 text-green-800 border-green-200">Good</span>
@@ -88,8 +119,8 @@ export default function BackroomStockPage() {
     <div className="space-y-6 p-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Backroom Stock</h1>
-        <p className="text-gray-600 mt-1">Manage warehouse inventory and transfers</p>
+        <h1 className="text-2xl font-bold text-gray-900">Batch-Level Inventory</h1>
+        <p className="text-gray-600 mt-1">Manage warehouse inventory and transfers by batch</p>
       </div>
 
       {/* Summary Cards */}
@@ -97,8 +128,8 @@ export default function BackroomStockPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Total Backroom SKUs</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">{backroomData.length}</p>
+              <p className="text-sm text-gray-600 font-medium">Total Batch SKUs</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">{batchInventory.length}</p>
             </div>
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
               <Package className="text-blue-600" size={24} />
@@ -109,9 +140,9 @@ export default function BackroomStockPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Total Backroom Stock</p>
+              <p className="text-sm text-gray-600 font-medium">Total Batch Stock</p>
               <p className="text-3xl font-bold text-gray-900 mt-2">
-                {backroomData.reduce((sum, item) => sum + item.backroomQty, 0).toLocaleString()}
+                {batchInventory.reduce((sum, item) => sum + item.quantity, 0).toLocaleString()}
               </p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -125,7 +156,7 @@ export default function BackroomStockPage() {
             <div>
               <p className="text-sm text-gray-600 font-medium">Items Near Expiry</p>
               <p className="text-3xl font-bold text-orange-600 mt-2">
-                {backroomData.filter(item => isExpiryNear(item.expiryDate)).length}
+                {batchInventory.filter(item => isExpiryNear(item.expiration_date)).length}
               </p>
             </div>
             <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
@@ -164,21 +195,33 @@ export default function BackroomStockPage() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  ID
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  Batch Code
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Product
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   SKU
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  Warehouse
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  Slot
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Backroom Qty
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Expiry Date
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -186,7 +229,7 @@ export default function BackroomStockPage() {
             <tbody className="divide-y divide-gray-200">
               {paginatedData.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={10} className="px-6 py-12 text-center text-gray-500">
                     <Warehouse className="mx-auto mb-3 text-gray-400" size={48} />
                     <p className="text-lg font-medium">No products found</p>
                     <p className="text-sm mt-1">Try adjusting your search</p>
@@ -197,47 +240,64 @@ export default function BackroomStockPage() {
                   <tr 
                     key={item.id} 
                     className={`hover:bg-gray-50 transition-colors ${
-                      isExpiryNear(item.expiryDate) ? 'bg-orange-50' : ''
+                      isExpired(item.expiration_date) ? 'bg-red-50' : isExpiryNear(item.expiration_date) ? 'bg-orange-50' : ''
                     }`}
                   >
                     <td className="px-6 py-4">
-                      <div className="font-medium text-gray-900">{item.name}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">{item.category}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-600 font-mono">{item.sku}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-semibold text-gray-900">
-                        {item.backroomQty} {item.unit}
+                      <div className="text-xs text-gray-500 font-mono truncate max-w-[120px]" title={item.id}>
+                        {item.id.substring(0, 8)}...
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      {item.expiryDate ? (
-                        <div className={`text-sm ${isExpiryNear(item.expiryDate) ? 'text-orange-600 font-semibold' : 'text-gray-600'}`}>
-                          {new Date(item.expiryDate).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric'
-                          })}
-                          {isExpiryNear(item.expiryDate) && (
-                            <span className="ml-2 text-xs">(Soon!)</span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-400">N/A</span>
-                      )}
+                      <div className="font-mono text-sm font-semibold text-gray-900">{item.batch_code}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">Created: {formatDate(item.created_at)}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <StockStatusBadge qty={item.backroomQty} status={item.status} />
+                      <div className="font-medium text-gray-900">{item.product_name}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex gap-2">
+                      <div className="text-sm text-gray-600 font-mono">{item.product_sku}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-gray-900">{item.warehouse_name}</div>
+                      <div className="text-xs text-gray-500">{item.warehouse_location}</div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className="inline-block bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-mono font-semibold">
+                        {item.slot_code}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="text-sm font-semibold text-gray-900">
+                        {item.quantity}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className={`text-sm ${
+                        isExpired(item.expiration_date) ? 'text-red-600 font-semibold' : 
+                        isExpiryNear(item.expiration_date) ? 'text-orange-600 font-semibold' : 
+                        'text-gray-600'
+                      }`}>
+                        {formatDate(item.expiration_date)}
+                        {isExpired(item.expiration_date) && (
+                          <div className="text-xs mt-1">(Expired!)</div>
+                        )}
+                        {!isExpired(item.expiration_date) && isExpiryNear(item.expiration_date) && (
+                          <div className="text-xs mt-1">(Soon!)</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <StockStatusBadge expiryDate={item.expiration_date} />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex gap-2 justify-center">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleTransferToShelf(item.id)}
+                          onClick={() => handleTransferToShelf(item.batch_code)}
                           className="text-[#2d6e3e] border-[#2d6e3e] hover:bg-[#2d6e3e] hover:text-white"
+                          disabled={isExpired(item.expiration_date)}
                         >
                           <ArrowRight size={16} className="mr-1" />
                           Transfer
@@ -245,7 +305,7 @@ export default function BackroomStockPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleAdjustStock(item.id)}
+                          onClick={() => handleAdjustStock(item.batch_code)}
                           className="text-gray-700 hover:bg-gray-100"
                         >
                           <Edit size={16} className="mr-1" />
