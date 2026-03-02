@@ -1,12 +1,12 @@
 'use client'
 
 import { useAuth } from '@/shared/hooks/useAuth'
-import { WarehouseSidebar } from '@/shared/ui/WarehouseSidebar'
-import { WarehouseHeader } from '@/shared/ui/WarehouseHeader'
+import { StoreWarehouseSidebar } from '@/shared/ui/StoreWarehouseSidebar'
+import { StoreWarehouseHeader } from '@/shared/ui/StoreWarehouseHeader'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 
-export default function WarehouseLayout({
+export default function StoreWarehouseLayout({
   children,
 }: {
   children: React.ReactNode
@@ -21,8 +21,8 @@ export default function WarehouseLayout({
         return
       }
       
-      // Kiểm tra role_id phải là 2 (Warehouse Manager) và email có @company.com
-      if (user && (user.roleId !== 2 || !user.email?.endsWith('@company.com'))) {
+      // Kiểm tra role_id phải là 4 (Warehouse Staff) và email có @company.com
+      if (user && (user.roleId !== 4 || !user.email?.endsWith('@company.com'))) {
         router.push('/')
         return
       }
@@ -37,19 +37,19 @@ export default function WarehouseLayout({
     )
   }
 
-  if (!isAuthenticated || !user || user.roleId !== 2) {
+  if (!isAuthenticated || !user || user.roleId !== 4 || !user.email?.endsWith('@company.com')) {
     return null
   }
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
       {/* Sidebar */}
-      <WarehouseSidebar />
+      <StoreWarehouseSidebar />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <WarehouseHeader />
+        <StoreWarehouseHeader />
 
         {/* Content */}
         <main className="flex-1 overflow-y-auto p-6">

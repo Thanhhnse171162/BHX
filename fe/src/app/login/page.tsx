@@ -9,7 +9,7 @@ import { Checkbox } from '@/shared/ui/Checkbox'
 import { useAuth } from '@/shared/hooks/useAuth'
 import { rolePermissions } from '@/shared/auth/permission-map'
 import { authService } from '@/services/auth.service'
-import { getRoleFromId, getRedirectPath, isStaffUser, isWarehouseStaffUser, resolveRole } from '@/shared/utils/role'
+import { getRoleFromId, getRedirectPath, isStaffUser, isWarehouseStaffUser, isWarehouseManagerUser, resolveRole } from '@/shared/utils/role'
 import type { User, UserRole } from '@/shared/types'
 
 export default function LoginPage() {
@@ -30,6 +30,7 @@ export default function LoginPage() {
     router.prefetch('/customer')
     router.prefetch('/staff')
     router.prefetch('/warehouse')
+    router.prefetch('/warehouse-store')
   }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -89,9 +90,13 @@ export default function LoginPage() {
       // Update auth state
       login(user, token)
 
-      // Kiểm tra nếu là WAREHOUSE_STAFF với email @company.com thì redirect đến /warehouse
-      if (isWarehouseStaffUser(roleId, userEmail)) {
+      // Kiểm tra nếu là WAREHOUSE_MANAGER (role 2) với email @company.com thì redirect đến /warehouse
+      if (isWarehouseManagerUser(roleId, userEmail)) {
         router.replace('/warehouse')
+      }
+      // Kiểm tra nếu là WAREHOUSE_STAFF (role 4) với email @company.com thì redirect đến /warehouse-store
+      else if (isWarehouseStaffUser(roleId, userEmail)) {
+        router.replace('/warehouse-store')
       } 
       // Kiểm tra nếu là STAFF với email @company.com thì redirect đến /staff
       else if (isStaffUser(roleId, userEmail)) {

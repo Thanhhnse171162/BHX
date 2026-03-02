@@ -1,7 +1,7 @@
 'use client'
 
 import { useAuth } from '@/shared/hooks/useAuth'
-import { Bell, Search, Settings } from 'lucide-react'
+import { Bell, Settings } from 'lucide-react'
 import { Avatar } from './Avatar'
 import { useState } from 'react'
 
@@ -19,20 +19,8 @@ export function WarehouseHeader() {
   const unreadCount = notifications.filter(n => n.unread).length
 
   return (
-    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
-      {/* Left - Search */}
-      <div className="flex-1 max-w-md">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input
-            type="text"
-            placeholder="Search products, SKU..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6e3e] focus:border-transparent"
-          />
-        </div>
-      </div>
-
-      {/* Right - Actions & User */}
+    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-end px-6">
+      {/* Actions & User */}
       <div className="flex items-center gap-4">
         {/* Notifications */}
         <div className="relative">
