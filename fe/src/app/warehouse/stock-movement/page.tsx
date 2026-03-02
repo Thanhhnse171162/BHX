@@ -184,15 +184,19 @@ export default function StockMovementPage() {
   const [movementType, setMovementType] = useState<'in' | 'out'>('in')
   const itemsPerPage = 10
 
+  // Define movement categories
+  const inboundTypes: MovementTypeCode[] = ['PURCHASE', 'TRANSFER_IN', 'PRODUCTION']
+  const outboundTypes: MovementTypeCode[] = ['SALE_DEDUCTION', 'TRANSFER_OUT', 'DAMAGE', 'EXPIRED', 'RETURN_SUPPLIER', 'SAMPLE', 'ADJUSTMENT']
+  
+  const isInboundMovement = (type: MovementTypeCode) => inboundTypes.includes(type)
+  
   const filteredMovements = useMemo(() => {
     let filtered = mockStockMovements
 
     // Filter by active tab (In/Out/All)
     if (activeTab === 'in') {
-      const inboundTypes: MovementTypeCode[] = ['PURCHASE', 'TRANSFER_IN', 'PRODUCTION']
       filtered = filtered.filter(m => inboundTypes.includes(m.type))
     } else if (activeTab === 'out') {
-      const outboundTypes: MovementTypeCode[] = ['SALE', 'TRANSFER_OUT', 'DAMAGE', 'EXPIRED', 'RETURN_TO_SUPPLIER', 'SAMPLE']
       filtered = filtered.filter(m => outboundTypes.includes(m.type))
     }
 
@@ -303,15 +307,15 @@ export default function StockMovementPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl shadow-sm border-l-4 border-[#2d6e3e] p-6 hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-green-600 p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-600 text-sm font-medium mb-1">Total Stock In</p>
-              <p className="text-3xl font-bold text-[#2d6e3e]">+{totalInTransactions}</p>
+              <p className="text-3xl font-bold text-green-600">+{totalInTransactions}</p>
               <p className="text-xs text-gray-500 mt-1">transactions</p>
             </div>
-            <div className="w-12 h-12 bg-[#e8f5e9] rounded-xl flex items-center justify-center">
-              <TrendingUp className="text-[#2d6e3e]" size={24} />
+            <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
+              <TrendingUp className="text-green-600" size={24} />
             </div>
           </div>
         </div>
@@ -329,11 +333,11 @@ export default function StockMovementPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border-l-4 border-gray-400 p-6 hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-blue-500 p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-600 text-sm font-medium mb-1">Net Movement</p>
-              <p className={`text-3xl font-bold ${totalInTransactions - totalOutTransactions >= 0 ? 'text-[#2d6e3e]' : 'text-red-600'}`}>
+              <p className={`text-3xl font-bold ${totalInTransactions - totalOutTransactions >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {totalInTransactions - totalOutTransactions >= 0 ? '+' : ''}{totalInTransactions - totalOutTransactions}
               </p>
               <p className="text-xs text-gray-500 mt-1">transactions</p>
@@ -529,15 +533,17 @@ export default function StockMovementPage() {
         {/* Movement History */}
         <div className="divide-y divide-gray-200">
           {paginatedMovements.length > 0 ? (
-            paginatedMovements.map((movement) => (
+            paginatedMovements.map((movement) => {
+              const isInbound = isInboundMovement(movement.type)
+              return (
               <div key={movement.id} className="p-6 hover:bg-gray-50">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-4 flex-1">
                     <div className={`p-3 rounded-lg ${
-                      movement.type === 'in' ? 'bg-green-100' : 'bg-red-100'
+                      isInbound ? 'bg-green-100' : 'bg-red-100'
                     }`}>
-                      {movement.type === 'in' ? (
-                        <TrendingUp className={movement.type === 'in' ? 'text-green-600' : 'text-red-600'} size={24} />
+                      {isInbound ? (
+                        <TrendingUp className="text-green-600" size={24} />
                       ) : (
                         <TrendingDown className="text-red-600" size={24} />
                       )}
@@ -554,8 +560,8 @@ export default function StockMovementPage() {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div>
                           <p className="text-gray-500 mb-1">Quantity</p>
-                          <p className={`font-bold text-lg ${movement.type === 'in' ? 'text-green-600' : 'text-red-600'}`}>
-                            {movement.type === 'in' ? '+' : '-'}{movement.quantity} {movement.unit}
+                          <p className={`font-bold text-lg ${isInbound ? 'text-green-600' : 'text-red-600'}`}>
+                            {isInbound ? '+' : '-'}{movement.quantity} {movement.unit}
                           </p>
                         </div>
                         <div>
@@ -584,7 +590,7 @@ export default function StockMovementPage() {
                   </div>
                 </div>
               </div>
-            ))
+            )})
           ) : (
             <div className="p-12 text-center">
               <p className="text-gray-500">No transactions found</p>
