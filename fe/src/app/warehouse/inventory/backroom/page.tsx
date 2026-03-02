@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, Package, ArrowRight, Edit, Warehouse } from 'lucide-react'
+import { Search, Package, ArrowRight, Edit, Warehouse, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Input } from '@/shared/ui/Input'
 import { Button } from '@/shared/ui/Button'
 import { inventoryData, InventoryItem } from '@/data/inventory-data'
@@ -23,6 +23,8 @@ const backroomData: BackroomStock[] = inventoryData.map(item => ({
 
 export default function BackroomStockPage() {
   const [searchTerm, setSearchTerm] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   // Filter data
   const filteredData = useMemo(() => {
@@ -34,6 +36,20 @@ export default function BackroomStockPage() {
       
       return matchesSearch
     })
+  }, [searchTerm])
+
+  // Paginated data
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    return filteredData.slice(startIndex, endIndex)
+  }, [filteredData, currentPage])
+
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage)
+
+  // Reset to page 1 when search changes
+  useMemo(() => {
+    setCurrentPage(1)
   }, [searchTerm])
 
   // Handle transfer to shelf
@@ -168,7 +184,7 @@ export default function BackroomStockPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredData.length === 0 ? (
+              {paginatedData.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                     <Warehouse className="mx-auto mb-3 text-gray-400" size={48} />
@@ -177,7 +193,7 @@ export default function BackroomStockPage() {
                   </td>
                 </tr>
               ) : (
-                filteredData.map((item) => (
+                paginatedData.map((item) => (
                   <tr 
                     key={item.id} 
                     className={`hover:bg-gray-50 transition-colors ${
@@ -245,10 +261,64 @@ export default function BackroomStockPage() {
         </div>
       </div>
 
-      {/* Footer Info */}
-      {filteredData.length > 0 && (
-        <div className="text-sm text-gray-600 text-center">
-          Showing {filteredData.length} of {backroomData.length} items
+      {/* Pagination */}
+      {filteredData.length > 0 && totalPages > 1 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-600">
+              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredData.length)} of {filteredData.length} items
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className={`p-2 rounded-lg border transition-colors ${
+                  currentPage === 1
+                    ? 'border-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'border-gray-300 text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                  if (
+                    page === 1 ||
+                    page === totalPages ||
+                    (page >= currentPage - 1 && page <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`min-w-[2.5rem] px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          currentPage === page
+                            ? 'bg-[#2d6e3e] text-white'
+                            : 'text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  } else if (page === currentPage - 2 || page === currentPage + 2) {
+                    return <span key={page} className="px-2 text-gray-400">...</span>
+                  }
+                  return null
+                })}
+              </div>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className={`p-2 rounded-lg border transition-colors ${
+                  currentPage === totalPages
+                    ? 'border-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'border-gray-300 text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

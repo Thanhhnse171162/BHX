@@ -29,7 +29,14 @@ export function isStaffUser(roleId: number, email: string): boolean {
 }
 
 /**
- * Kiểm tra user có phải là warehouse staff không
+ * Kiểm tra user có phải là warehouse manager không (role 2)
+ */
+export function isWarehouseManagerUser(roleId: number, email: string): boolean {
+  return roleId === 2 && isCompanyEmail(email)
+}
+
+/**
+ * Kiểm tra user có phải là warehouse staff không (role 4 - Store Warehouse)
  */
 export function isWarehouseStaffUser(roleId: number, email: string): boolean {
   return roleId === 4 && isCompanyEmail(email)
@@ -52,8 +59,8 @@ export function getRedirectPath(role: UserRole): string {
   const paths: Record<UserRole, string> = {
     ADMIN: '/admin/dashboard',
     STORE_MANAGER: '/ops',
-    WAREHOUSE_MANAGER: '/ops',
-    WAREHOUSE_STAFF: '/warehouse',
+    WAREHOUSE_MANAGER: '/warehouse',
+    WAREHOUSE_STAFF: '/warehouse-store',
     STAFF: '/staff',
     CUSTOMER: '/customer',
   }
