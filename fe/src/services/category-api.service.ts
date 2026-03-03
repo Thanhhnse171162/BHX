@@ -11,26 +11,19 @@ const localApiClient: AxiosInstance = axios.create({
   },
 })
 
-// Types cho Category từ backend
+// Types cho Category từ backend - Đúng với database schema
 export interface CategoryFromAPI {
   id: string
   name: string
-  description: string | null
-  parentId: string | null
-  parentName: string | null
-  level: number
-  displayOrder: number
-  isActive: boolean
-  createdAt: string
-  updatedAt: string
+  status: string  // ACTIVE hoặc INACTIVE
+  is_deleted: number  // 0 hoặc 1
+  created_at: string
+  updated_at: string | null
 }
 
 export interface CreateCategoryDTO {
   name: string
-  description?: string
-  parentId?: string
-  displayOrder?: number
-  isActive?: boolean
+  status?: string  // 'ACTIVE' hoặc 'INACTIVE'
 }
 
 /**

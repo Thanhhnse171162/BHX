@@ -3,16 +3,13 @@ import { NextRequest, NextResponse } from 'next/server'
 const CATALOG_SERVICE_URL = process.env.NEXT_PUBLIC_CATALOG_URL || 'http://localhost:5001'
 
 /**
- * GET /api/categories - Lấy tất cả categories
- * WORKAROUND: Backend không có GET /api/Category endpoint
- * Lấy categories từ products thay vì
+ * GET /api/categories - Lấy tất cả categories từ backend
  */
 export async function GET(_request: NextRequest) {
   try {
-    console.log('🔍 Forwarding GET /api/categories (via products) to:', CATALOG_SERVICE_URL)
+    console.log('🔍 Forwarding GET /api/categories to:', CATALOG_SERVICE_URL)
 
-    // Backend không có GET /api/Category, phải lấy từ products
-    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Product`, {
+    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Category/get-all-categories`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -22,39 +19,24 @@ export async function GET(_request: NextRequest) {
 
     if (!response.ok) {
       console.error('❌ Backend error:', response.status, response.statusText)
+      const errorText = await response.text()
+      console.error('Error response:', errorText)
       return NextResponse.json(
         { 
           success: false,
-          error: `Backend returned ${response.status}` 
+          error: `Backend returned ${response.status}`,
+          details: errorText
         },
         { status: response.status }
       )
     }
 
     const result = await response.json()
-    const products = result.data || []
+    console.log('✅ Backend response:', result)
     
-    // Extract unique categories từ products
-    const categoriesMap = new Map()
-    products.forEach((product: any) => {
-      if (product.categoryId && !categoriesMap.has(product.categoryId)) {
-        categoriesMap.set(product.categoryId, {
-          id: product.categoryId,
-          name: product.categoryName,
-          description: null,
-          parentId: null,
-          parentName: null,
-          level: 1,
-          displayOrder: 0,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        })
-      }
-    })
-    
-    const categories = Array.from(categoriesMap.values())
-    console.log('✅ Categories extracted from products:', categories.length, 'items')
+    // Backend có thể trả về { data: [...] } hoặc trực tiếp array
+    const categories = result.data || result
+    console.log('✅ Categories loaded:', categories.length, 'items')
     
     return NextResponse.json(categories, { status: 200 })
   } catch (error: any) {
