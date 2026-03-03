@@ -7,6 +7,7 @@ import { EmptyState } from '@/shared/ui/EmptyState'
 import { DataTable } from '@/shared/ui/DataTable'
 import { Input } from '@/shared/ui/Input'
 import Modal from '@/shared/ui/Modal'
+import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
 
 type ProductStatus = 'ACTIVE' | 'INACTIVE'
 
@@ -23,6 +24,8 @@ interface ProductRow {
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<ProductRow[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [mode, setMode] = useState<'create' | 'edit'>('create')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -33,22 +36,34 @@ export default function ProductsPage() {
   const [price, setPrice] = useState<number>(0)
   const [status, setStatus] = useState<ProductStatus>('ACTIVE')
 
+  // Fetch products từ API backend
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const raw = window.localStorage.getItem('demo-products')
-    if (!raw) return
-    try {
-      const parsed = JSON.parse(raw) as ProductRow[]
-      setProducts(parsed)
-    } catch {
-      // ignore
-    }
+    fetchProducts()
   }, [])
 
-  const syncProducts = (next: ProductRow[]) => {
-    setProducts(next)
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('demo-products', JSON.stringify(next))
+  const fetchProducts = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      const data = await ProductAPIService.getAllProducts()
+      
+      // Transform API data sang ProductRow format
+      const rows: ProductRow[] = data.map((p: ProductFromAPI) => ({
+        id: p.id,
+        sku: p.sku,
+        name: p.name,
+        category: p.categoryName || 'Unknown',
+        price: p.price,
+        status: p.isActive ? 'ACTIVE' : 'INACTIVE',
+        createdAt: p.createdAt,
+      }))
+      
+      setProducts(rows)
+    } catch (err) {
+      console.error('Error loading products:', err)
+      setError('Không thể tải danh sách sản phẩm. Vui lòng kiểm tra backend đang chạy.')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -74,39 +89,57 @@ export default function ProductsPage() {
     setIsModalOpen(true)
   }
 
-  const handleDelete = (id: string) => {
-    const next = products.filter((p) => p.id !== id)
-    syncProducts(next)
+  const handleDelete = async (id: string) => {
+    if (!confirm('Bạn có chắc muốn xóa sản phẩm này?')) return
+    
+    try {
+      await ProductAPIService.deleteProduct(id)
+      await fetchProducts() // Reload lại danh sách
+      alert('Xóa sản phẩm thành công!')
+    } catch (err) {
+      console.error('Error deleting product:', err)
+      alert('Không thể xóa sản phẩm. Vui lòng thử lại.')
+    }
   }
 
   const handleClose = () => {
     setIsModalOpen(false)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (mode === 'create') {
-      const newRow: ProductRow = {
-        id: `prod-${Date.now()}`,
-        sku,
-        name,
-        category,
-        price,
-        status,
-        createdAt: new Date().toISOString(),
+    try {
+      if (mode === 'create') {
+        // TODO: Cần lấy categoryId thực từ API, hiện tại dùng giá trị tạm
+        await ProductAPIService.createProduct({
+          sku,
+          name,
+          // Tạm thời dùng categoryId mặc định, cần sửa sau khi có API Categories
+          categoryId: '00000000-0000-0000-0000-000000000001',
+          price,
+          originalPrice: price,
+          weight: 1,
+          isActive: status === 'ACTIVE',
+          isFeatured: false,
+        })
+        alert('Tạo sản phẩm thành công!')
+      } else if (mode === 'edit' && editingId) {
+        await ProductAPIService.updateProduct(editingId, {
+          sku,
+          name,
+          price,
+          isActive: status === 'ACTIVE',
+        })
+        alert('Cập nhật sản phẩm thành công!')
       }
-      syncProducts([...products, newRow])
-    } else if (mode === 'edit' && editingId) {
-      const next = products.map((p) =>
-        p.id === editingId
-          ? { ...p, sku, name, category, price, status }
-          : p
-      )
-      syncProducts(next)
-    }
 
-    setIsModalOpen(false)
+      setIsModalOpen(false)
+      await fetchProducts() // Reload lại danh sách
+    } catch (err) {
+      console.error('Error saving product:', err)
+      alert('Không thể lưu sản phẩm. Vui lòng thử lại.')
+    }
   }
 
   const createProductButton = (
@@ -129,13 +162,38 @@ export default function ProductsPage() {
       />
 
       <div className="card">
-        {products.length === 0 ? (
+        {/* Loading state */}
+        {isLoading && (
+          <div className="flex justify-center items-center py-12">
+            <div className="text-gray-600">Đang tải dữ liệu...</div>
+          </div>
+        )}
+
+        {/* Error state */}
+        {error && !isLoading && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+            <p className="font-medium">Lỗi kết nối</p>
+            <p className="text-sm mt-1">{error}</p>
+            <button 
+              onClick={fetchProducts}
+              className="mt-2 text-sm underline hover:no-underline"
+            >
+              Thử lại
+            </button>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!isLoading && !error && products.length === 0 && (
           <EmptyState
             title="No Products"
             description="Add your first product to the catalog"
             action={createProductButton}
           />
-        ) : (
+        )}
+
+        {/* Data table */}
+        {!isLoading && !error && products.length > 0 && (
           <DataTable
             data={products}
             columns={[

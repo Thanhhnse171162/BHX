@@ -25,7 +25,8 @@ export async function POST(request: NextRequest) {
     console.log('🔍 Forwarding login request to backend:', IDENTITY_SERVICE_URL)
 
     // Forward request to backend IdentityService
-    const response = await fetch(`${IDENTITY_SERVICE_URL}/api/auth/login`, {
+    // Chú ý: Backend ASP.NET Core dùng /api/Auth/login (chữ A viết HOA)
+    const response = await fetch(`${IDENTITY_SERVICE_URL}/api/Auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
