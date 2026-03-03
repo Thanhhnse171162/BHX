@@ -10,10 +10,9 @@ import { CategoryAPIService, CategoryFromAPI } from '@/services/category-api.ser
 interface CategoryRow {
   id: string
   name: string
-  description: string
-  level: number
   status: string
   createdAt: string
+  updatedAt: string | null
   [key: string]: unknown
 }
 
@@ -30,21 +29,24 @@ export default function CategoriesPage() {
     try {
       setIsLoading(true)
       setError(null)
+      console.log('🔍 Fetching categories...')
       const data = await CategoryAPIService.getAllCategories()
+      console.log('✅ Raw data:', data)
       
-      // Transform API data
+      // Transform API data - Đúng với database schema
       const rows: CategoryRow[] = data.map((c: CategoryFromAPI) => ({
         id: c.id,
         name: c.name,
-        description: c.description || '-',
-        level: c.level,
-        status: c.isActive ? 'Active' : 'Inactive',
-        createdAt: c.createdAt,
+        status: c.status,  // ACTIVE hoặc INACTIVE
+        createdAt: c.created_at,
+        updatedAt: c.updated_at,
       }))
       
+      console.log('✅ Transformed rows:', rows)
       setCategories(rows)
-    } catch (err) {
-      console.error('Error loading categories:', err)
+    } catch (err: any) {
+      console.error('❌ Error loading categories:', err)
+      console.error('Error details:', err.response?.data || err.message)
       setError('Không thể tải danh sách categories. Vui lòng kiểm tra backend.')
     } finally {
       setIsLoading(false)
@@ -101,20 +103,18 @@ export default function CategoriesPage() {
             data={categories}
             columns={[
               { key: 'name', label: 'Name' },
-              { key: 'description', label: 'Description' },
-              { key: 'level', label: 'Level' },
               {
                 key: 'status',
                 label: 'Status',
                 render: (value) => (
                   <span
                     className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      value === 'Active'
+                      value === 'ACTIVE'
                         ? 'bg-green-100 text-green-800'
                         : 'bg-gray-100 text-gray-700'
                     }`}
                   >
-                    {value}
+                    {String(value)}
                   </span>
                 ),
               },
@@ -127,6 +127,16 @@ export default function CategoriesPage() {
                     month: 'short',
                     day: 'numeric',
                   }),
+              },
+              {
+                key: 'updatedAt',
+                label: 'Updated At',
+                render: (value) =>
+                  value ? new Date(value as string).toLocaleDateString('vi-VN', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                  }) : '-',
               },
             ]}
           />
