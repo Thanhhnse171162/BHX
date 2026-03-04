@@ -6,15 +6,22 @@ const CATALOG_SERVICE_URL = process.env.NEXT_PUBLIC_CATALOG_URL || 'http://local
  * GET /api/products - Lấy tất cả products
  * Proxy request đến Product Service để tránh CORS
  */
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     console.log('🔍 Forwarding GET /api/products to:', CATALOG_SERVICE_URL)
 
-    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Product`, {
+    // Lấy token từ request headers
+    const authHeader = request.headers.get('authorization')
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    }
+    if (authHeader) {
+      headers['Authorization'] = authHeader
+    }
+
+    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Product/Get-All-Products`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       cache: 'no-store',
     })
 
@@ -56,11 +63,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     console.log('🔍 Forwarding POST /api/products to:', CATALOG_SERVICE_URL)
 
-    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Product`, {
+    // Lấy token từ request headers
+    const authHeader = request.headers.get('authorization')
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    }
+    if (authHeader) {
+      headers['Authorization'] = authHeader
+    }
+
+    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Product/Add-Product`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(body),
     })
 

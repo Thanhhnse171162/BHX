@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const CATALOG_SERVICE_URL = process.env.NEXT_PUBLIC_CATALOG_URL || 'http://localhost:5001'
+const IAM_SERVICE_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://localhost:5000'
 
 /**
- * GET /api/products/[id] - Lấy product theo ID
+ * GET /api/roles/[id] - Lấy role theo ID
  */
 export async function GET(
   request: NextRequest,
@@ -11,8 +11,9 @@ export async function GET(
 ) {
   try {
     const { id } = params
-    console.log('🔍 Forwarding GET /api/products/:id to:', CATALOG_SERVICE_URL)
+    console.log('🔍 Forwarding GET /api/roles/:id to:', IAM_SERVICE_URL)
 
+    // Lấy token từ request headers
     const authHeader = request.headers.get('authorization')
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
@@ -21,7 +22,7 @@ export async function GET(
       headers['Authorization'] = authHeader
     }
 
-    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Product/Get-Product-by-ID?id=${id}`, {
+    const response = await fetch(`${IAM_SERVICE_URL}/api/roles/${id}`, {
       method: 'GET',
       headers,
       cache: 'no-store',
@@ -33,15 +34,14 @@ export async function GET(
     }
 
     const result = await response.json()
-    // Backend returns { success, message, data: {...} }
-    const product = result.data || result
-    return NextResponse.json(product, { status: 200 })
+    const role = result.data || result
+    return NextResponse.json(role, { status: 200 })
   } catch (error: any) {
-    console.error('❌ Get Product Error:', error.message)
+    console.error('❌ Get Role Error:', error.message)
     return NextResponse.json(
       { 
         success: false,
-        error: 'Không thể lấy thông tin product',
+        error: 'Không thể lấy thông tin role',
         details: error.message
       },
       { status: 500 }
@@ -50,7 +50,7 @@ export async function GET(
 }
 
 /**
- * PUT /api/products/[id] - Cập nhật product
+ * PUT /api/roles/[id] - Cập nhật role
  */
 export async function PUT(
   request: NextRequest,
@@ -59,8 +59,9 @@ export async function PUT(
   try {
     const { id } = params
     const body = await request.json()
-    console.log('🔍 Forwarding PUT /api/products/:id to:', CATALOG_SERVICE_URL)
+    console.log('🔍 Forwarding PUT /api/roles/:id to:', IAM_SERVICE_URL)
 
+    // Lấy token từ request headers
     const authHeader = request.headers.get('authorization')
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
@@ -69,7 +70,7 @@ export async function PUT(
       headers['Authorization'] = authHeader
     }
 
-    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Product/Update-Product?id=${id}`, {
+    const response = await fetch(`${IAM_SERVICE_URL}/api/roles/${id}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify(body),
@@ -81,16 +82,15 @@ export async function PUT(
     }
 
     const result = await response.json()
-    // Backend returns { success, message, data: {...} }
-    const product = result.data || result
-    console.log('✅ Product updated:', id)
-    return NextResponse.json(product, { status: 200 })
+    const role = result.data || result
+    console.log('✅ Role updated:', id)
+    return NextResponse.json(role, { status: 200 })
   } catch (error: any) {
-    console.error('❌ Update Product Error:', error.message)
+    console.error('❌ Update Role Error:', error.message)
     return NextResponse.json(
       { 
         success: false,
-        error: 'Không thể cập nhật product',
+        error: 'Không thể cập nhật role',
         details: error.message
       },
       { status: 500 }
@@ -99,7 +99,7 @@ export async function PUT(
 }
 
 /**
- * DELETE /api/products/[id] - Xóa product
+ * DELETE /api/roles/[id] - Xóa role
  */
 export async function DELETE(
   request: NextRequest,
@@ -107,8 +107,9 @@ export async function DELETE(
 ) {
   try {
     const { id } = params
-    console.log('🔍 Forwarding DELETE /api/products/:id to:', CATALOG_SERVICE_URL)
+    console.log('🔍 Forwarding DELETE /api/roles/:id to:', IAM_SERVICE_URL)
 
+    // Lấy token từ request headers
     const authHeader = request.headers.get('authorization')
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
@@ -117,7 +118,7 @@ export async function DELETE(
       headers['Authorization'] = authHeader
     }
 
-    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Product/Delete-Product?id=${id}`, {
+    const response = await fetch(`${IAM_SERVICE_URL}/api/roles/${id}`, {
       method: 'DELETE',
       headers,
     })
@@ -127,14 +128,14 @@ export async function DELETE(
       return NextResponse.json(errorData, { status: response.status })
     }
 
-    console.log('✅ Product deleted:', id)
+    console.log('✅ Role deleted:', id)
     return NextResponse.json({ success: true }, { status: 200 })
   } catch (error: any) {
-    console.error('❌ Delete Product Error:', error.message)
+    console.error('❌ Delete Role Error:', error.message)
     return NextResponse.json(
       { 
         success: false,
-        error: 'Không thể xóa product',
+        error: 'Không thể xóa role',
         details: error.message
       },
       { status: 500 }
