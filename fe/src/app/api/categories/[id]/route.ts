@@ -6,18 +6,24 @@ const CATALOG_SERVICE_URL = process.env.NEXT_PUBLIC_CATALOG_URL || 'http://local
  * GET /api/categories/[id] - Lấy category theo ID
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const { id } = params
     console.log('🔍 Forwarding GET /api/categories/:id to:', CATALOG_SERVICE_URL)
 
-    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Category/${id}`, {
+    const authHeader = request.headers.get('authorization')
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    }
+    if (authHeader) {
+      headers['Authorization'] = authHeader
+    }
+
+    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Category/Get-Category-by-ID?id=${id}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       cache: 'no-store',
     })
 
@@ -53,11 +59,17 @@ export async function PUT(
     const body = await request.json()
     console.log('🔍 Forwarding PUT /api/categories/:id to:', CATALOG_SERVICE_URL)
 
-    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Category/${id}`, {
+    const authHeader = request.headers.get('authorization')
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    }
+    if (authHeader) {
+      headers['Authorization'] = authHeader
+    }
+
+    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Category/Update-Category-by-ID?id=${id}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(body),
     })
 

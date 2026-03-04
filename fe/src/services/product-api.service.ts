@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios'
+import { useAuthStore } from '@/store/auth.store'
 
 /**
  * Local API Client - Gọi qua Next.js API routes (proxy)
@@ -12,6 +13,17 @@ const localApiClient: AxiosInstance = axios.create({
   },
 })
 
+// Request interceptor to attach token
+localApiClient.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    const token = useAuthStore.getState().token
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+  }
+  return config
+})
+
 // Types cho Product từ backend
 export interface ProductFromAPI {
   id: string
@@ -23,6 +35,7 @@ export interface ProductFromAPI {
   brandId: string | null
   brand: string | null
   price: number
+  unit: string
   originalPrice: number
   weight: number
   volume: number | null
@@ -32,18 +45,41 @@ export interface ProductFromAPI {
   updatedAt: string
 }
 
+// DTO khớp với backend API - Theo Swagger
 export interface CreateProductDTO {
+  // Required fields
   sku: string
   name: string
-  description?: string
   categoryId: string
-  brandId?: string
   price: number
+  unit: string  // Required trong backend
+  
+  // Optional fields
+  barcode?: string
+  description?: string
+  brand?: string
+  origin?: string
   originalPrice?: number
+  costPrice?: number
   weight?: number
   volume?: number
+  quantityPerUnit?: number
+  minOrderQuantity?: number
+  maxOrderQuantity?: number
+  expirationDate?: string
+  shelfLifeDays?: number
+  storageInstructions?: string
+  isPerishable?: boolean
+  isAvailable?: boolean
   isFeatured?: boolean
-  isActive?: boolean
+  isNew?: boolean
+  isOnSale?: boolean
+  slug?: string
+  metaTitle?: string
+  metaDescription?: string
+  maxKeywords?: string
+  maxImage?: string  // Base64 string hoặc URL
+  additionalImages?: string[]  // Array of image URLs/Base64
 }
 
 export interface UpdateProductDTO extends Partial<CreateProductDTO> {

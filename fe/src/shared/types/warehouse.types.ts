@@ -971,3 +971,45 @@ export interface BatchFilters {
   expiryDateTo?: string;
   warehouseId?: number;
 }
+
+// =====================================================
+// ADMIN WAREHOUSE MANAGEMENT
+// =====================================================
+
+export interface AdminWarehouse extends Record<string, unknown> {
+  id: string;
+  name: string;
+  location: string;
+  capacity: number;
+  status: 'ACTIVE' | 'INACTIVE';
+  is_deleted: number;
+  created_at: string;
+  created_by: string;
+}
+
+export interface AdminWarehouseFilters {
+  id?: string;
+  name?: string;
+  location?: string;
+  capacityMin?: string;
+  capacityMax?: string;
+  status?: string;
+  isDeleted?: string;
+  createdAtFrom?: string;
+  createdAtTo?: string;
+  createdBy?: string;
+}
+
+export interface AdminWarehouseFormData {
+  name: string;
+  location: string;
+  capacity: number;
+  status: 'ACTIVE' | 'INACTIVE';
+}
+
+export interface AdminWarehouseApiResponse {
+  success: boolean;
+  message?: string;
+  data?: AdminWarehouse | AdminWarehouse[];
+  error?: string;
+}

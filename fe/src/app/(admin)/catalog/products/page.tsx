@@ -17,6 +17,7 @@ interface ProductRow {
   name: string
   category: string
   price: number
+  unit: string
   status: ProductStatus
   createdAt: string
   [key: string]: unknown
@@ -34,7 +35,22 @@ export default function ProductsPage() {
   const [name, setName] = useState('')
   const [category, setCategory] = useState('')
   const [price, setPrice] = useState<number>(0)
+  const [unit, setUnit] = useState('kg')
   const [status, setStatus] = useState<ProductStatus>('ACTIVE')
+  
+  // Additional fields from Swagger
+  const [barcode, setBarcode] = useState('')
+  const [description, setDescription] = useState('')
+  const [brand, setBrand] = useState('')
+  const [origin, setOrigin] = useState('')
+  const [originalPrice, setOriginalPrice] = useState<number>(0)
+  const [costPrice, setCostPrice] = useState<number>(0)
+  const [weight, setWeight] = useState<number>(0)
+  const [mainImage, setMainImage] = useState<File | null>(null)
+  const [slug, setSlug] = useState('')
+  const [metaTitle, setMetaTitle] = useState('')
+  const [metaDescription, setMetaDescription] = useState('')
+  const [metaKeywords, setMetaKeywords] = useState('')
 
   // Fetch products từ API backend
   useEffect(() => {
@@ -54,6 +70,7 @@ export default function ProductsPage() {
         name: p.name,
         category: p.categoryName || 'Unknown',
         price: p.price,
+        unit: p.unit || '',
         status: p.isActive ? 'ACTIVE' : 'INACTIVE',
         createdAt: p.createdAt,
       }))
@@ -74,7 +91,20 @@ export default function ProductsPage() {
     setName('')
     setCategory('')
     setPrice(0)
+    setUnit('kg')
     setStatus('ACTIVE')
+    setBarcode('')
+    setDescription('')
+    setBrand('')
+    setOrigin('')
+    setOriginalPrice(0)
+    setCostPrice(0)
+    setWeight(0)
+    setMainImage(null)
+    setSlug('')
+    setMetaTitle('')
+    setMetaDescription('')
+    setMetaKeywords('')
     setIsModalOpen(true)
   }
 
@@ -85,6 +115,7 @@ export default function ProductsPage() {
     setName(row.name)
     setCategory(row.category)
     setPrice(row.price)
+    setUnit(row.unit)
     setStatus(row.status)
     setIsModalOpen(true)
   }
@@ -111,17 +142,44 @@ export default function ProductsPage() {
 
     try {
       if (mode === 'create') {
-        // TODO: Cần lấy categoryId thực từ API, hiện tại dùng giá trị tạm
+        // Convert image to base64 if provided
+        let mainImageBase64: string | undefined = undefined
+        if (mainImage) {
+          try {
+            mainImageBase64 = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader()
+              reader.onloadend = () => resolve(reader.result as string)
+              reader.onerror = reject
+              reader.readAsDataURL(mainImage)
+            })
+          } catch (err) {
+            console.error('Error reading image:', err)
+            alert('Không thể đọc file ảnh. Vui lòng thử lại.')
+            return
+          }
+        }
+
         await ProductAPIService.createProduct({
           sku,
           name,
-          // Tạm thời dùng categoryId mặc định, cần sửa sau khi có API Categories
-          categoryId: '00000000-0000-0000-0000-000000000001',
+          categoryId: category || '00000000-0000-0000-0000-000000000001',
           price,
-          originalPrice: price,
-          weight: 1,
-          isActive: status === 'ACTIVE',
+          unit,
+          barcode: barcode || undefined,
+          description: description || undefined,
+          brand: brand || undefined,
+          origin: origin || undefined,
+          originalPrice: originalPrice || undefined,
+          costPrice: costPrice || undefined,
+          weight: weight || undefined,
+          isAvailable: status === 'ACTIVE',
           isFeatured: false,
+          isNew: true,
+          slug: slug || undefined,
+          metaTitle: metaTitle || undefined,
+          metaDescription: metaDescription || undefined,
+          maxKeywords: metaKeywords || undefined,
+          maxImage: mainImageBase64,
         })
         alert('Tạo sản phẩm thành công!')
       } else if (mode === 'edit' && editingId) {
@@ -129,7 +187,8 @@ export default function ProductsPage() {
           sku,
           name,
           price,
-          isActive: status === 'ACTIVE',
+          unit,
+          isAvailable: status === 'ACTIVE',
         })
         alert('Cập nhật sản phẩm thành công!')
       }
@@ -209,6 +268,7 @@ export default function ProductsPage() {
                     currency: 'VND',
                   }).format(value as number),
               },
+              { key: 'unit', label: 'Unit' },
               {
                 key: 'status',
                 label: 'Status',
@@ -286,7 +346,8 @@ export default function ProductsPage() {
           </div>
         }
       >
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <div className="max-h-[calc(100vh-250px)] overflow-y-auto pr-2">
+          <form className="space-y-4" onSubmit={handleSubmit}>
           <Input
             label="SKU"
             value={sku}
@@ -315,6 +376,124 @@ export default function ProductsPage() {
             onChange={(e) => setPrice(Number(e.target.value))}
             required
           />
+          <Input
+            label="Unit"
+            value={unit}
+            onChange={(e) => setUnit(e.target.value)}
+            placeholder="kg, gói, hộp, chai..."
+            required
+          />
+          
+          <Input
+            label="Barcode"
+            value={barcode}
+            onChange={(e) => setBarcode(e.target.value)}
+            placeholder="8934680010043"
+          />
+          
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">
+              Description
+            </label>
+            <textarea
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Mô tả sản phẩm..."
+              rows={3}
+            />
+          </div>
+          
+          <Input
+            label="Brand"
+            value={brand}
+            onChange={(e) => setBrand(e.target.value)}
+            placeholder="Vinamilk, TH True Milk..."
+          />
+          
+          <Input
+            label="Origin"
+            value={origin}
+            onChange={(e) => setOrigin(e.target.value)}
+            placeholder="Việt Nam"
+          />
+          
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Original Price"
+              type="number"
+              value={originalPrice}
+              onChange={(e) => setOriginalPrice(Number(e.target.value))}
+              placeholder="0"
+            />
+            <Input
+              label="Cost Price"
+              type="number"
+              value={costPrice}
+              onChange={(e) => setCostPrice(Number(e.target.value))}
+              placeholder="0"
+            />
+          </div>
+          
+          <Input
+            label="Weight (kg)"
+            type="number"
+            value={weight}
+            onChange={(e) => setWeight(Number(e.target.value))}
+            placeholder="0"
+          />
+          
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">
+              Main Image *
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setMainImage(e.target.files?.[0] || null)}
+              className="mt-1 block w-full text-sm text-gray-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-md file:border-0
+                file:text-sm file:font-semibold
+                file:bg-primary-50 file:text-primary-700
+                hover:file:bg-primary-100"
+            />
+          </div>
+          
+          <Input
+            label="Slug (SEO URL)"
+            value={slug}
+            onChange={(e) => setSlug(e.target.value)}
+            placeholder="gao-thom-st25"
+          />
+          
+          <Input
+            label="Meta Title (SEO)"
+            value={metaTitle}
+            onChange={(e) => setMetaTitle(e.target.value)}
+            placeholder="Gạo thơm ST25 cao cấp"
+          />
+          
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">
+              Meta Description (SEO)
+            </label>
+            <textarea
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              value={metaDescription}
+              onChange={(e) => setMetaDescription(e.target.value)}
+              placeholder="Mô tả cho SEO..."
+              rows={2}
+            />
+          </div>
+          
+          <Input
+            label="Meta Keywords (SEO)"
+            value={metaKeywords}
+            onChange={(e) => setMetaKeywords(e.target.value)}
+            placeholder="gạo, thơm, st25"
+          />
+          
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-gray-700">
               Status
@@ -329,6 +508,7 @@ export default function ProductsPage() {
             </select>
           </div>
         </form>
+        </div>
       </Modal>
     </div>
   )

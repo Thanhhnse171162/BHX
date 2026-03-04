@@ -5,15 +5,22 @@ const CATALOG_SERVICE_URL = process.env.NEXT_PUBLIC_CATALOG_URL || 'http://local
 /**
  * GET /api/categories - Lấy tất cả categories từ backend
  */
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     console.log('🔍 Forwarding GET /api/categories to:', CATALOG_SERVICE_URL)
 
+    // Lấy token từ request headers
+    const authHeader = request.headers.get('authorization')
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    }
+    if (authHeader) {
+      headers['Authorization'] = authHeader
+    }
+
     const response = await fetch(`${CATALOG_SERVICE_URL}/api/Category/get-all-categories`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       cache: 'no-store',
     })
 
@@ -60,11 +67,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     console.log('🔍 Forwarding POST /api/categories to:', CATALOG_SERVICE_URL)
 
-    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Category`, {
+    // Lấy token từ request headers
+    const authHeader = request.headers.get('authorization')
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    }
+    if (authHeader) {
+      headers['Authorization'] = authHeader
+    }
+
+    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Category/add-category`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(body),
     })
 

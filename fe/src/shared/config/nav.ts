@@ -113,6 +113,11 @@ export const getAdminNavigation = (): NavGroup[] => {
       label: 'Kho & Tồn kho',
       items: [
         {
+          label: 'Warehouse Management',
+          href: '/warehouses',
+          icon: 'Building2',
+        },
+        {
           label: 'Inventory Overview',
           href: '/inventory-admin',
           icon: 'Warehouse',

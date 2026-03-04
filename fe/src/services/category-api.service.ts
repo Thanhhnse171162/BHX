@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios'
+import { useAuthStore } from '@/store/auth.store'
 
 /**
  * Local API Client - Gọi qua Next.js API routes (proxy)
@@ -9,6 +10,17 @@ const localApiClient: AxiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+})
+
+// Request interceptor to attach token
+localApiClient.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    const token = useAuthStore.getState().token
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+  }
+  return config
 })
 
 // Types cho Category từ backend - Đúng với database schema
