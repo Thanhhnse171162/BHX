@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       headers['Authorization'] = authHeader
     }
 
-    const response = await fetch(`${IAM_SERVICE_URL}/api/roles`, {
+    const response = await fetch(`${IAM_SERVICE_URL}/api/roles/Get-All-Roles`, {
       method: 'GET',
       headers,
       cache: 'no-store',
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       headers['Authorization'] = authHeader
     }
 
-    const response = await fetch(`${IAM_SERVICE_URL}/api/roles`, {
+    const response = await fetch(`${IAM_SERVICE_URL}/api/roles/Create-Role`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
