@@ -227,7 +227,7 @@ export default function RolesPage() {
               },
             },
             {
-              key: 'created_at',
+              key: 'createdAt',
               label: 'Created At',
               render: (value) => {
                 const date = new Date(value as string)
