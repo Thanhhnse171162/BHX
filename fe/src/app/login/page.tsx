@@ -9,7 +9,7 @@ import { Checkbox } from '@/shared/ui/Checkbox'
 import { useAuth } from '@/shared/hooks/useAuth'
 import { rolePermissions } from '@/shared/auth/permission-map'
 import { authService } from '@/services/auth.service'
-import { getRoleFromId, getRedirectPath, isStaffUser, isWarehouseStaffUser, isWarehouseManagerUser, resolveRole } from '@/shared/utils/role'
+import { getRoleFromId, getRedirectPath, isStaffUser, isWarehouseStaffUser, isWarehouseManagerUser, isStoreManagerUser, resolveRole } from '@/shared/utils/role'
 import type { User, UserRole } from '@/shared/types'
 
 export default function LoginPage() {
@@ -26,6 +26,7 @@ export default function LoginPage() {
   // Prefetch routes để giảm độ trễ khi chuyển trang
   useEffect(() => {
     router.prefetch('/admin/dashboard')
+    router.prefetch('/cashier')
     router.prefetch('/ops')
     router.prefetch('/customer')
     router.prefetch('/staff')
@@ -90,17 +91,17 @@ export default function LoginPage() {
       // Update auth state
       login(user, token)
 
-      // Kiểm tra nếu là WAREHOUSE_MANAGER (role 2) với email @company.com thì redirect đến /warehouse
-      if (isWarehouseManagerUser(roleId, userEmail)) {
-        router.replace('/warehouse')
+      // Kiểm tra nếu là Store Staff (role 3) với email @company.com thì redirect đến /cashier
+      if (isStaffUser(roleId, userEmail)) {
+        router.replace('/cashier')
+      }
+      // Kiểm tra nếu là Store Manager (role 2) với email @company.com thì redirect đến /ops
+      else if (isStoreManagerUser(roleId, userEmail)) {
+        router.replace('/ops')
       }
       // Kiểm tra nếu là WAREHOUSE_STAFF (role 4) với email @company.com thì redirect đến /warehouse-store
       else if (isWarehouseStaffUser(roleId, userEmail)) {
         router.replace('/warehouse-store')
-      } 
-      // Kiểm tra nếu là STAFF với email @company.com thì redirect đến /staff
-      else if (isStaffUser(roleId, userEmail)) {
-        router.replace('/staff')
       } else {
         // Sử dụng helper function để redirect
         const redirectPath = getRedirectPath(userRole)

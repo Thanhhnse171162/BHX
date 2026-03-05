@@ -4,10 +4,11 @@ import './globals.css'
 import { Providers } from './providers'
 
 const poppins = Poppins({
-  weight: ['300', '400', '500', '600', '700', '800', '900'],
+  weight: ['400', '500', '600', '700'],
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-poppins',
+  preload: true,
 })
 
 export const metadata: Metadata = {

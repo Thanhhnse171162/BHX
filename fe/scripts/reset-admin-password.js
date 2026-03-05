@@ -24,9 +24,9 @@ async function resetAdminPassword() {
     await sql.connect(config);
     console.log('✅ Connected to database');
 
-    // Password mới cho Cashier
-    const newPassword = 'Cashier123!';
-    const email = 'cashier1@company.com';
+    // Password mới cho Admin
+    const newPassword = 'Password123!';
+    const email = 'admin@company.com';
 
     // Hash password
     console.log('🔐 Hashing password...');
