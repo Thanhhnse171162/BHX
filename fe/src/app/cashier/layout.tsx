@@ -90,7 +90,7 @@ export default function CashierLayout({ children }: CashierLayoutProps) {
       return
     }
     const allowedRoles = ['STAFF', 'ADMIN']
-    const allowedRoleIds = [3, 1]
+    const allowedRoleIds = [4, 1] // Store Staff (role 4) và Admin (role 1)
     const isAllowed =
       allowedRoles.includes(user.role) ||
       (user.roleId !== undefined && allowedRoleIds.includes(user.roleId))
