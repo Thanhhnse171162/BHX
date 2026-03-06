@@ -1,128 +1,76 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { executeQuery } from '@/lib/db/config'
-import bcrypt from 'bcryptjs'
+
+const IDENTITY_SERVICE_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://localhost:5000'
 
 interface RegisterRequest {
-  fullName: string
-  email: string
+  fullName?: string
+  email?: string
   phone?: string
-  password: string
-  confirmPassword: string
+  password?: string
+  confirmPassword?: string
+  FullName?: string
+  Email?: string
+  Phone?: string
+  Password?: string
+  ConfirmPassword?: string
 }
 
+/**
+ * Register API Route - Forward to Backend IAM Service
+ * Backend IAM service will handle user creation and send OTP email
+ */
 export async function POST(request: NextRequest) {
   try {
     const body: RegisterRequest = await request.json()
-    const { fullName, email, phone, password, confirmPassword } = body
 
-    // Validation
-    if (!fullName || !email || !password || !confirmPassword) {
-      return NextResponse.json(
-        { success: false, error: 'Vui lòng điền đầy đủ thông tin bắt buộc' },
-        { status: 400 }
-      )
+    console.log('📤 Register Request body:', body)
+
+    // Transform to PascalCase for .NET backend
+    const backendPayload = {
+      FullName: body.fullName || body.FullName,
+      Email: body.email || body.Email,
+      Phone: body.phone || body.Phone || '',
+      Password: body.password || body.Password,
+      ConfirmPassword: body.confirmPassword || body.ConfirmPassword,
     }
 
-    if (password !== confirmPassword) {
-      return NextResponse.json(
-        { success: false, error: 'Mật khẩu xác nhận không khớp' },
-        { status: 400 }
-      )
-    }
+    console.log('📤 Backend payload:', backendPayload)
 
-    if (password.length < 6) {
-      return NextResponse.json(
-        { success: false, error: 'Mật khẩu phải có ít nhất 6 ký tự' },
-        { status: 400 }
-      )
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { success: false, error: 'Email không hợp lệ' },
-        { status: 400 }
-      )
-    }
-
-    // Check if email already exists
-    const emailCheck = await executeQuery<{ count: number }>(
-      'SELECT COUNT(*) as count FROM users WHERE LOWER(email) = @email',
-      { email: email.toLowerCase().trim() }
-    )
-
-    if (emailCheck[0].count > 0) {
-      return NextResponse.json(
-        { success: false, error: 'Email đã được sử dụng' },
-        { status: 409 }
-      )
-    }
-
-    // Check if phone already exists (if provided)
-    if (phone) {
-      const phoneCheck = await executeQuery<{ count: number }>(
-        'SELECT COUNT(*) as count FROM users WHERE phone = @phone',
-        { phone: phone.trim() }
-      )
-
-      if (phoneCheck[0].count > 0) {
-        return NextResponse.json(
-          { success: false, error: 'Số điện thoại đã được sử dụng' },
-          { status: 409 }
-        )
-      }
-    }
-
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10)
-
-    console.log('🔐 Register - Password hash generated:', {
-      email: email.toLowerCase().trim(),
-      hashLength: passwordHash.length,
-      hashPreview: passwordHash.substring(0, 20) + '...'
-    })
-
-    // Insert new user with Customer role (role_id = 5)
-    const insertQuery = `
-      INSERT INTO users (id, email, password_hash, full_name, phone, role_id, status, email_verified)
-      OUTPUT INSERTED.id, INSERTED.email, INSERTED.full_name, INSERTED.phone
-      VALUES (NEWID(), @email, @passwordHash, @fullName, @phone, 5, 'ACTIVE', 0)
-    `
-
-    const result = await executeQuery<{
-      id: string
-      email: string
-      full_name: string
-      phone: string | null
-    }>(insertQuery, {
-      email: email.toLowerCase().trim(),
-      passwordHash,
-      fullName: fullName.trim(),
-      phone: phone?.trim() || null,
-    })
-
-    console.log('✅ User created successfully:', result[0].email)
-
-    const newUser = result[0]
-
-    return NextResponse.json(
-      {
-        success: true,
-        message: 'Đăng ký tài khoản thành công',
-        user: {
-          id: newUser.id,
-          email: newUser.email,
-          fullName: newUser.full_name,
-          phone: newUser.phone,
-        },
+    // Forward to Backend IAM Service
+    const backendResponse = await fetch(`${IDENTITY_SERVICE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-      { status: 201 }
-    )
-  } catch (error) {
-    console.error('Register error:', error)
+      body: JSON.stringify(backendPayload),
+    })
+
+    const responseData = await backendResponse.json()
+
+    console.log('📧 Backend Response:', {
+      status: backendResponse.status,
+      data: responseData
+    })
+
+    if (!backendResponse.ok) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: responseData.message || responseData.error || 'Đăng ký thất bại' 
+        },
+        { status: backendResponse.status }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: responseData.message || 'Đăng ký thành công! Vui lòng kiểm tra email để nhập mã OTP.',
+      data: responseData.data || responseData,
+    })
+  } catch (error: any) {
+    console.error('❌ Register API Error:', error)
     return NextResponse.json(
-      { success: false, error: 'Đã có lỗi xảy ra. Vui lòng thử lại sau.' },
+      { success: false, error: error.message || 'Lỗi server' },
       { status: 500 }
     )
   }
