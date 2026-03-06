@@ -25,9 +25,9 @@ export default function RegisterPage() {
   const [success, setSuccess] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
 
-  // Prefetch verify-email page để giảm độ trễ
+  // Prefetch login page để giảm độ trễ
   useEffect(() => {
-    router.prefetch('/verify-email')
+    router.prefetch('/login')
   }, [router])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -84,11 +84,11 @@ export default function RegisterPage() {
 
       setSuccess(true)
       // Hiển thị message từ BE
-      setSuccessMessage(response.message || 'Đăng ký thành công! Đang chuyển đến trang nhập OTP...')
+      setSuccessMessage(response.message || 'Đăng ký thành công! Vui lòng đăng nhập và xác thực email trong trang cá nhân.')
       
-      // Redirect to verify-email page with email pre-filled
+      // Redirect to login page
       setTimeout(() => {
-        router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`)
+        router.push('/login')
       }, 2000)
     } catch (err: any) {
       setError(err.message || 'Đã có lỗi xảy ra. Vui lòng thử lại.')

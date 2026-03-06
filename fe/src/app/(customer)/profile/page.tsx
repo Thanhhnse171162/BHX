@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { PageHeader } from '@/shared/ui/PageHeader'
 import { Button } from '@/shared/ui/Button'
 import { Input } from '@/shared/ui/Input'
@@ -10,7 +10,8 @@ import { PasswordInput } from '@/shared/ui/PasswordInput'
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog'
 import { ToastContainer, ToastItem } from '@/shared/ui/Toast'
 import { useAuth } from '@/shared/hooks/useAuth'
-import { User, Shield, Activity, Save, X, Edit2 } from 'lucide-react'
+import { authService } from '@/services/auth.service'
+import { User, Shield, Activity, Save, X, Edit2, Mail, CheckCircle2, AlertCircle } from 'lucide-react'
 
 type TabKey = 'profile' | 'security' | 'activity'
 
@@ -29,6 +30,15 @@ export default function CustomerProfilePage() {
   })
   const [profileErrors, setProfileErrors] = useState<Record<string, string>>({})
 
+  // Email verification state
+  const [isVerifyingEmail, setIsVerifyingEmail] = useState(false)
+  const [verifyOtp, setVerifyOtp] = useState('')
+  const [verifyOtpError, setVerifyOtpError] = useState('')
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false)
+  const [isResendingOtp, setIsResendingOtp] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const [isEmailVerified, setIsEmailVerified] = useState(user?.emailVerified || false)
+
   // Password form state
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -40,6 +50,14 @@ export default function CustomerProfilePage() {
 
   // Loading states
   const [isSaving, setIsSaving] = useState(false)
+
+  // Countdown for resend OTP
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [resendCooldown])
 
   // Mock activity data
   const activities = [
@@ -72,6 +90,46 @@ export default function CustomerProfilePage() {
     setTimeout(() => {
       addToast('Cập nhật ảnh đại diện thành công!', 'success')
     }, 1500)
+  }
+
+  const handleVerifyEmail = async () => {
+    if (!verifyOtp || verifyOtp.length !== 6) {
+      setVerifyOtpError('Vui lòng nhập mã OTP 6 số')
+      return
+    }
+
+    setIsVerifyingOtp(true)
+    setVerifyOtpError('')
+
+    try {
+      const response = await authService.verifyEmail(user?.email || '', verifyOtp)
+      addToast(response.message || 'Xác thực email thành công!', 'success')
+      setIsEmailVerified(true)
+      setIsVerifyingEmail(false)
+      setVerifyOtp('')
+    } catch (error: any) {
+      setVerifyOtpError(error.message || 'Xác thực thất bại. Vui lòng thử lại.')
+      addToast(error.message || 'Xác thực thất bại', 'error')
+    } finally {
+      setIsVerifyingOtp(false)
+    }
+  }
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0) return
+
+    setIsResendingOtp(true)
+    setVerifyOtpError('')
+
+    try {
+      const response = await authService.resendEmailOtp(user?.email || '')
+      addToast(response.message || 'Mã OTP mới đã được gửi đến email của bạn', 'success')
+      setResendCooldown(60) // 60 seconds cooldown
+    } catch (error: any) {
+      addToast(error.message || 'Không thể gửi lại OTP', 'error')
+    } finally {
+      setIsResendingOtp(false)
+    }
   }
 
   const validateProfile = () => {
@@ -226,6 +284,94 @@ export default function CustomerProfilePage() {
                   disabled={!isEditing}
                   placeholder="Nhập email"
                 />
+
+                {/* Email Verification Section */}
+                <div className="pt-2">
+                  {isEmailVerified ? (
+                    <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+                      <span className="text-sm font-medium text-green-700">Email đã được xác thực</span>
+                    </div>
+                  ) : (
+                    <div className="border border-orange-200 rounded-lg p-4 bg-orange-50">
+                      <div className="flex items-start gap-3 mb-3">
+                        <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-orange-900">Email chưa được xác thực</p>
+                          <p className="text-xs text-orange-700 mt-1">
+                            Vui lòng xác thực email để tăng cường bảo mật tài khoản
+                          </p>
+                        </div>
+                      </div>
+
+                      {!isVerifyingEmail ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsVerifyingEmail(true)}
+                          className="w-full gap-2"
+                        >
+                          <Mail className="w-4 h-4" />
+                          Xác thực Email
+                        </Button>
+                      ) : (
+                        <div className="space-y-3 mt-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Mã OTP
+                            </label>
+                            <Input
+                              value={verifyOtp}
+                              onChange={(e) => {
+                                setVerifyOtp(e.target.value)
+                                setVerifyOtpError('')
+                              }}
+                              error={verifyOtpError}
+                              placeholder="Nhập mã OTP 6 số"
+                              maxLength={6}
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                              Mã OTP đã được gửi đến email của bạn
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              onClick={handleVerifyEmail}
+                              disabled={isVerifyingOtp || !verifyOtp || verifyOtp.length !== 6}
+                              className="flex-1"
+                            >
+                              {isVerifyingOtp ? 'Đang xác thực...' : 'Xác thực'}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setIsVerifyingEmail(false)
+                                setVerifyOtp('')
+                                setVerifyOtpError('')
+                              }}
+                              disabled={isVerifyingOtp}
+                              className="flex-1"
+                            >
+                              Hủy
+                            </Button>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleResendOtp}
+                            disabled={resendCooldown > 0 || isResendingOtp}
+                            className="text-xs text-emerald-600 hover:text-emerald-700 disabled:text-gray-400 disabled:cursor-not-allowed"
+                          >
+                            {isResendingOtp ? 'Đang gửi...' : resendCooldown > 0 ? `Gửi lại OTP (${resendCooldown}s)` : 'Gửi lại mã OTP'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 <Input
                   label="Số điện thoại"
