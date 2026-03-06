@@ -36,6 +36,9 @@ export interface User {
   id: string
   name: string
   email: string
+  phone?: string
+  avatar?: string
+  emailVerified?: boolean
   role: UserRole
   roleId?: number
   permissions: Permission[]
