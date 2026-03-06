@@ -159,31 +159,61 @@ export const authService = {
   },
 
   /**
-   * Forgot password
+   * Forgot password - Gửi OTP về email
    */
   forgotPassword: async (email: string) => {
     try {
-      const response = await iamClient.post(iamEndpoints.auth.forgotPassword, { email })
+      const response = await localApiClient.post('/auth/forgot-password', { email })
       return response.data
     } catch (error: any) {
       const apiError = error.response?.data as ApiErrorResponse
-      throw new Error(apiError?.error || apiError?.message || 'Yêu cầu reset password thất bại')
+      throw new Error(apiError?.error || apiError?.message || 'Không thể gửi OTP. Vui lòng thử lại.')
     }
   },
 
   /**
-   * Reset password
+   * Reset password với OTP
    */
-  resetPassword: async (token: string, newPassword: string) => {
+  resetPassword: async (email: string, otp: string, newPassword: string) => {
     try {
-      const response = await iamClient.post(iamEndpoints.auth.resetPassword, { 
-        token, 
+      const response = await localApiClient.post('/auth/reset-password', { 
+        email,
+        otp,
         newPassword 
       })
       return response.data
     } catch (error: any) {
       const apiError = error.response?.data as ApiErrorResponse
-      throw new Error(apiError?.error || apiError?.message || 'Reset password thất bại')
+      throw new Error(apiError?.error || apiError?.message || 'Không thể đặt lại mật khẩu. Vui lòng thử lại.')
+    }
+  },
+
+  /**
+   * Verify email với OTP
+   */
+  verifyEmail: async (email: string, otp: string) => {
+    try {
+      const response = await localApiClient.post('/auth/verify-email', { 
+        email,
+        otp
+      })
+      return response.data
+    } catch (error: any) {
+      const apiError = error.response?.data as ApiErrorResponse
+      throw new Error(apiError?.error || apiError?.message || 'Xác thực email thất bại.')
+    }
+  },
+
+  /**
+   * Resend email OTP
+   */
+  resendEmailOtp: async (email: string) => {
+    try {
+      const response = await localApiClient.post('/auth/resend-email-otp', { email })
+      return response.data
+    } catch (error: any) {
+      const apiError = error.response?.data as ApiErrorResponse
+      throw new Error(apiError?.error || apiError?.message || 'Không thể gửi lại OTP.')
     }
   },
 }

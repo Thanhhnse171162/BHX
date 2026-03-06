@@ -2,33 +2,27 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@/shared/ui/Button'
 import { Input } from '@/shared/ui/Input'
-import axiosInstance from '@/shared/api/http'
-import { endpoints } from '@/shared/api/endpoints'
+import { authService } from '@/services/auth.service'
 import { getErrorMessage } from '@/shared/api/errors'
 
 const forgotPasswordSchema = z.object({
-  emailOrPhone: z.string().min(1, 'Vui lòng nhập email hoặc số điện thoại').refine(
-    (value) => {
-      // Check if it's a valid email
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      // Check if it's a valid Vietnamese phone number (10 digits starting with 0)
-      const phoneRegex = /^0\d{9}$/
-      return emailRegex.test(value) || phoneRegex.test(value)
-    },
-    { message: 'Email hoặc số điện thoại không hợp lệ' }
-  ),
+  email: z.string().min(1, 'Vui lòng nhập email').email('Email không hợp lệ'),
 })
 
 type ForgotPasswordForm = z.infer<typeof forgotPasswordSchema>
 
 export default function ForgotPasswordPage() {
+  const router = useRouter()
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
+  const [sentEmail, setSentEmail] = useState('')
   const [loading, setLoading] = useState(false)
 
   const {
@@ -44,11 +38,9 @@ export default function ForgotPasswordPage() {
     setError('')
 
     try {
-      // TODO: Replace with actual API call
-      // await axiosInstance.post(endpoints.auth.forgotPassword, data)
-      
-      // Mock success for demo
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const response = await authService.forgotPassword(data.email)
+      setSuccessMessage(response.message || 'Mã OTP đã được gửi đến email của bạn.')
+      setSentEmail(data.email)
       setSuccess(true)
     } catch (err) {
       setError(getErrorMessage(err) || 'Không thể gửi yêu cầu. Vui lòng thử lại sau.')
@@ -69,14 +61,21 @@ export default function ForgotPasswordPage() {
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Yêu cầu đã được gửi</h1>
             <p className="text-gray-600 mb-6">
-              Chúng tôi đã gửi hướng dẫn đặt lại mật khẩu đến email/số điện thoại của bạn. 
-              Vui lòng kiểm tra và làm theo hướng dẫn.
+              {successMessage}
             </p>
-            <Link href="/login">
-              <Button fullWidth className="bg-emerald-600 hover:bg-emerald-700">
-                Quay lại đăng nhập
-              </Button>
-            </Link>
+            <div className="space-y-3">
+              <button
+                onClick={() => router.push(`/reset-password?email=${encodeURIComponent(sentEmail)}`)}
+                className="w-full px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl transition-colors"
+              >
+                Nhập mã OTP
+              </button>
+              <Link href="/login">
+                <Button fullWidth variant="outline" className="border-emerald-600 text-emerald-600 hover:bg-emerald-50">
+                  Quay lại đăng nhập
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -105,7 +104,7 @@ export default function ForgotPasswordPage() {
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Quên mật khẩu</h1>
             <p className="text-gray-600 text-sm">
-              Nhập email hoặc số điện thoại đã đăng ký để nhận hướng dẫn đặt lại mật khẩu
+              Nhập email đã đăng ký để nhận mã OTP đặt lại mật khẩu
             </p>
           </div>
 
@@ -120,11 +119,11 @@ export default function ForgotPasswordPage() {
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <Input
-              label="Email hoặc Số điện thoại"
-              type="text"
-              placeholder="0901234567 hoặc email@example.com"
-              {...register('emailOrPhone')}
-              error={errors.emailOrPhone?.message}
+              label="Email"
+              type="email"
+              placeholder="email@example.com"
+              {...register('email')}
+              error={errors.email?.message}
               className="focus:border-emerald-500 focus:ring-emerald-500"
             />
 

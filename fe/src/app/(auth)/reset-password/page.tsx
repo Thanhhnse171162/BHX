@@ -8,8 +8,12 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@/shared/ui/Button'
 import { Input } from '@/shared/ui/Input'
+import { authService } from '@/services/auth.service'
+import { getErrorMessage } from '@/shared/api/errors'
 
 const resetPasswordSchema = z.object({
+  email: z.string().min(1, 'Vui lòng nhập email').email('Email không hợp lệ'),
+  otp: z.string().min(6, 'Vui lòng nhập mã OTP 6 số').max(6, 'Mã OTP phải có 6 số'),
   password: z.string()
     .min(8, 'Mật khẩu phải có ít nhất 8 ký tự')
     .regex(/[A-Z]/, 'Mật khẩu phải có ít nhất một chữ hoa')
@@ -28,8 +32,8 @@ export default function ResetPasswordPage() {
   const searchParams = useSearchParams()
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
   const [loading, setLoading] = useState(false)
-  const [token, setToken] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
@@ -38,6 +42,7 @@ export default function ResetPasswordPage() {
     handleSubmit,
     formState: { errors },
     watch,
+    setValue,
   } = useForm<ResetPasswordForm>({
     resolver: zodResolver(resetPasswordSchema),
   })
@@ -45,42 +50,28 @@ export default function ResetPasswordPage() {
   const password = watch('password')
 
   useEffect(() => {
-    // Get token from URL query params
-    const tokenFromUrl = searchParams.get('token')
-    if (!tokenFromUrl) {
-      setError('Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn')
-    } else {
-      setToken(tokenFromUrl)
+    // Get email from URL query params if available
+    const emailFromUrl = searchParams.get('email')
+    if (emailFromUrl) {
+      setValue('email', emailFromUrl)
     }
-  }, [searchParams])
+  }, [searchParams, setValue])
 
   const onSubmit = async (data: ResetPasswordForm) => {
-    if (!token) {
-      setError('Token không hợp lệ')
-      return
-    }
-
     setLoading(true)
     setError('')
 
     try {
-      // TODO: Replace with actual API call
-      // await axiosInstance.post(endpoints.auth.resetPassword, {
-      //   token,
-      //   password: data.password,
-      // })
-
-      // Mock success for demo (using password from form)
-      console.log('Resetting password with:', { token, password: data.password })
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const response = await authService.resetPassword(data.email, data.otp, data.password)
+      setSuccessMessage(response.message || 'Đặt lại mật khẩu thành công!')
       setSuccess(true)
 
-      // Redirect to login after 2 seconds
+      // Redirect to login after 3 seconds
       setTimeout(() => {
         router.push('/login')
-      }, 2000)
+      }, 3000)
     } catch (err) {
-      setError('Không thể đặt lại mật khẩu. Vui lòng thử lại sau.')
+      setError(getErrorMessage(err) || 'Không thể đặt lại mật khẩu. Vui lòng thử lại sau.')
     } finally {
       setLoading(false)
     }
@@ -114,34 +105,11 @@ export default function ResetPasswordPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Đặt lại mật khẩu thành công!</h1>
-            <p className="text-gray-600 mb-6">
-              Mật khẩu của bạn đã được cập nhật. Bạn có thể đăng nhập với mật khẩu mới.
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Thành công!</h1>
+            <p className="text-gray-600 mb-4">
+              {successMessage}
             </p>
             <p className="text-sm text-gray-500">Đang chuyển đến trang đăng nhập...</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (!token && error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gray-50">
-        <div className="w-full max-w-md">
-          <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
-            <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
-              <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Link không hợp lệ</h1>
-            <p className="text-gray-600 mb-6">{error}</p>
-            <Link href="/forgot-password">
-              <Button fullWidth className="bg-emerald-600 hover:bg-emerald-700">
-                Yêu cầu link mới
-              </Button>
-            </Link>
           </div>
         </div>
       </div>
@@ -170,7 +138,7 @@ export default function ResetPasswordPage() {
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Đặt lại mật khẩu</h1>
             <p className="text-gray-600 text-sm">
-              Tạo mật khẩu mới mạnh và bảo mật cho tài khoản của bạn
+              Nhập mã OTP đã được gửi đến email và tạo mật khẩu mới
             </p>
           </div>
 
@@ -184,6 +152,25 @@ export default function ResetPasswordPage() {
           )}
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <Input
+              label="Email"
+              type="email"
+              placeholder="email@example.com"
+              {...register('email')}
+              error={errors.email?.message}
+              className="focus:border-emerald-500 focus:ring-emerald-500"
+            />
+
+            <Input
+              label="Mã OTP"
+              type="text"
+              placeholder="Nhập mã OTP 6 số"
+              maxLength={6}
+              {...register('otp')}
+              error={errors.otp?.message}
+              className="focus:border-emerald-500 focus:ring-emerald-500"
+            />
+
             <div>
               <div className="relative">
                 <Input

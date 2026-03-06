@@ -23,10 +23,11 @@ export default function RegisterPage() {
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
 
-  // Prefetch login page để giảm độ trễ
+  // Prefetch verify-email page để giảm độ trễ
   useEffect(() => {
-    router.prefetch('/login')
+    router.prefetch('/verify-email')
   }, [router])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -73,7 +74,7 @@ export default function RegisterPage() {
 
     try {
       // Gọi backend IAM microservice thông qua authService
-      const data = await authService.register({
+      const response = await authService.register({
         FullName: formData.fullName,
         Email: formData.email,
         Phone: formData.phone || '', // Backend require Phone
@@ -82,11 +83,13 @@ export default function RegisterPage() {
       })
 
       setSuccess(true)
+      // Hiển thị message từ BE
+      setSuccessMessage(response.message || 'Đăng ký thành công! Đang chuyển đến trang nhập OTP...')
       
-      // Redirect to login after 1.5 seconds (giảm thời gian chờ)
+      // Redirect to verify-email page with email pre-filled
       setTimeout(() => {
-        router.push('/login')
-      }, 1500)
+        router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`)
+      }, 2000)
     } catch (err: any) {
       setError(err.message || 'Đã có lỗi xảy ra. Vui lòng thử lại.')
     } finally {
@@ -197,7 +200,11 @@ export default function RegisterPage() {
                 <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span>Đăng ký thành công! Đang chuyển đến trang đăng nhập...</span>
+                <div className="flex-1">
+                  <div className="font-medium mb-1">Đăng ký thành công!</div>
+                  <div className="text-sm">{successMessage}</div>
+                  <div className="text-xs mt-1 opacity-75">Đang chuyển đến trang đăng nhập...</div>
+                </div>
               </div>
             )}
 
