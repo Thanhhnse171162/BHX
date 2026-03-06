@@ -10,6 +10,7 @@ import { PasswordInput } from '@/shared/ui/PasswordInput'
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog'
 import { ToastContainer, ToastItem } from '@/shared/ui/Toast'
 import { useAuth } from '@/shared/hooks/useAuth'
+import { useAuthStore } from '@/store/auth.store'
 import { authService } from '@/services/auth.service'
 import { User, Shield, Activity, Save, X, Edit2, Mail, CheckCircle2, AlertCircle } from 'lucide-react'
 
@@ -59,6 +60,11 @@ export default function CustomerProfilePage() {
     }
   }, [resendCooldown])
 
+  // Sync email verification status with user object
+  useEffect(() => {
+    setIsEmailVerified(user?.emailVerified || false)
+  }, [user?.emailVerified])
+
   // Mock activity data
   const activities = [
     { id: 1, action: 'Đăng nhập', time: '5/2/2026, 10:30 AM', device: 'Chrome - Windows', location: 'TP.HCM' },
@@ -107,6 +113,14 @@ export default function CustomerProfilePage() {
       setIsEmailVerified(true)
       setIsVerifyingEmail(false)
       setVerifyOtp('')
+      
+      // Update user object in auth store with emailVerified = true
+      if (user) {
+        useAuthStore.getState().setUser({
+          ...user,
+          emailVerified: true
+        })
+      }
     } catch (error: any) {
       setVerifyOtpError(error.message || 'Xác thực thất bại. Vui lòng thử lại.')
       addToast(error.message || 'Xác thực thất bại', 'error')

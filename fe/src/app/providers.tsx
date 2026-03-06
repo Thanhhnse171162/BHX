@@ -30,7 +30,8 @@ export function Providers({ children }: { children: ReactNode }) {
     // Chỉ chạy cleanup 1 lần duy nhất (tránh chạy mỗi lần mount)
     if (!cleanedUp.current && typeof window !== 'undefined') {
       if (!sessionStorage.getItem('__cleaned')) {
-        const keysToRemove = ['auth-storage', 'auth_token', 'refresh_token', 'access_token', 'user', 'token']
+        // Cleanup old auth keys but keep 'auth-storage' (used by zustand persist)
+        const keysToRemove = ['auth_token', 'refresh_token', 'access_token', 'user', 'token']
         keysToRemove.forEach(key => {
           localStorage.removeItem(key)
           sessionStorage.removeItem(key)
