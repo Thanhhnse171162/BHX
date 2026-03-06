@@ -175,15 +175,19 @@ export default function CashierLayout({ children }: CashierLayoutProps) {
           })}
         </nav>
 
-        {/* User footer */}
-        <div className="border-t border-gray-100 p-4">
+      </aside>
+
+      {/* Main content */}
+      <div className="ml-[240px] flex-1 flex flex-col min-h-screen font-sans">
+        {/* Top header */}
+        <header className="sticky top-0 z-30 bg-white border-b border-gray-200 h-14 flex items-center justify-end px-6 gap-3 shadow-sm">
           <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-[14px] font-semibold text-gray-900 leading-tight font-sans">{user.name}</p>
+              <p className="text-[12px] text-gray-500 font-sans">Store Staff</p>
+            </div>
             <div className="w-9 h-9 rounded-full bg-green-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0 font-sans">
               {userInitial}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[15px] font-semibold text-gray-900 truncate font-sans">{user.name}</p>
-              <p className="text-[13px] text-gray-500 font-sans">Store Staff</p>
             </div>
             <button
               onClick={handleLogout}
@@ -193,11 +197,9 @@ export default function CashierLayout({ children }: CashierLayoutProps) {
               <LogOut size={16} />
             </button>
           </div>
-        </div>
-      </aside>
-
-      {/* Main content */}
-      <main className="ml-[240px] flex-1 min-h-screen font-sans">{children}</main>
+        </header>
+        <main className="flex-1">{children}</main>
+      </div>
     </div>
   )
 }
