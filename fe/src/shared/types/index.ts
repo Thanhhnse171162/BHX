@@ -1,12 +1,13 @@
 export type UserRole = 'CUSTOMER' | 'STAFF' | 'STORE_MANAGER' | 'WAREHOUSE_MANAGER' | 'WAREHOUSE_STAFF' | 'ADMIN'
 
-// Role ID mapping theo database IdentityDB (5 roles)
+// Role ID mapping theo database IdentityDB (6 roles)
 export const ROLE_ID_MAP: Record<number, UserRole> = {
-  1: 'ADMIN',            // Admin - System Administrator - Full Access
-  2: 'STORE_MANAGER',   // Manager - Store Manager - Manage store operations
-  3: 'STAFF',           // Store Staff - Process sales transactions (CASHIER PORTAL)
-  4: 'WAREHOUSE_STAFF', // Warehouse Staff - Manage inventory
-  5: 'CUSTOMER',        // Customer - Online shopping
+  1: 'ADMIN',              // Admin - System Administrator - Full Access
+  2: 'STORE_MANAGER',      // Store Manager - Manage store operations
+  3: 'WAREHOUSE_MANAGER',  // Warehouse Manager - Manage warehouse operations
+  4: 'STAFF',              // Store Staff - Process sales transactions (CASHIER PORTAL)
+  5: 'WAREHOUSE_STAFF',    // Warehouse Staff - Manage inventory
+  6: 'CUSTOMER',           // Customer - Online shopping
 }
 
 export type Permission =

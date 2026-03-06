@@ -21,8 +21,8 @@ export default function WarehouseLayout({
         return
       }
       
-      // Kiểm tra role_id phải là 2 (Warehouse Manager) và email có @company.com
-      if (user && (user.roleId !== 2 || !user.email?.endsWith('@company.com'))) {
+      // Kiểm tra role_id phải là 3 (Warehouse Manager) và email có @company.com
+      if (user && (user.roleId !== 3 || !user.email?.endsWith('@company.com'))) {
         router.push('/')
         return
       }
@@ -37,7 +37,7 @@ export default function WarehouseLayout({
     )
   }
 
-  if (!isAuthenticated || !user || user.roleId !== 2) {
+  if (!isAuthenticated || !user || user.roleId !== 3) {
     return null
   }
 

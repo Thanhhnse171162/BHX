@@ -2,12 +2,13 @@ import { UserRole, ROLE_ID_MAP } from '@/shared/types'
 
 /**
  * Convert roleId (số) sang UserRole (string)
- * Database IdentityDB mapping (5 roles):
+ * Database IdentityDB mapping (6 roles):
  * 1 = Admin
- * 2 = Manager (Store Manager)
- * 3 = Store Staff  ← Cashier Portal
- * 4 = Warehouse Staff
- * 5 = Customer
+ * 2 = Store Manager
+ * 3 = Warehouse Manager  ← Warehouse Portal
+ * 4 = Store Staff  ← Cashier Portal
+ * 5 = Warehouse Staff  ← Warehouse-Store Portal
+ * 6 = Customer
  */
 export function getRoleFromId(roleId: number): UserRole {
   return ROLE_ID_MAP[roleId] || 'CUSTOMER'
@@ -21,10 +22,10 @@ export function isCompanyEmail(email: string): boolean {
 }
 
 /**
- * Kiểm tra user có phải là Store Staff/Cashier không (role 3)
+ * Kiểm tra user có phải là Store Staff/Cashier không (role 4)
  */
 export function isStaffUser(roleId: number, email: string): boolean {
-  return roleId === 3 && isCompanyEmail(email)
+  return roleId === 4 && isCompanyEmail(email)
 }
 
 /**
@@ -35,18 +36,17 @@ export function isStoreManagerUser(roleId: number, email: string): boolean {
 }
 
 /**
- * @deprecated Không còn role Warehouse Manager trong DB mới (5 roles)
- * Giữ lại để tránh breaking change
+ * Kiểm tra user có phải là Warehouse Manager không (role 3)
  */
 export function isWarehouseManagerUser(roleId: number, email: string): boolean {
-  return false
+  return roleId === 3 && isCompanyEmail(email)
 }
 
 /**
- * Kiểm tra user có phải là Warehouse Staff không (role 4)
+ * Kiểm tra user có phải là Warehouse Staff không (role 5)
  */
 export function isWarehouseStaffUser(roleId: number, email: string): boolean {
-  return roleId === 4 && isCompanyEmail(email)
+  return roleId === 5 && isCompanyEmail(email)
 }
 
 /**

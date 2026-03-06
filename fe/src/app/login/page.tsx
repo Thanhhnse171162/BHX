@@ -94,15 +94,15 @@ export default function LoginPage() {
       // Update auth state
       login(user, token)
 
-      // Kiểm tra nếu là Store Staff (role 3) với email @company.com thì redirect đến /cashier
-      if (isStaffUser(roleId, userEmail)) {
-        router.replace('/cashier')
-      }
-      // Kiểm tra nếu là Store Manager (role 2) với email @company.com thì redirect đến /warehouse
-      else if (isStoreManagerUser(roleId, userEmail)) {
+      // Kiểm tra nếu là Warehouse Manager (role 3) với email @company.com thì redirect đến /warehouse
+      if (isWarehouseManagerUser(roleId, userEmail)) {
         router.replace('/warehouse')
       }
-      // Kiểm tra nếu là WAREHOUSE_STAFF (role 4) với email @company.com thì redirect đến /warehouse-store
+      // Kiểm tra nếu là Store Staff (role 4) với email @company.com thì redirect đến /cashier
+      else if (isStaffUser(roleId, userEmail)) {
+        router.replace('/cashier')
+      }
+      // Kiểm tra nếu là Warehouse Staff (role 5) với email @company.com thì redirect đến /warehouse-store
       else if (isWarehouseStaffUser(roleId, userEmail)) {
         router.replace('/warehouse-store')
       } else {

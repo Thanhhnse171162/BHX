@@ -21,8 +21,8 @@ export default function StoreWarehouseLayout({
         return
       }
       
-      // Kiểm tra role_id phải là 4 (Warehouse Staff) và email có @company.com
-      if (user && (user.roleId !== 4 || !user.email?.endsWith('@company.com'))) {
+      // Kiểm tra role_id phải là 5 (Warehouse Staff) và email có @company.com
+      if (user && (user.roleId !== 5 || !user.email?.endsWith('@company.com'))) {
         router.push('/')
         return
       }
@@ -37,7 +37,7 @@ export default function StoreWarehouseLayout({
     )
   }
 
-  if (!isAuthenticated || !user || user.roleId !== 4 || !user.email?.endsWith('@company.com')) {
+  if (!isAuthenticated || !user || user.roleId !== 5 || !user.email?.endsWith('@company.com')) {
     return null
   }
 
