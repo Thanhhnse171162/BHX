@@ -81,6 +81,9 @@ export default function LoginPage() {
         id: responseData.userId || responseData.id || userEmail,
         name: responseData.fullName || responseData.name || 'User',
         email: userEmail,
+        phone: responseData.phone || undefined,
+        avatar: responseData.avatar || undefined,
+        emailVerified: responseData.emailVerified || false,
         role: userRole,
         roleId: roleId,
         permissions: rolePermissions[userRole as keyof typeof rolePermissions] ?? rolePermissions.CUSTOMER,
@@ -95,9 +98,9 @@ export default function LoginPage() {
       if (isStaffUser(roleId, userEmail)) {
         router.replace('/cashier')
       }
-      // Kiểm tra nếu là Store Manager (role 2) với email @company.com thì redirect đến /ops
+      // Kiểm tra nếu là Store Manager (role 2) với email @company.com thì redirect đến /warehouse
       else if (isStoreManagerUser(roleId, userEmail)) {
-        router.replace('/ops')
+        router.replace('/warehouse')
       }
       // Kiểm tra nếu là WAREHOUSE_STAFF (role 4) với email @company.com thì redirect đến /warehouse-store
       else if (isWarehouseStaffUser(roleId, userEmail)) {

@@ -65,7 +65,7 @@ export function resolveRole(roleId: number, email: string): UserRole {
 export function getRedirectPath(role: UserRole): string {
   const paths: Record<UserRole, string> = {
     ADMIN: '/admin/dashboard',
-    STORE_MANAGER: '/ops',          // Manager (role 2) → ops portal
+    STORE_MANAGER: '/warehouse',    // Manager (role 2) → warehouse portal
     WAREHOUSE_MANAGER: '/warehouse', // legacy
     WAREHOUSE_STAFF: '/warehouse-store',
     STAFF: '/cashier',              // Store Staff (role 3) → cashier portal
