@@ -18,6 +18,8 @@ interface LoginResponse {
     roleId: number
     userId?: string
     id?: string
+    isEmailVerified?: boolean
+    emailVerified?: boolean
     createdAt?: string
     updatedAt?: string
   }
@@ -30,6 +32,8 @@ interface LoginResponse {
   roleId?: number
   userId?: string
   id?: string
+  isEmailVerified?: boolean
+  emailVerified?: boolean
   createdAt?: string
   updatedAt?: string
 }

@@ -1,19 +1,13 @@
  'use client'
 
-import { useEffect, useRef, useState, useMemo } from 'react'
-import {
-  Eye,
-  MoreVertical,
-  Search,
-  Bell,
-  Plus,
-  ChevronDown,
-  SlidersHorizontal,
-  ArrowUpDown,
-  X,
-  Package,
-  Info,
-} from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
+import { Button } from '@/shared/ui/Button'
+import { Input } from '@/shared/ui/Input'
+import DataTable from '@/shared/ui/DataTable'
+import PageHeader from '@/shared/ui/PageHeader'
+import EmptyState from '@/shared/ui/EmptyState'
+import Modal from '@/shared/ui/Modal'
 
 type ProductStatus = 'ACTIVE' | 'INACTIVE'
 

@@ -98,6 +98,7 @@ export default function CustomerProfilePage() {
     }, 1500)
   }
 
+  
   const handleVerifyEmail = async () => {
     if (!verifyOtp || verifyOtp.length !== 6) {
       setVerifyOtpError('Vui lòng nhập mã OTP 6 số')
