@@ -83,7 +83,7 @@ export default function LoginPage() {
         email: userEmail,
         phone: responseData.phone || undefined,
         avatar: responseData.avatar || undefined,
-        emailVerified: responseData.emailVerified || false,
+        emailVerified: responseData.isEmailVerified ?? responseData.emailVerified ?? false,
         role: userRole,
         roleId: roleId,
         permissions: rolePermissions[userRole as keyof typeof rolePermissions] ?? rolePermissions.CUSTOMER,
