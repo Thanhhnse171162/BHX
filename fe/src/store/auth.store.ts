@@ -86,6 +86,37 @@ export const useAuthStore = create<AuthStore>()(
         token: state.token,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.error('Failed to rehydrate auth storage:', error)
+        }
+        // Normalize/migrate legacy user shape so workplace-based pages work reliably
+        const u: any = state?.user
+        if (u) {
+          const normalizedWorkplaceType =
+            u.workplaceType ??
+            u.workplace_type ??
+            u.workplace?.type ??
+            (u.warehouseId ? 'WAREHOUSE' : u.storeId ? 'STORE' : null)
+
+          const normalizedWorkplaceId =
+            u.workplaceId ??
+            u.workplace_id ??
+            u.workplace?.id ??
+            u.warehouseId ??
+            u.storeId ??
+            null
+
+          if (u.workplaceType !== normalizedWorkplaceType || u.workplaceId !== normalizedWorkplaceId) {
+            state?.setUser({
+              ...u,
+              workplaceType: normalizedWorkplaceType,
+              workplaceId: normalizedWorkplaceId,
+            })
+          }
+        }
+        state?.setHydrated()
+      },
     }
   )
 )

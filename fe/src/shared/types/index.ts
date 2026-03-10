@@ -45,6 +45,8 @@ export interface User {
   permissions: Permission[]
   storeId?: string
   warehouseId?: string
+  workplaceType?: 'STORE' | 'WAREHOUSE' | null
+  workplaceId?: string | null
   createdAt: string
   updatedAt: string
 }

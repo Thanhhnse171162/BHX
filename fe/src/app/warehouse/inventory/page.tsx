@@ -6,6 +6,7 @@ import { Button } from '@/shared/ui/Button'
 import { Input } from '@/shared/ui/Input'
 import { InventoryAPIService, InventoryItem } from '@/services/inventory-api.service'
 import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
+import { useAuthStore } from '@/store/auth.store'
 
 type FilterTab = 'all' | 'warehouse' | 'store'
 
@@ -24,17 +25,29 @@ export default function InventoryPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
+  const { user, hydrated } = useAuthStore()
+
   useEffect(() => {
+    if (!hydrated) return
     fetchData()
-  }, [])
+  }, [hydrated, user?.workplaceType, user?.workplaceId])
 
   const fetchData = async () => {
     try {
       setIsLoading(true)
       setError(null)
 
+      if (!user?.workplaceType || !user?.workplaceId) {
+        setInventory([])
+        setError('Tài khoản chưa có thông tin kho/cửa hàng (workplace). Vui lòng đăng xuất và đăng nhập lại.')
+        return
+      }
+
       const [inventoryData, productsData] = await Promise.all([
-        InventoryAPIService.getAllInventory(),
+        InventoryAPIService.getInventoryByLocation(
+          user.workplaceType as 'WAREHOUSE' | 'STORE',
+          user.workplaceId
+        ),
         ProductAPIService.getAllProducts().catch(() => [] as ProductFromAPI[])
       ])
 
