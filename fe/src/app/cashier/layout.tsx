@@ -98,7 +98,7 @@ export default function CashierLayout({ children }: CashierLayoutProps) {
     if (!isAllowed) {
       if (user.role === 'ADMIN') router.push('/admin/dashboard')
       else if (user.role === 'CUSTOMER') router.push('/customer')
-      else if (user.role === 'STORE_MANAGER') router.push('/ops')
+      else if (user.role === 'STORE_MANAGER') router.push('/store-manager')
       else router.push('/login')
     }
   }, [isAuthenticated, user, router])
