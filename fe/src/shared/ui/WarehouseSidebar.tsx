@@ -12,7 +12,6 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
-  BarChart3,
   Warehouse,
   Eye,
   LucideIcon
@@ -37,9 +36,9 @@ const inventorySection: NavSection = {
   icon: Package,
   items: [
     {
-      label: 'Overview',
-      href: '/warehouse/inventory/overview',
-      icon: BarChart3
+      label: 'Inventory',
+      href: '/warehouse/inventory',
+      icon: Package
     },
     {
       label: 'Batch-Level Inventory',
