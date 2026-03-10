@@ -5,6 +5,7 @@ import { Search, Filter, Package, CheckCircle, AlertTriangle, XCircle, Download,
 import { Button } from '@/shared/ui/Button'
 import { InventoryAPIService } from '@/services/inventory-api.service'
 import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
+import { useAuthStore } from '@/store/auth.store'
 
 interface InventoryItemDisplay {
   productId: string
@@ -34,6 +35,9 @@ export default function InventoryListPage() {
   const [error, setError] = useState<string | null>(null)
   const itemsPerPage = 10
 
+  // Get user from auth store
+  const { user, hydrated } = useAuthStore()
+
   // Fetch data from API
   useEffect(() => {
     const fetchInventoryData = async () => {
@@ -42,9 +46,29 @@ export default function InventoryListPage() {
         setError(null)
 
         console.log('Fetching inventory data...')
+        console.log('User workplace info:', {
+          workplaceType: user?.workplaceType,
+          workplaceId: user?.workplaceId
+        })
         
-        // Fetch inventory data
-        const inventoryData = await InventoryAPIService.getAllInventory()
+        // Fetch inventory data based on user's workplace
+        let inventoryData
+        
+        if (user?.workplaceType && user?.workplaceId) {
+          // Fetch inventory for specific location
+          console.log(`Fetching inventory for ${user.workplaceType} ${user.workplaceId}`)
+          inventoryData = await InventoryAPIService.getInventoryByLocation(
+            user.workplaceType as 'WAREHOUSE' | 'STORE',
+            user.workplaceId
+          )
+        } else {
+          // Nếu auth chưa hydrate hoặc chưa có workplace info, đừng gọi "get all" (sẽ hiện sai dữ liệu)
+          console.log('Waiting for hydrated user/workplace info; skip fetching inventory for now')
+          setInventory([])
+          setError('Tài khoản chưa có thông tin kho/cửa hàng (workplace). Vui lòng đăng xuất và đăng nhập lại.')
+          return
+        }
+        
         console.log('Inventory data received:', inventoryData?.length || 0, 'items')
         
         // Fetch all products
@@ -115,8 +139,11 @@ export default function InventoryListPage() {
       }
     }
 
+    // Chờ zustand persist hydrate xong rồi mới fetch
+    if (!hydrated) return
+
     fetchInventoryData()
-  }, [])
+  }, [hydrated, user?.workplaceType, user?.workplaceId])
 
   const categories = useMemo(() => {
     return Array.from(new Set(inventory.map(item => item.category)))
@@ -154,7 +181,7 @@ export default function InventoryListPage() {
       outOfStock: inventory.filter(i => i.status === 'out-of-stock').length,
       needRestock: inventory.filter(i => i.status === 'need-restock').length,
     }
-  }, [])
+  }, [inventory])
 
   const getStatusBadge = (status: string) => {
     const config = {
@@ -184,7 +211,15 @@ export default function InventoryListPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Inventory List</h1>
-          <p className="text-gray-600 mt-1">Danh sách tồn kho cửa hàng</p>
+          <p className="text-gray-600 mt-1">
+            {user?.workplaceType && user?.workplaceId ? (
+              <>
+                Tồn kho {user.workplaceType === 'STORE' ? 'Cửa hàng' : 'Kho'} - ID: {user.workplaceId}
+              </>
+            ) : (
+              'Danh sách tồn kho'
+            )}
+          </p>
         </div>
         <Button variant="outline" onClick={handleExport} disabled={loading}>
           <Download className="w-4 h-4 mr-2" />

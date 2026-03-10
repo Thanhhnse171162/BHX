@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
 import { InventoryAPIService, InventoryItem } from '@/services/inventory-api.service'
+import { useAuthStore } from '@/store/auth.store'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Product {
@@ -266,12 +267,22 @@ export default function CashierProductsPage() {
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>(null)
   const filterRef = useRef<HTMLDivElement>(null)
 
+  const { user, hydrated } = useAuthStore()
+
   // Fetch data helper function
   const fetchData = async () => {
     console.log('Fetching inventory and product data...')
+
+    if (!user?.workplaceType || !user?.workplaceId) {
+      throw new Error('Tài khoản chưa có thông tin cửa hàng (workplace). Vui lòng đăng xuất và đăng nhập lại.')
+    }
+
+    if (user.workplaceType !== 'STORE') {
+      throw new Error('Tài khoản này không thuộc cửa hàng (STORE), không thể xem danh sách sản phẩm POS.')
+    }
     
     // Fetch inventory data (có stock info)
-    const inventoryData = await InventoryAPIService.getAllInventory()
+    const inventoryData = await InventoryAPIService.getInventoryByLocation('STORE', user.workplaceId)
     console.log('Inventory data:', inventoryData?.length || 0, 'items')
     console.log('Sample inventory item:', inventoryData[0]) // Log để xem structure
     
@@ -296,7 +307,7 @@ export default function CashierProductsPage() {
       if (product) {
         // Có đầy đủ product info, merge với inventory
         console.log('✅ Found product for:', item.productId)
-        return mapApiProduct({ ...product, stock: item.quantity, minStock: item.minStockLevel })
+        return mapApiProduct({ ...product, stock: item.availableQuantity ?? item.quantity, minStock: item.minStockLevel })
       } else {
         // Không có product info, dùng inventory data thôi
         console.log('⚠️ No product found for:', item.productId, '- using inventory data only')
@@ -307,6 +318,7 @@ export default function CashierProductsPage() {
 
   // Fetch products from API
   useEffect(() => {
+    if (!hydrated) return
     let cancelled = false
     setLoading(true)
     setError(null)
@@ -327,7 +339,7 @@ export default function CashierProductsPage() {
       })
     
     return () => { cancelled = true }
-  }, [])
+  }, [hydrated, user?.workplaceType, user?.workplaceId])
 
   // Close filter panel on outside click
   useEffect(() => {

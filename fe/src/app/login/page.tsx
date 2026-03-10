@@ -87,6 +87,20 @@ export default function LoginPage() {
         role: userRole,
         roleId: roleId,
         permissions: rolePermissions[userRole as keyof typeof rolePermissions] ?? rolePermissions.CUSTOMER,
+        // Backend có thể trả:
+        // - workplaceType/workplaceId (camelCase)
+        // - workplace_type/workplace_id (snake_case)
+        // - workplace: { type, id }
+        workplaceType:
+          responseData.workplaceType ||
+          responseData.workplace_type ||
+          responseData.workplace?.type ||
+          null,
+        workplaceId:
+          responseData.workplaceId ||
+          responseData.workplace_id ||
+          responseData.workplace?.id ||
+          null,
         createdAt: responseData.createdAt || new Date().toISOString(),
         updatedAt: responseData.updatedAt || new Date().toISOString(),
       }

@@ -114,8 +114,9 @@ export class InventoryAPIService {
     locationId: string
   ): Promise<InventoryItem[]> {
     try {
+      // Gọi tới route proxy mới: /api/inventory/location/[locationType]/[locationId]
       const response = await localApiClient.get<InventoryApiResponse>(
-        `${this.baseURL}?locationType=${locationType}&locationId=${locationId}`
+        `${this.baseURL}/location/${locationType}/${locationId}`
       )
       return response.data.data
     } catch (error) {

@@ -23,7 +23,6 @@ export function Providers({ children }: { children: ReactNode }) {
       })
   )
 
-  const setHydrated = useAuthStore((state) => state.setHydrated)
   const cleanedUp = useRef(false)
 
   useEffect(() => {
@@ -40,8 +39,7 @@ export function Providers({ children }: { children: ReactNode }) {
       }
       cleanedUp.current = true
     }
-    setHydrated()
-  }, [setHydrated])
+  }, [])
 
   return (
     <QueryClientProvider client={queryClient}>
