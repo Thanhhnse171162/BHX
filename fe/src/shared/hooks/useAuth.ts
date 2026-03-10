@@ -9,6 +9,7 @@ export function useAuth() {
   const token = useAuthStore((state) => state.token)
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const isLoading = useAuthStore((state) => state.isLoading)
+  const hydrated = useAuthStore((state) => state.hydrated)
   const login = useAuthStore((state) => state.login)
   const logout = useAuthStore((state) => state.logout)
   const hasPermission = useAuthStore((state) => state.hasPermission)
@@ -19,6 +20,7 @@ export function useAuth() {
     token,
     isAuthenticated,
     isLoading,
+    hydrated,
     login,
     logout,
     hasPermission,

@@ -15,7 +15,7 @@ interface StaffLayoutProps {
 export default function StaffLayout({ children }: StaffLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
-  const { user, isAuthenticated, logout } = useAuthStore()
+  const { user, isAuthenticated, logout, hydrated } = useAuthStore()
   const navItems = getStaffNavigation()
   const [isCollapsed, setIsCollapsed] = useState(false)
   
@@ -24,6 +24,11 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
   const announcementCount = 3
 
   useEffect(() => {
+    // Đợi auth store hydrate xong trước khi kiểm tra
+    if (!hydrated) {
+      return
+    }
+
     // Check authentication and role
     if (!isAuthenticated || !user) {
       router.push('/login')
@@ -41,14 +46,14 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
       else router.push('/ops')
       return
     }
-  }, [isAuthenticated, user, router])
+  }, [isAuthenticated, user, router, hydrated])
 
   const handleLogout = () => {
     logout()
     router.push('/login')
   }
 
-  if (!isAuthenticated || !user || user.role !== 'STAFF') {
+  if (!hydrated || !isAuthenticated || !user || user.role !== 'STAFF') {
     return null
   }
 

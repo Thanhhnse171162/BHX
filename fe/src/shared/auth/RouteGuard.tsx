@@ -14,10 +14,16 @@ interface RouteGuardProps {
 export function RouteGuard({ children, allowedRoles, fallback }: RouteGuardProps) {
   const router = useRouter()
   const pathname = usePathname()
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, hydrated } = useAuthStore()
   const [isChecking, setIsChecking] = useState(true)
 
   useEffect(() => {
+    // Đợi zustand persist hydrate xong trước khi kiểm tra
+    if (!hydrated) {
+      setIsChecking(true)
+      return
+    }
+
     if (!isAuthenticated || !user) {
       router.replace('/login')
       return
@@ -44,9 +50,9 @@ export function RouteGuard({ children, allowedRoles, fallback }: RouteGuardProps
     }
 
     setIsChecking(false)
-  }, [isAuthenticated, user, allowedRoles, router])
+  }, [isAuthenticated, user, allowedRoles, router, pathname, hydrated])
 
-  if (isChecking) {
+  if (isChecking || !hydrated) {
     return fallback || <div className="flex items-center justify-center min-h-screen">Loading...</div>
   }
 
