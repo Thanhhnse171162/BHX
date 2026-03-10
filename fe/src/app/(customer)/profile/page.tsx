@@ -4,23 +4,16 @@ import { useState, useEffect } from 'react'
 import { PageHeader } from '@/shared/ui/PageHeader'
 import { Button } from '@/shared/ui/Button'
 import { Input } from '@/shared/ui/Input'
-import { Tabs, Tab } from '@/shared/ui/Tabs'
 import { Avatar } from '@/shared/ui/Avatar'
-import { PasswordInput } from '@/shared/ui/PasswordInput'
-import { ConfirmDialog } from '@/shared/ui/ConfirmDialog'
 import { ToastContainer, ToastItem } from '@/shared/ui/Toast'
 import { useAuth } from '@/shared/hooks/useAuth'
 import { useAuthStore } from '@/store/auth.store'
 import { authService } from '@/services/auth.service'
-import { User, Shield, Activity, Save, X, Edit2, Mail, CheckCircle2, AlertCircle } from 'lucide-react'
-
-type TabKey = 'profile' | 'security' | 'activity'
+import { Save, X, Edit2, Mail, CheckCircle2, AlertCircle } from 'lucide-react'
 
 export default function CustomerProfilePage() {
   const { user } = useAuth()
-  const [activeTab, setActiveTab] = useState<TabKey>('profile')
   const [isEditing, setIsEditing] = useState(false)
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [toasts, setToasts] = useState<ToastItem[]>([])
 
   // Profile form state
@@ -40,15 +33,6 @@ export default function CustomerProfilePage() {
   const [resendCooldown, setResendCooldown] = useState(0)
   const [isEmailVerified, setIsEmailVerified] = useState(user?.emailVerified || false)
 
-  // Password form state
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-  })
-  const [passwordErrors, setPasswordErrors] = useState<Record<string, string>>({})
-  const [isChangingPassword, setIsChangingPassword] = useState(false)
-
   // Loading states
   const [isSaving, setIsSaving] = useState(false)
 
@@ -58,25 +42,13 @@ export default function CustomerProfilePage() {
       const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000)
       return () => clearTimeout(timer)
     }
+    return undefined
   }, [resendCooldown])
 
   // Sync email verification status with user object
   useEffect(() => {
     setIsEmailVerified(user?.emailVerified || false)
   }, [user?.emailVerified])
-
-  // Mock activity data
-  const activities = [
-    { id: 1, action: 'Đăng nhập', time: '5/2/2026, 10:30 AM', device: 'Chrome - Windows', location: 'TP.HCM' },
-    { id: 2, action: 'Cập nhật thông tin', time: '1/2/2026, 3:15 PM', device: 'Chrome - Windows', location: 'TP.HCM' },
-    { id: 3, action: 'Đổi mật khẩu', time: '28/1/2026, 9:20 AM', device: 'Safari - iPhone', location: 'TP.HCM' },
-  ]
-
-  const tabs: Tab[] = [
-    { key: 'profile', label: 'Thông tin cá nhân', icon: <User className="w-5 h-5" /> },
-    { key: 'security', label: 'Bảo mật', icon: <Shield className="w-5 h-5" /> },
-    { key: 'activity', label: 'Hoạt động', icon: <Activity className="w-5 h-5" />, badge: activities.length },
-  ]
 
   const addToast = (message: string, type: ToastItem['type'] = 'info') => {
     const id = Date.now().toString()
@@ -164,55 +136,31 @@ export default function CustomerProfilePage() {
     return Object.keys(errors).length === 0
   }
 
-  const validatePassword = () => {
-    const errors: Record<string, string> = {}
-    if (!passwordForm.currentPassword) {
-      errors.currentPassword = 'Vui lòng nhập mật khẩu hiện tại'
-    }
-    if (!passwordForm.newPassword) {
-      errors.newPassword = 'Vui lòng nhập mật khẩu mới'
-    } else if (passwordForm.newPassword.length < 8) {
-      errors.newPassword = 'Mật khẩu phải có ít nhất 8 ký tự'
-    }
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      errors.confirmPassword = 'Mật khẩu xác nhận không khớp'
-    }
-    setPasswordErrors(errors)
-    return Object.keys(errors).length === 0
-  }
-
   const handleSaveProfile = async () => {
     if (!validateProfile()) return
 
     setIsSaving(true)
     try {
-      // TODO: Call API to update profile
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const response = await authService.updateProfile({
+        name: profileForm.name,
+        email: profileForm.email,
+        phone: profileForm.phone,
+      })
       
-      addToast('Cập nhật thông tin thành công!', 'success')
+      // Update user in auth store
+      if (user) {
+        useAuthStore.getState().setUser({
+          ...user,
+          name: profileForm.name,
+          email: profileForm.email,
+          phone: profileForm.phone,
+        })
+      }
+      
+      addToast(response.message || 'Cập nhật thông tin thành công!', 'success')
       setIsEditing(false)
-    } catch (error) {
-      addToast('Có lỗi xảy ra. Vui lòng thử lại!', 'error')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const handleChangePassword = async () => {
-    if (!validatePassword()) return
-
-    setShowConfirmDialog(false)
-    setIsSaving(true)
-    
-    try {
-      // TODO: Call API to change password
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      
-      addToast('Đổi mật khẩu thành công!', 'success')
-      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
-      setIsChangingPassword(false)
-    } catch (error) {
-      addToast('Có lỗi xảy ra. Vui lòng thử lại!', 'error')
+    } catch (error: any) {
+      addToast(error.message || 'Có lỗi xảy ra. Vui lòng thử lại!', 'error')
     } finally {
       setIsSaving(false)
     }
@@ -233,7 +181,7 @@ export default function CustomerProfilePage() {
       <div className="max-w-5xl mx-auto">
         <PageHeader
           title="Tài khoản của tôi"
-          subtitle="Quản lý thông tin cá nhân và bảo mật"
+          subtitle="Quản lý thông tin cá nhân"
           breadcrumbs={[
             { label: 'Trang chủ', href: '/customer' },
             { label: 'Tài khoản', href: '/customer/profile' },
@@ -257,7 +205,7 @@ export default function CustomerProfilePage() {
                 Tham gia từ {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('vi-VN') : 'N/A'}
               </p>
             </div>
-            {!isEditing && activeTab === 'profile' && (
+            {!isEditing && (
               <Button
                 variant="outline"
                 onClick={() => setIsEditing(true)}
@@ -270,13 +218,9 @@ export default function CustomerProfilePage() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <Tabs tabs={tabs} activeTab={activeTab} onChange={(key) => setActiveTab(key as TabKey)} />
-
-        {/* Tab Content */}
+        {/* Profile Content */}
         <div className="mt-6">
-          {/* Profile Tab */}
-          {activeTab === 'profile' && (
+          {
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-6">Thông tin cá nhân</h3>
               
@@ -421,127 +365,9 @@ export default function CustomerProfilePage() {
                 )}
               </div>
             </div>
-          )}
-
-          {/* Security Tab */}
-          {activeTab === 'security' && (
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-6">Bảo mật tài khoản</h3>
-              
-              {!isChangingPassword ? (
-                <div>
-                  <div className="flex items-start gap-4 p-4 bg-blue-50 rounded-lg mb-6">
-                    <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-blue-900">Mật khẩu hiện tại</p>
-                      <p className="text-sm text-blue-700 mt-1">••••••••</p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsChangingPassword(true)}
-                    >
-                      Đổi mật khẩu
-                    </Button>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                      <div>
-                        <p className="font-medium text-gray-900">Xác thực 2 lớp</p>
-                        <p className="text-sm text-gray-500 mt-1">Tăng cường bảo mật cho tài khoản</p>
-                      </div>
-                      <Button variant="outline" size="sm">Bật</Button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  <PasswordInput
-                    label="Mật khẩu hiện tại"
-                    value={passwordForm.currentPassword}
-                    onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                    error={passwordErrors.currentPassword}
-                    placeholder="Nhập mật khẩu hiện tại"
-                  />
-
-                  <PasswordInput
-                    label="Mật khẩu mới"
-                    value={passwordForm.newPassword}
-                    onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                    error={passwordErrors.newPassword}
-                    placeholder="Nhập mật khẩu mới"
-                    showStrength={true}
-                  />
-
-                  <PasswordInput
-                    label="Xác nhận mật khẩu mới"
-                    value={passwordForm.confirmPassword}
-                    onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                    error={passwordErrors.confirmPassword}
-                    placeholder="Nhập lại mật khẩu mới"
-                  />
-
-                  <div className="flex items-center gap-3 pt-4">
-                    <Button
-                      onClick={() => setShowConfirmDialog(true)}
-                      disabled={isSaving}
-                    >
-                      {isSaving ? 'Đang xử lý...' : 'Đổi mật khẩu'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setIsChangingPassword(false)
-                        setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
-                        setPasswordErrors({})
-                      }}
-                      disabled={isSaving}
-                    >
-                      Hủy
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Activity Tab */}
-          {activeTab === 'activity' && (
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-6">Lịch sử hoạt động</h3>
-              
-              <div className="space-y-4">
-                {activities.map((activity) => (
-                  <div key={activity.id} className="flex items-start gap-4 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                      <Activity className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900">{activity.action}</p>
-                      <p className="text-sm text-gray-500 mt-1">{activity.time}</p>
-                      <p className="text-sm text-gray-500">{activity.device} • {activity.location}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          }
         </div>
       </div>
-
-      {/* Confirm Dialog */}
-      <ConfirmDialog
-        isOpen={showConfirmDialog}
-        title="Xác nhận đổi mật khẩu"
-        message="Bạn có chắc chắn muốn đổi mật khẩu? Bạn sẽ cần đăng nhập lại sau khi đổi mật khẩu."
-        confirmText="Đồng ý"
-        cancelText="Hủy"
-        type="warning"
-        onConfirm={handleChangePassword}
-        onCancel={() => setShowConfirmDialog(false)}
-        loading={isSaving}
-      />
 
       {/* Toast Container */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
