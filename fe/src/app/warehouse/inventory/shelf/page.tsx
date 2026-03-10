@@ -129,21 +129,21 @@ export default function ShelfMonitoringPage() {
         text: 'text-green-800',
         border: 'border-green-200',
         icon: <CheckCircle size={14} />,
-        label: 'Well Stocked'
+        label: 'Đủ hàng'
       },
       low: {
         bg: 'bg-orange-100',
         text: 'text-orange-800',
         border: 'border-orange-200',
         icon: <AlertTriangle size={14} />,
-        label: 'Low Stock'
+        label: 'Tồn kho thấp'
       },
       empty: {
         bg: 'bg-red-100',
         text: 'text-red-800',
         border: 'border-red-200',
         icon: <AlertCircle size={14} />,
-        label: 'Empty - Urgent!'
+        label: 'Trống - Khẩn!'
       }
     }
 
@@ -168,13 +168,13 @@ export default function ShelfMonitoringPage() {
             className="bg-red-500 hover:bg-red-600 text-white text-xs"
           >
             <AlertCircle size={14} className="mr-1" />
-            Refill Now
+            Bổ sung ngay
           </Button>
         )
       }
       return (
         <div className="flex flex-col gap-1">
-          <p className="text-xs text-red-600 font-semibold">⚠️ No backroom stock</p>
+          <p className="text-xs text-red-600 font-semibold">⚠️ Không có hàng trong kho sau</p>
           <Button
             size="sm"
             variant="outline"
@@ -182,7 +182,7 @@ export default function ShelfMonitoringPage() {
             className="text-red-600 border-red-600 hover:bg-red-50 text-xs"
           >
             <Package size={14} className="mr-1" />
-            Order Stock
+            Đặt hàng
           </Button>
         </div>
       )
@@ -196,7 +196,7 @@ export default function ShelfMonitoringPage() {
           className="bg-orange-500 hover:bg-orange-600 text-white text-xs"
         >
           <ArrowRight size={14} className="mr-1" />
-          Transfer
+          Chuyển
         </Button>
       )
     }
@@ -210,12 +210,12 @@ export default function ShelfMonitoringPage() {
           className="text-blue-600 border-blue-600 hover:bg-blue-50 text-xs"
         >
           <ArrowRight size={14} className="mr-1" />
-          Transfer
+          Chuyển
         </Button>
       )
     }
 
-    return <span className="text-xs text-gray-400 italic">No action needed</span>
+    return <span className="text-xs text-gray-400 italic">Không cần thao tác</span>
   }
 
   // Format date/time
@@ -241,8 +241,8 @@ export default function ShelfMonitoringPage() {
       <div className="max-w-[1600px] mx-auto p-6 space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Shelf Monitoring</h1>
-          <p className="text-gray-600 mt-1">Monitor and manage product display levels</p>
+          <h1 className="text-2xl font-bold text-gray-900">Giám sát kệ hàng</h1>
+          <p className="text-gray-600 mt-1">Giám sát và quản lý mức độ trưng bày sản phẩm</p>
         </div>
 
         {/* Summary Cards */}
@@ -251,7 +251,7 @@ export default function ShelfMonitoringPage() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 font-medium">Total Shelves</p>
+                <p className="text-sm text-gray-600 font-medium">Tổng kệ</p>
                 <p className="text-3xl font-bold text-gray-900 mt-2">{stats.total}</p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -264,7 +264,7 @@ export default function ShelfMonitoringPage() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 font-medium">Well Stocked</p>
+                <p className="text-sm text-gray-600 font-medium">Đủ hàng</p>
                 <p className="text-3xl font-bold text-green-600 mt-2">{stats.wellStocked}</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -277,7 +277,7 @@ export default function ShelfMonitoringPage() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 font-medium">Refill Needed</p>
+                <p className="text-sm text-gray-600 font-medium">Cần bổ sung</p>
                 <p className="text-3xl font-bold text-orange-600 mt-2">{stats.refillNeeded}</p>
               </div>
               <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
@@ -290,7 +290,7 @@ export default function ShelfMonitoringPage() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 font-medium">Empty Shelves</p>
+                <p className="text-sm text-gray-600 font-medium">Kệ trống</p>
                 <p className="text-3xl font-bold text-red-600 mt-2">{stats.emptyShelves}</p>
               </div>
               <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
@@ -309,7 +309,7 @@ export default function ShelfMonitoringPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                 <Input
                   type="text"
-                  placeholder="Search by product name, SKU, category, or shelf location..."
+                  placeholder="Tìm theo tên sản phẩm, SKU, danh mục hoặc vị trí kệ..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 h-11"
@@ -323,10 +323,10 @@ export default function ShelfMonitoringPage() {
               onChange={(e) => setFilterStatus(e.target.value as any)}
               className="px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2d6e3e] focus:border-transparent min-w-[200px]"
             >
-              <option value="all">All Status</option>
-              <option value="good">✅ Well Stocked ({stats.wellStocked})</option>
-              <option value="low">⚠️ Low Stock ({stats.refillNeeded})</option>
-              <option value="empty">🔴 Empty ({stats.emptyShelves})</option>
+              <option value="all">Tất cả trạng thái</option>
+              <option value="good">✅ Đủ hàng ({stats.wellStocked})</option>
+              <option value="low">⚠️ Tồn kho thấp ({stats.refillNeeded})</option>
+              <option value="empty">🔴 Trống ({stats.emptyShelves})</option>
             </select>
           </div>
         </div>
@@ -341,28 +341,28 @@ export default function ShelfMonitoringPage() {
                     ID
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Product
+                    Sản phẩm
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Shelf Location
+                    Vị trí kệ
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    On Shelf
+                    Trên kệ
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Min Display
+                    Tối thiểu trưng bày
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Backroom Qty
+                    Kho sau
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Last Refilled
+                    Bổ sung cuối
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Status
+                    Trạng thái
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Action
+                    Hành động
                   </th>
                 </tr>
               </thead>
@@ -372,8 +372,8 @@ export default function ShelfMonitoringPage() {
                     <td colSpan={9} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center justify-center text-gray-500">
                         <Package size={48} className="mb-3 opacity-50" />
-                        <p className="text-sm font-medium">No shelves found</p>
-                        <p className="text-xs mt-1">Try adjusting your search or filter</p>
+                        <p className="text-sm font-medium">Không tìm thấy kệ</p>
+                        <p className="text-xs mt-1">Thử điều chỉnh tìm kiếm hoặc bộ lọc</p>
                       </div>
                     </td>
                   </tr>
@@ -432,7 +432,7 @@ export default function ShelfMonitoringPage() {
                             {item.backroomQty} {item.unit}
                           </div>
                           {item.backroomQty === 0 && (
-                            <div className="text-xs text-red-600 mt-0.5">⚠️ No stock</div>
+                            <div className="text-xs text-red-600 mt-0.5">⚠️ Không có hàng</div>
                           )}
                         </td>
 
@@ -467,9 +467,9 @@ export default function ShelfMonitoringPage() {
           {filteredData.length > 0 && (
             <div className="border-t border-gray-200 px-6 py-4 bg-gray-50">
               <div className="text-sm text-gray-700">
-                Showing <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> to{' '}
-                <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredData.length)}</span> of{' '}
-                <span className="font-medium">{filteredData.length}</span> shelves
+                Hiển thị <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> đến{' '}
+                <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredData.length)}</span> trong{' '}
+                <span className="font-medium">{filteredData.length}</span> kệ
               </div>
             </div>
           )}
@@ -480,7 +480,7 @@ export default function ShelfMonitoringPage() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-600">
-                Page {currentPage} of {totalPages}
+                Trang {currentPage} trong {totalPages}
               </div>
               <div className="flex items-center gap-2">
                 <button
