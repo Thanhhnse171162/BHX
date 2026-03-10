@@ -195,24 +195,23 @@ export default function WarehouseProfilePage() {
                 Mã nhân viên
               </label>
               <Input
-                value={profileForm.employeeId} disabled={isSaving}>
-                <Save className="w-4 h-4 mr-2" />
-                {isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
-              </Button>
-              <Button
-                onClick={() => {
-                  setIsEditing(false)
-                  setProfileForm({
-                    name: user?.name || '',
-                    email: user?.email || '',
-                    phone: user?.phone || '',
-                    employeeId: 'BK02',
-                    department: 'Warehouse',
-                  })
-                  setErrors({})
-                }}
-                variant="outline"
-                disabled={isSaving}
+                value={profileForm.employeeId}
+                disabled
+              />
+            </div>
+
+            {/* Department */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Building className="w-4 h-4 inline mr-2" />
+                Phòng ban
+              </label>
+              <Input
+                value={profileForm.department}
+                disabled
+              />
+            </div>
+          </div>
 
           {/* Action Buttons */}
           {isEditing && (
