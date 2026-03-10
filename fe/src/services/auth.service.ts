@@ -220,6 +220,19 @@ export const authService = {
       throw new Error(apiError?.error || apiError?.message || 'Không thể gửi lại OTP.')
     }
   },
+
+  /**
+   * Update user profile
+   */
+  updateProfile: async (data: { name: string; email: string; phone: string }) => {
+    try {
+      const response = await localApiClient.put('/auth/update-profile', data)
+      return response.data
+    } catch (error: any) {
+      const apiError = error.response?.data as ApiErrorResponse
+      throw new Error(apiError?.error || apiError?.message || 'Không thể cập nhật thông tin. Vui lòng thử lại.')
+    }
+  },
 }
 
 export default authService

@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useAuth } from '@/shared/hooks/useAuth'
+import { useAuthStore } from '@/store/auth.store'
+import { authService } from '@/services/auth.service'
 import { Button } from '@/shared/ui/Button'
 import { Input } from '@/shared/ui/Input'
 import { Avatar } from '@/shared/ui/Avatar'
@@ -14,12 +16,13 @@ export default function WarehouseProfilePage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
   // Profile form state
   const [profileForm, setProfileForm] = useState({
-    name: user?.name || 'Đỗ Văn Kho',
-    email: user?.email || 'dovankho@company.com',
-    phone: '0901234567',
+    name: user?.name || '',
+    email: user?.email || '',
+    phone: user?.phone || '',
     employeeId: 'BK02',
     department: 'Warehouse',
   })
@@ -33,7 +36,7 @@ export default function WarehouseProfilePage() {
 
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     const newErrors: Record<string, string> = {}
     
     if (!profileForm.name.trim()) {
@@ -51,10 +54,31 @@ export default function WarehouseProfilePage() {
     setErrors(newErrors)
 
     if (Object.keys(newErrors).length === 0) {
-      // TODO: Save to API
-      console.log('Saving profile:', profileForm)
-      setIsEditing(false)
-      alert('Cập nhật thông tin thành công!')
+      setIsSaving(true)
+      try {
+        const response = await authService.updateProfile({
+          name: profileForm.name,
+          email: profileForm.email,
+          phone: profileForm.phone,
+        })
+        
+        // Update user in auth store
+        if (user) {
+          useAuthStore.getState().setUser({
+            ...user,
+            name: profileForm.name,
+            email: profileForm.email,
+            phone: profileForm.phone,
+          })
+        }
+        
+        setIsEditing(false)
+        alert(response.message || 'Cập nhật thông tin thành công!')
+      } catch (error: any) {
+        alert(error.message || 'Có lỗi xảy ra. Vui lòng thử lại!')
+      } finally {
+        setIsSaving(false)
+      }
     }
   }
 
@@ -171,23 +195,24 @@ export default function WarehouseProfilePage() {
                 Mã nhân viên
               </label>
               <Input
-                value={profileForm.employeeId}
-                disabled
-              />
-            </div>
-
-            {/* Department */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Building className="w-4 h-4 inline mr-2" />
-                Bộ phận
-              </label>
-              <Input
-                value={profileForm.department}
-                disabled
-              />
-            </div>
-          </div>
+                value={profileForm.employeeId} disabled={isSaving}>
+                <Save className="w-4 h-4 mr-2" />
+                {isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
+              </Button>
+              <Button
+                onClick={() => {
+                  setIsEditing(false)
+                  setProfileForm({
+                    name: user?.name || '',
+                    email: user?.email || '',
+                    phone: user?.phone || '',
+                    employeeId: 'BK02',
+                    department: 'Warehouse',
+                  })
+                  setErrors({})
+                }}
+                variant="outline"
+                disabled={isSaving}
 
           {/* Action Buttons */}
           {isEditing && (
