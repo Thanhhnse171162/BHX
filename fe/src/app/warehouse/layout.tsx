@@ -11,10 +11,15 @@ export default function WarehouseLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { user, isAuthenticated, isLoading } = useAuth()
+  const { user, isAuthenticated, isLoading, hydrated } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
+    // Đợi auth store hydrate xong trước khi kiểm tra
+    if (!hydrated) {
+      return
+    }
+
     if (!isLoading) {
       if (!isAuthenticated) {
         router.push('/login')
@@ -27,9 +32,9 @@ export default function WarehouseLayout({
         return
       }
     }
-  }, [isAuthenticated, isLoading, user, router])
+  }, [isAuthenticated, isLoading, user, router, hydrated])
 
-  if (isLoading) {
+  if (isLoading || !hydrated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2d6e3e]"></div>

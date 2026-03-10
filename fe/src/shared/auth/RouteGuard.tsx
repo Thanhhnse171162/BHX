@@ -41,7 +41,7 @@ export function RouteGuard({ children, allowedRoles, fallback }: RouteGuardProps
     setIsChecking(false)
   }, [isAuthenticated, user, allowedRoles, router, hydrated])
 
-  if (isChecking) {
+  if (isChecking || !hydrated) {
     return fallback || <div className="flex items-center justify-center min-h-screen">Loading...</div>
   }
 

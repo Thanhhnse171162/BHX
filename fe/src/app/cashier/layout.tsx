@@ -61,7 +61,7 @@ const navItems = [
 export default function CashierLayout({ children }: CashierLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
-  const { user, isAuthenticated, logout } = useAuthStore()
+  const { user, isAuthenticated, logout, hydrated } = useAuthStore()
   const [incidentCount, setIncidentCount] = useState<number>(0)
 
   // Fetch unresolved incident count from API
@@ -85,6 +85,11 @@ export default function CashierLayout({ children }: CashierLayoutProps) {
   }, [])
 
   useEffect(() => {
+    // Đợi auth store hydrate xong trước khi kiểm tra
+    if (!hydrated) {
+      return
+    }
+
     if (!isAuthenticated || !user) {
       router.push('/login')
       return
@@ -101,14 +106,14 @@ export default function CashierLayout({ children }: CashierLayoutProps) {
       else if (user.role === 'STORE_MANAGER') router.push('/store-manager')
       else router.push('/login')
     }
-  }, [isAuthenticated, user, router])
+  }, [isAuthenticated, user, router, hydrated])
 
   const handleLogout = () => {
     logout()
     router.push('/login')
   }
 
-  if (!isAuthenticated || !user) return null
+  if (!hydrated || !isAuthenticated || !user) return null
 
   const userInitial = user.name ? user.name.charAt(0).toUpperCase() : 'U'
 
