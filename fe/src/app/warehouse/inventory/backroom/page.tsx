@@ -107,20 +107,20 @@ export default function BackroomStockPage() {
   // Status badge for stock level
   const StockStatusBadge = ({ expiryDate }: { expiryDate: string }) => {
     if (isExpired(expiryDate)) {
-      return <span className="px-2.5 py-1 rounded-full text-xs font-medium border bg-red-100 text-red-800 border-red-200">Expired</span>
+      return <span className="px-2.5 py-1 rounded-full text-xs font-medium border bg-red-100 text-red-800 border-red-200">Hết hạn</span>
     }
     if (isExpiryNear(expiryDate)) {
-      return <span className="px-2.5 py-1 rounded-full text-xs font-medium border bg-orange-100 text-orange-800 border-orange-200">Low</span>
+      return <span className="px-2.5 py-1 rounded-full text-xs font-medium border bg-orange-100 text-orange-800 border-orange-200">Thấp</span>
     }
-    return <span className="px-2.5 py-1 rounded-full text-xs font-medium border bg-green-100 text-green-800 border-green-200">Good</span>
+    return <span className="px-2.5 py-1 rounded-full text-xs font-medium border bg-green-100 text-green-800 border-green-200">Tốt</span>
   }
 
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Batch-Level Inventory</h1>
-        <p className="text-gray-600 mt-1">Manage warehouse inventory and transfers by batch</p>
+        <h1 className="text-2xl font-bold text-gray-900">Tồn kho theo lô</h1>
+        <p className="text-gray-600 mt-1">Quản lý tồn kho và chuyển kho theo lô</p>
       </div>
 
       {/* Summary Cards */}
@@ -128,7 +128,7 @@ export default function BackroomStockPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Total Batch SKUs</p>
+              <p className="text-sm text-gray-600 font-medium">Tổng SKU theo lô</p>
               <p className="text-3xl font-bold text-gray-900 mt-2">{batchInventory.length}</p>
             </div>
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -140,7 +140,7 @@ export default function BackroomStockPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Total Batch Stock</p>
+              <p className="text-sm text-gray-600 font-medium">Tổng tồn kho theo lô</p>
               <p className="text-3xl font-bold text-gray-900 mt-2">
                 {batchInventory.reduce((sum, item) => sum + item.quantity, 0).toLocaleString()}
               </p>
@@ -154,7 +154,7 @@ export default function BackroomStockPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Items Near Expiry</p>
+              <p className="text-sm text-gray-600 font-medium">Sản phẩm gần hết hạn</p>
               <p className="text-3xl font-bold text-orange-600 mt-2">
                 {batchInventory.filter(item => isExpiryNear(item.expiration_date)).length}
               </p>
@@ -178,7 +178,7 @@ export default function BackroomStockPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
               <Input
                 type="text"
-                placeholder="Search by product name, SKU, or category..."
+                placeholder="Tìm theo tên sản phẩm, SKU hoặc danh mục..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -198,31 +198,31 @@ export default function BackroomStockPage() {
                   ID
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Batch Code
+                  Mã lô
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Product
+                  Sản phẩm
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   SKU
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Warehouse
+                  Kho
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Slot
+                  Vị trí
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Backroom Qty
+                  Số lượng kho sau
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Expiry Date
+                  Ngày hết hạn
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Status
+                  Trạng thái
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Actions
+                  Hành động
                 </th>
               </tr>
             </thead>
@@ -231,8 +231,8 @@ export default function BackroomStockPage() {
                 <tr>
                   <td colSpan={10} className="px-6 py-12 text-center text-gray-500">
                     <Warehouse className="mx-auto mb-3 text-gray-400" size={48} />
-                    <p className="text-lg font-medium">No products found</p>
-                    <p className="text-sm mt-1">Try adjusting your search</p>
+                    <p className="text-lg font-medium">Không tìm thấy sản phẩm</p>
+                    <p className="text-sm mt-1">Thử điều chỉnh tìm kiếm</p>
                   </td>
                 </tr>
               ) : (
@@ -250,7 +250,7 @@ export default function BackroomStockPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="font-mono text-sm font-semibold text-gray-900">{item.batch_code}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">Created: {formatDate(item.created_at)}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">Tạo: {formatDate(item.created_at)}</div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="font-medium text-gray-900">{item.product_name}</div>
@@ -280,10 +280,10 @@ export default function BackroomStockPage() {
                       }`}>
                         {formatDate(item.expiration_date)}
                         {isExpired(item.expiration_date) && (
-                          <div className="text-xs mt-1">(Expired!)</div>
+                          <div className="text-xs mt-1">(Hết hạn!)</div>
                         )}
                         {!isExpired(item.expiration_date) && isExpiryNear(item.expiration_date) && (
-                          <div className="text-xs mt-1">(Soon!)</div>
+                          <div className="text-xs mt-1">(Sắp hết hạn!)</div>
                         )}
                       </div>
                     </td>
@@ -300,7 +300,7 @@ export default function BackroomStockPage() {
                           disabled={isExpired(item.expiration_date)}
                         >
                           <ArrowRight size={16} className="mr-1" />
-                          Transfer
+                          Chuyển
                         </Button>
                         <Button
                           variant="outline"
@@ -309,7 +309,7 @@ export default function BackroomStockPage() {
                           className="text-gray-700 hover:bg-gray-100"
                         >
                           <Edit size={16} className="mr-1" />
-                          Adjust
+                          Điều chỉnh
                         </Button>
                       </div>
                     </td>
@@ -326,7 +326,7 @@ export default function BackroomStockPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-600">
-              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredData.length)} of {filteredData.length} items
+              Hiển thị {((currentPage - 1) * itemsPerPage) + 1} đến {Math.min(currentPage * itemsPerPage, filteredData.length)} trong {filteredData.length} mục
             </div>
             <div className="flex items-center gap-2">
               <button

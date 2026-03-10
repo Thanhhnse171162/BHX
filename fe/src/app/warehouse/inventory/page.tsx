@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Search, Package, TrendingUp, AlertTriangle, XCircle, MapPin, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Package, TrendingUp, AlertTriangle, XCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/shared/ui/Button'
 import { Input } from '@/shared/ui/Input'
 import { InventoryAPIService, InventoryItem } from '@/services/inventory-api.service'
@@ -122,19 +122,19 @@ export default function InventoryPage() {
     if (item.availableQuantity === 0) {
       return (
         <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-          Out of Stock
+          Hết hàng
         </span>
       )
     } else if (item.isLowStock) {
       return (
         <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-          Low Stock
+          Tồn kho thấp
         </span>
       )
     } else {
       return (
         <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-          In Stock
+          Còn hàng
         </span>
       )
     }
@@ -144,8 +144,8 @@ export default function InventoryPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
-        <p className="text-gray-600 mt-1">View all inventory items across locations</p>
+        <h1 className="text-2xl font-bold text-gray-900">Quản lý tồn kho</h1>
+        <p className="text-gray-600 mt-1">Xem tất cả sản phẩm tồn kho qua các địa điểm</p>
       </div>
 
       {/* KPI Cards */}
@@ -153,7 +153,7 @@ export default function InventoryPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Total Items</p>
+              <p className="text-sm text-gray-600 font-medium">Tổng sản phẩm</p>
               <p className="text-3xl font-bold text-gray-900 mt-2">{stats.total}</p>
             </div>
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -165,7 +165,7 @@ export default function InventoryPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Total Stock</p>
+              <p className="text-sm text-gray-600 font-medium">Tổng tồn kho</p>
               <p className="text-3xl font-bold text-gray-900 mt-2">{stats.totalStock.toLocaleString()}</p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -177,7 +177,7 @@ export default function InventoryPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Low Stock</p>
+              <p className="text-sm text-gray-600 font-medium">Tồn kho thấp</p>
               <p className="text-3xl font-bold text-orange-600 mt-2">{stats.lowStock}</p>
             </div>
             <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
@@ -189,7 +189,7 @@ export default function InventoryPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Out of Stock</p>
+              <p className="text-sm text-gray-600 font-medium">Hết hàng</p>
               <p className="text-3xl font-bold text-red-600 mt-2">{stats.outOfStock}</p>
             </div>
             <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
@@ -208,7 +208,7 @@ export default function InventoryPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
               <Input
                 type="text"
-                placeholder="Search by product, SKU, category, or location..."
+                placeholder="Tìm theo sản phẩm, SKU, danh mục hoặc địa điểm..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -223,21 +223,21 @@ export default function InventoryPage() {
               onClick={() => setFilterTab('all')}
               className={filterTab === 'all' ? 'bg-blue-600 hover:bg-blue-700' : ''}
             >
-              All
+              Tất cả
             </Button>
             <Button
               variant={filterTab === 'warehouse' ? 'primary' : 'outline'}
               onClick={() => setFilterTab('warehouse')}
               className={filterTab === 'warehouse' ? 'bg-purple-600 hover:bg-purple-700' : ''}
             >
-              Warehouse
+              Kho
             </Button>
             <Button
               variant={filterTab === 'store' ? 'primary' : 'outline'}
               onClick={() => setFilterTab('store')}
               className={filterTab === 'store' ? 'bg-indigo-600 hover:bg-indigo-700' : ''}
             >
-              Store
+              Cửa hàng
             </Button>
           </div>
         </div>
@@ -248,7 +248,7 @@ export default function InventoryPage() {
         {isLoading ? (
           <div className="p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-gray-600 mt-4">Loading inventory data...</p>
+            <p className="text-gray-600 mt-4">Đang tải dữ liệu tồn kho...</p>
           </div>
         ) : error ? (
           <div className="p-12 text-center">
@@ -259,14 +259,14 @@ export default function InventoryPage() {
               onClick={fetchData}
               className="mt-4"
             >
-              Retry
+              Thử lại
             </Button>
           </div>
         ) : filteredData.length === 0 ? (
           <div className="p-12 text-center">
             <Package className="mx-auto text-gray-400" size={48} />
-            <p className="text-gray-500 mt-4">No inventory items found</p>
-            <p className="text-gray-400 text-sm mt-2">Try adjusting your search or filters</p>
+            <p className="text-gray-500 mt-4">Không tìm thấy sản phẩm tồn kho</p>
+            <p className="text-gray-400 text-sm mt-2">Thử điều chỉnh tìm kiếm hoặc bộ lọc</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -274,28 +274,25 @@ export default function InventoryPage() {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Product
+                    Sản phẩm
+                  </th>
+                  <th className="text-center py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Số lượng
+                  </th>
+                  <th className="text-center py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Có sẵn
+                  </th>
+                  <th className="text-center py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Đã đặt
+                  </th>
+                  <th className="text-center py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Tối thiểu/Tối đa
+                  </th>
+                  <th className="text-center py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Trạng thái
                   </th>
                   <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Location
-                  </th>
-                  <th className="text-center py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Quantity
-                  </th>
-                  <th className="text-center py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Available
-                  </th>
-                  <th className="text-center py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Reserved
-                  </th>
-                  <th className="text-center py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Min/Max
-                  </th>
-                  <th className="text-center py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Last Updated
+                    Cập nhật cuối
                   </th>
                 </tr>
               </thead>
@@ -310,21 +307,6 @@ export default function InventoryPage() {
                         <div>
                           <p className="font-medium text-gray-900">{item.productName}</p>
                           <p className="text-xs text-gray-500">SKU: {item.productSKU}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="flex items-center gap-2">
-                        <MapPin size={16} className={item.locationType === 'WAREHOUSE' ? 'text-purple-600' : 'text-indigo-600'} />
-                        <div>
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
-                            item.locationType === 'WAREHOUSE' 
-                              ? 'bg-purple-100 text-purple-700' 
-                              : 'bg-indigo-100 text-indigo-700'
-                          }`}>
-                            {item.locationType}
-                          </span>
-                          <p className="text-xs text-gray-500 mt-1">{item.locationId.substring(0, 8)}...</p>
                         </div>
                       </div>
                     </td>
@@ -374,11 +356,11 @@ export default function InventoryPage() {
           <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-700">
-                Showing <span className="font-medium">{filteredData.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}</span> to{' '}
+                Hiển thị <span className="font-medium">{filteredData.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}</span> đến{' '}
                 <span className="font-medium">
                   {Math.min(currentPage * itemsPerPage, filteredData.length)}
                 </span>{' '}
-                of <span className="font-medium">{filteredData.length}</span> results
+                trong <span className="font-medium">{filteredData.length}</span> kết quả
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -389,7 +371,7 @@ export default function InventoryPage() {
                   className="gap-1"
                 >
                   <ChevronLeft size={16} />
-                  Previous
+                  Trước
                 </Button>
                 <div className="flex items-center gap-1">
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
@@ -411,7 +393,7 @@ export default function InventoryPage() {
                   disabled={currentPage === totalPages}
                   className="gap-1"
                 >
-                  Next
+                  Tiếp
                   <ChevronRight size={16} />
                 </Button>
               </div>
