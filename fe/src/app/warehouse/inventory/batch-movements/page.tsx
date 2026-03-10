@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, Filter, ArrowUpDown, Package, TrendingUp, TrendingDown, FileText } from 'lucide-react'
+import { Search, ArrowUpDown, Package, TrendingUp, TrendingDown, FileText } from 'lucide-react'
 import { Input } from '@/shared/ui/Input'
 import { Button } from '@/shared/ui/Button'
 
@@ -747,7 +747,7 @@ export default function BatchMovementsPage() {
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                   <Button
                     key={page}
-                    variant={currentPage === page ? "default" : "outline"}
+                    variant={currentPage === page ? "primary" : "outline"}
                     size="sm"
                     onClick={() => setCurrentPage(page)}
                     className={currentPage === page ? "bg-[#2d6e3e] text-white" : ""}

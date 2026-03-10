@@ -19,6 +19,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
+import { InventoryAPIService, InventoryItem } from '@/services/inventory-api.service'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Product {
@@ -82,6 +83,49 @@ function mapApiProduct(p: ProductFromAPI & Record<string, any>): Product {
     expiry: p.expiry ?? (p.shelfLifeDays ? `${p.shelfLifeDays} ngày` : ''),
     imageColor: getImageColor(p.id),
     imageInitials: getInitials(p.name),
+  }
+}
+
+// ─── Inventory → UI mapper ───────────────────────────────────────────────────
+function mapInventoryToProduct(item: InventoryItem): Product {
+  // Backend có thể trả về product nested hoặc flattened
+  const product = item.product
+  const id = item.productId || item.id
+  
+  // Thử nhiều cách lấy tên product
+  const name = product?.name || item.productName || item.name || item.sku || item.barcode || `Product ${id.substring(0, 8)}`
+  const sku = product?.sku || item.sku || item.barcode || id
+  const categoryName = product?.categoryName || item.categoryName || 'Chưa phân loại'
+  const brand = product?.brand || item.brand || ''
+  const unit = product?.unit || item.unit || 'sản phẩm'
+  const price = product?.price || item.price || 0
+  const costPrice = product?.costPrice || product?.originalPrice || item.costPrice || item.originalPrice || 0
+  const isActive = product?.isActive ?? true
+  
+  const stock = item.quantity || item.availableQuantity || 0
+  const minStock = item.minStockLevel || 0
+  
+  let status: Product['status'] = 'Còn hàng'
+  if (!isActive || stock === 0) status = 'Hết hàng'
+  else if (minStock > 0 && stock <= minStock) status = 'Sắp hết'
+  
+  return {
+    id,
+    barcode: sku,
+    name,
+    category: categoryName,
+    brand,
+    unit,
+    price,
+    costPrice,
+    stock,
+    minStock,
+    status,
+    description: product?.description || '',
+    origin: '',
+    expiry: '',
+    imageColor: getImageColor(id),
+    imageInitials: getInitials(name),
   }
 }
 
@@ -222,15 +266,55 @@ export default function CashierProductsPage() {
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>(null)
   const filterRef = useRef<HTMLDivElement>(null)
 
+  // Fetch data helper function
+  const fetchData = async () => {
+    console.log('Fetching inventory and product data...')
+    
+    // Fetch inventory data (có stock info)
+    const inventoryData = await InventoryAPIService.getAllInventory()
+    console.log('Inventory data:', inventoryData?.length || 0, 'items')
+    console.log('Sample inventory item:', inventoryData[0]) // Log để xem structure
+    
+    // Thử fetch product data (có tên, giá, category)
+    let productsData: ProductFromAPI[] = []
+    try {
+      productsData = await ProductAPIService.getAllProducts()
+      console.log('Products data:', productsData?.length || 0, 'items')
+    } catch (productErr) {
+      console.warn('⚠️ Product API failed, using inventory data only:', productErr)
+    }
+    
+    // Create product map để join
+    const productMap = new Map<string, ProductFromAPI>()
+    productsData.forEach(product => {
+      productMap.set(product.id, product)
+    })
+    
+    // Join inventory với product data
+    return inventoryData.map(item => {
+      const product = productMap.get(item.productId)
+      if (product) {
+        // Có đầy đủ product info, merge với inventory
+        console.log('✅ Found product for:', item.productId)
+        return mapApiProduct({ ...product, stock: item.quantity, minStock: item.minStockLevel })
+      } else {
+        // Không có product info, dùng inventory data thôi
+        console.log('⚠️ No product found for:', item.productId, '- using inventory data only')
+        return mapInventoryToProduct(item)
+      }
+    })
+  }
+
   // Fetch products from API
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
-    ProductAPIService.getAllProducts()
+    
+    fetchData()
       .then(data => {
         if (!cancelled) {
-          setProducts(data.map(mapApiProduct))
+          setProducts(data)
         }
       })
       .catch(err => {
@@ -241,6 +325,7 @@ export default function CashierProductsPage() {
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
+    
     return () => { cancelled = true }
   }, [])
 
@@ -314,7 +399,14 @@ export default function CashierProductsPage() {
           <XCircle className="w-5 h-5 flex-shrink-0 text-red-500" />
           <p className="text-sm text-red-700 flex-1">{error}</p>
           <button
-            onClick={() => { setError(null); setLoading(true); ProductAPIService.getAllProducts().then(d => setProducts(d.map(mapApiProduct))).catch(e => setError(e?.message || 'Lỗi tải dữ liệu')).finally(() => setLoading(false)) }}
+            onClick={() => { 
+              setError(null)
+              setLoading(true)
+              fetchData()
+                .then(d => setProducts(d))
+                .catch(e => setError(e?.message || 'Lỗi tải dữ liệu'))
+                .finally(() => setLoading(false))
+            }}
             className="text-xs font-medium text-red-600 underline hover:text-red-800"
           >Thử lại</button>
         </div>

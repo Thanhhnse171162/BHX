@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
+import { InventoryAPIService, InventoryItem } from '@/services/inventory-api.service'
 import { Button } from '@/shared/ui/Button'
 import { Input } from '@/shared/ui/Input'
 import DataTable from '@/shared/ui/DataTable'
@@ -20,6 +21,12 @@ interface ProductRow {
   unit: string
   status: ProductStatus
   createdAt: string
+  // Inventory fields
+  totalQuantity?: number
+  availableQuantity?: number
+  reservedQuantity?: number
+  inventoryStatus?: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'
+  reorderLevel?: number
   [key: string]: unknown
 }
 
@@ -61,19 +68,64 @@ export default function ProductsPage() {
     try {
       setIsLoading(true)
       setError(null)
-      const data = await ProductAPIService.getAllProducts()
       
-      // Transform API data sang ProductRow format
-      const rows: ProductRow[] = data.map((p: ProductFromAPI) => ({
-        id: p.id,
-        sku: p.sku,
-        name: p.name,
-        category: p.categoryName || 'Unknown',
-        price: p.price,
-        unit: p.unit || '',
-        status: p.isActive ? 'ACTIVE' : 'INACTIVE',
-        createdAt: p.createdAt,
-      }))
+      // Fetch cả products và inventory
+      const [productsData, inventoryData] = await Promise.all([
+        ProductAPIService.getAllProducts(),
+        InventoryAPIService.getAllInventory().catch(() => [] as InventoryItem[])
+      ])
+      
+      // Tạo map để tính tổng quantity cho mỗi product
+      const inventoryMap = new Map<string, {
+        totalQuantity: number
+        availableQuantity: number
+        reservedQuantity: number
+        isLowStock: boolean
+        minStockLevel: number
+      }>()
+      
+      inventoryData.forEach((inv) => {
+        const existing = inventoryMap.get(inv.productId)
+        if (existing) {
+          existing.totalQuantity += inv.quantity
+          existing.availableQuantity += inv.availableQuantity
+          existing.reservedQuantity += inv.reservedQuantity
+          // Cập nhật low stock status nếu có bất kỳ location nào low stock
+          if (inv.isLowStock) {
+            existing.isLowStock = true
+          }
+        } else {
+          inventoryMap.set(inv.productId, {
+            totalQuantity: inv.quantity,
+            availableQuantity: inv.availableQuantity,
+            reservedQuantity: inv.reservedQuantity,
+            isLowStock: inv.isLowStock,
+            minStockLevel: inv.minStockLevel,
+          })
+        }
+      })
+      
+      // Transform API data sang ProductRow format với inventory info
+      const rows: ProductRow[] = productsData.map((p: ProductFromAPI) => {
+        const inventory = inventoryMap.get(p.id)
+        return {
+          id: p.id,
+          sku: p.sku,
+          name: p.name,
+          category: p.categoryName || 'Unknown',
+          price: p.price,
+          unit: p.unit || '',
+          status: p.isActive ? 'ACTIVE' : 'INACTIVE',
+          createdAt: p.createdAt,
+          totalQuantity: inventory?.totalQuantity ?? 0,
+          availableQuantity: inventory?.availableQuantity ?? 0,
+          reservedQuantity: inventory?.reservedQuantity ?? 0,
+          inventoryStatus: inventory?.isLowStock 
+            ? (inventory.availableQuantity === 0 ? 'OUT_OF_STOCK' : 'LOW_STOCK') 
+            : 'IN_STOCK',
+          reorderLevel: inventory?.minStockLevel ?? 0,
+        }
+      })
       
       setProducts(rows)
     } catch (err) {
@@ -269,6 +321,59 @@ export default function ProductsPage() {
                   }).format(value as number),
               },
               { key: 'unit', label: 'Unit' },
+              {
+                key: 'totalQuantity',
+                label: 'Total Stock',
+                render: (value) => (
+                  <span className="font-medium">
+                    {value !== undefined && value !== null ? String(value) : 'N/A'}
+                  </span>
+                ),
+              },
+              {
+                key: 'availableQuantity',
+                label: 'Available',
+                render: (value) => (
+                  <span className="font-medium text-green-600">
+                    {value !== undefined && value !== null ? String(value) : 'N/A'}
+                  </span>
+                ),
+              },
+              {
+                key: 'reservedQuantity',
+                label: 'Reserved',
+                render: (value) => (
+                  <span className="font-medium text-orange-600">
+                    {value !== undefined && value !== null ? String(value) : 'N/A'}
+                  </span>
+                ),
+              },
+              {
+                key: 'inventoryStatus',
+                label: 'Stock Status',
+                render: (value) => {
+                  const statusColors = {
+                    IN_STOCK: 'bg-green-100 text-green-800',
+                    LOW_STOCK: 'bg-yellow-100 text-yellow-800',
+                    OUT_OF_STOCK: 'bg-red-100 text-red-800',
+                  }
+                  const statusLabels = {
+                    IN_STOCK: 'In Stock',
+                    LOW_STOCK: 'Low Stock',
+                    OUT_OF_STOCK: 'Out of Stock',
+                  }
+                  const status = value as 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'
+                  return (
+                    <span
+                      className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        statusColors[status] || 'bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      {statusLabels[status] || 'Unknown'}
+                    </span>
+                  )
+                },
+              },
               {
                 key: 'status',
                 label: 'Status',
