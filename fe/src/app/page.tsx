@@ -1,15 +1,33 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Header } from '@/shared/ui/Header'
 import { HeroBanner } from '@/features/promotions/components/HeroBanner'
 import { QuickCategories } from '@/features/catalog/components/QuickCategories'
 import { ShortcutGrid } from '@/features/catalog/components/ShortcutGrid'
 import { FlashSaleStrip } from '@/features/promotions/components/FlashSaleStrip'
 import { ProductBlock } from '@/features/catalog/components/ProductBlock'
+import { useAuthStore } from '@/store/auth.store'
 
 export default function Home() {
+  const router = useRouter()
+  const { user, isAuthenticated, hydrated } = useAuthStore()
   const [isCategoryDrawerOpen, setIsCategoryDrawerOpen] = useState(false)
+
+  useEffect(() => {
+    if (!hydrated) return
+    if (!isAuthenticated || !user) return
+    const portalMap: Partial<Record<typeof user.role, string>> = {
+      ADMIN: '/admin/dashboard',
+      STORE_MANAGER: '/store-manager',
+      WAREHOUSE_MANAGER: '/warehouse',
+      WAREHOUSE_STAFF: '/warehouse-store',
+      STAFF: '/cashier',
+    }
+    const portal = portalMap[user.role]
+    if (portal) router.replace(portal)
+  }, [hydrated, isAuthenticated, user, router])
 
   return (
     <div className="min-h-screen bg-gray-50">

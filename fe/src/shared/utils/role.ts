@@ -50,6 +50,10 @@ export function isWarehouseStaffUser(roleId: number, email: string): boolean {
 }
 
 /**
+ * @deprecated DO NOT USE. This silently downgrades any non-@company.com email to CUSTOMER,
+ * even when the backend already returned the correct roleId.
+ * Use getRoleFromId(roleId) directly instead.
+ *
  * Xác định role thực tế: nếu email không có đuôi @company.com thì chỉ là CUSTOMER
  */
 export function resolveRole(roleId: number, email: string): UserRole {
@@ -65,10 +69,10 @@ export function resolveRole(roleId: number, email: string): UserRole {
 export function getRedirectPath(role: UserRole): string {
   const paths: Record<UserRole, string> = {
     ADMIN: '/admin/dashboard',
-    STORE_MANAGER: '/warehouse',    // Manager (role 2) → warehouse portal
-    WAREHOUSE_MANAGER: '/warehouse', // legacy
+    STORE_MANAGER: '/store-manager',   // Store Manager (role 2) → store manager portal
+    WAREHOUSE_MANAGER: '/warehouse',
     WAREHOUSE_STAFF: '/warehouse-store',
-    STAFF: '/cashier',              // Store Staff (role 3) → cashier portal
+    STAFF: '/cashier',                 // Store Staff (role 4) → cashier portal
     CUSTOMER: '/customer',
   }
   return paths[role] || '/'

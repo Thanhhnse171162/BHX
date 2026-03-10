@@ -1,7 +1,7 @@
 'use client'
 
 import { ReactNode, useEffect, useState } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { UserRole } from '@/shared/types'
 
@@ -13,44 +13,33 @@ interface RouteGuardProps {
 
 export function RouteGuard({ children, allowedRoles, fallback }: RouteGuardProps) {
   const router = useRouter()
-  const pathname = usePathname()
   const { user, isAuthenticated, hydrated } = useAuthStore()
   const [isChecking, setIsChecking] = useState(true)
 
   useEffect(() => {
-    // Đợi zustand persist hydrate xong trước khi kiểm tra
-    if (!hydrated) {
-      setIsChecking(true)
-      return
-    }
-
+    if (!hydrated) return // Wait for Zustand persistence to rehydrate
     if (!isAuthenticated || !user) {
       router.replace('/login')
       return
     }
 
     if (!allowedRoles.includes(user.role)) {
-      // Nếu role không đúng, tự động chuyển sang portal phù hợp, không hiển thị màn hình cảnh báo
-      const isInternalUser = ['STAFF', 'STORE_MANAGER', 'WAREHOUSE_MANAGER', 'ADMIN'].includes(user.role)
-      const isCustomerUser = user.role === 'CUSTOMER'
-      const isOnCustomerPortal = pathname?.startsWith('/customer')
-      const isOnOpsPortal = pathname?.startsWith('/ops')
-      const isOnAdminPortal = pathname?.startsWith('/admin')
-
-      let suggestedPortal = '/login'
-
-      if (isCustomerUser && (isOnOpsPortal || isOnAdminPortal)) {
-        suggestedPortal = '/customer'
-      } else if (isInternalUser && isOnCustomerPortal) {
-        suggestedPortal = user.role === 'ADMIN' ? '/admin' : '/ops'
+      // Redirect to the correct portal for this role
+      const rolePortalMap: Partial<Record<typeof user.role, string>> = {
+        ADMIN: '/admin/dashboard',
+        STORE_MANAGER: '/store-manager',
+        WAREHOUSE_MANAGER: '/warehouse',
+        WAREHOUSE_STAFF: '/warehouse-store',
+        STAFF: '/cashier',
+        CUSTOMER: '/customer',
       }
-
+      const suggestedPortal = rolePortalMap[user.role] ?? '/login'
       router.replace(suggestedPortal)
       return
     }
 
     setIsChecking(false)
-  }, [isAuthenticated, user, allowedRoles, router, pathname, hydrated])
+  }, [isAuthenticated, user, allowedRoles, router, hydrated])
 
   if (isChecking || !hydrated) {
     return fallback || <div className="flex items-center justify-center min-h-screen">Loading...</div>

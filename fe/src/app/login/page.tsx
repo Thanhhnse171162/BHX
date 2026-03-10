@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/shared/ui/Button'
@@ -9,8 +9,8 @@ import { Checkbox } from '@/shared/ui/Checkbox'
 import { useAuth } from '@/shared/hooks/useAuth'
 import { rolePermissions } from '@/shared/auth/permission-map'
 import { authService } from '@/services/auth.service'
-import { getRoleFromId, getRedirectPath, isStaffUser, isWarehouseStaffUser, isWarehouseManagerUser, isStoreManagerUser, resolveRole } from '@/shared/utils/role'
-import type { User, UserRole } from '@/shared/types'
+import { getRoleFromId } from '@/shared/utils/role'
+import type { User } from '@/shared/types'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -27,7 +27,7 @@ export default function LoginPage() {
   useEffect(() => {
     router.prefetch('/admin/dashboard')
     router.prefetch('/cashier')
-    router.prefetch('/ops')
+    router.prefetch('/store-manager')
     router.prefetch('/customer')
     router.prefetch('/staff')
     router.prefetch('/warehouse')
@@ -74,7 +74,10 @@ export default function LoginPage() {
 
       const roleId = responseData.roleId || 4
       const userEmail = responseData.email || emailOrPhone.trim()
-      const userRole = resolveRole(roleId, userEmail)
+      // Use getRoleFromId directly — trust the backend roleId.
+      // resolveRole() was silently downgrading internal users to CUSTOMER
+      // when their email domain didn't match '@company.com'.
+      const userRole = getRoleFromId(roleId)
 
       // Tạo user object và login song song
       const user: User = {
@@ -92,15 +95,17 @@ export default function LoginPage() {
         // - workplace_type/workplace_id (snake_case)
         // - workplace: { type, id }
         workplaceType:
-          responseData.workplaceType ||
+          (responseData.workplaceType ||
           responseData.workplace_type ||
           responseData.workplace?.type ||
-          null,
+          null) as 'STORE' | 'WAREHOUSE' | null,
         workplaceId:
-          responseData.workplaceId ||
-          responseData.workplace_id ||
-          responseData.workplace?.id ||
-          null,
+          String(
+            responseData.workplaceId ??
+            responseData.workplace_id ??
+            responseData.workplace?.id ??
+            ''
+          ) || null,
         createdAt: responseData.createdAt || new Date().toISOString(),
         updatedAt: responseData.updatedAt || new Date().toISOString(),
       }
@@ -108,21 +113,20 @@ export default function LoginPage() {
       // Update auth state
       login(user, token)
 
-      // Kiểm tra nếu là Warehouse Manager (role 3) với email @company.com thì redirect đến /warehouse
-      if (isWarehouseManagerUser(roleId, userEmail)) {
+      // Redirect based on userRole string (more robust than numeric roleId comparison).
+      // Backend may return roleId as string or number — getRoleFromId handles both.
+      if (userRole === 'ADMIN') {
+        router.replace('/admin/dashboard')
+      } else if (userRole === 'STORE_MANAGER') {
+        router.replace('/store-manager')
+      } else if (userRole === 'WAREHOUSE_MANAGER') {
         router.replace('/warehouse')
-      }
-      // Kiểm tra nếu là Store Staff (role 4) với email @company.com thì redirect đến /cashier
-      else if (isStaffUser(roleId, userEmail)) {
+      } else if (userRole === 'STAFF') {
         router.replace('/cashier')
-      }
-      // Kiểm tra nếu là Warehouse Staff (role 5) với email @company.com thì redirect đến /warehouse-store
-      else if (isWarehouseStaffUser(roleId, userEmail)) {
+      } else if (userRole === 'WAREHOUSE_STAFF') {
         router.replace('/warehouse-store')
       } else {
-        // Sử dụng helper function để redirect
-        const redirectPath = getRedirectPath(userRole)
-        router.replace(redirectPath)
+        router.replace('/customer')
       }
     } catch (err: any) {
       console.error('Login error:', err)

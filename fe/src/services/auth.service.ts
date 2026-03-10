@@ -18,8 +18,15 @@ interface LoginResponse {
     roleId: number
     userId?: string
     id?: string
+    phone?: string
+    avatar?: string
     isEmailVerified?: boolean
     emailVerified?: boolean
+    workplaceType?: string | null
+    workplace_type?: string | null
+    workplaceId?: string | number | null
+    workplace_id?: string | number | null
+    workplace?: { type?: string; id?: string | number } | null
     createdAt?: string
     updatedAt?: string
   }
@@ -32,8 +39,15 @@ interface LoginResponse {
   roleId?: number
   userId?: string
   id?: string
+  phone?: string
+  avatar?: string
   isEmailVerified?: boolean
   emailVerified?: boolean
+  workplaceType?: string | null
+  workplace_type?: string | null
+  workplaceId?: string | number | null
+  workplace_id?: string | number | null
+  workplace?: { type?: string; id?: string | number } | null
   createdAt?: string
   updatedAt?: string
 }
