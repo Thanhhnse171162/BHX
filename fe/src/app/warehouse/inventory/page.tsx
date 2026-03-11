@@ -8,7 +8,7 @@ import { InventoryAPIService, InventoryItem } from '@/services/inventory-api.ser
 import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
 import { useAuthStore } from '@/store/auth.store'
 
-type FilterTab = 'all' | 'warehouse' | 'store'
+type FilterTab = 'all' | 'in-stock' | 'low-stock' | 'out-of-stock'
 
 interface InventoryWithProductInfo extends InventoryItem {
   productName?: string
@@ -97,8 +97,9 @@ export default function InventoryPage() {
       
       const matchesFilter = 
         filterTab === 'all' || 
-        (filterTab === 'warehouse' && item.locationType === 'WAREHOUSE') ||
-        (filterTab === 'store' && item.locationType === 'STORE')
+        (filterTab === 'in-stock' && item.availableQuantity > 0 && !item.isLowStock) ||
+        (filterTab === 'low-stock' && item.isLowStock && item.availableQuantity > 0) ||
+        (filterTab === 'out-of-stock' && item.availableQuantity === 0)
       
       return matchesSearch && matchesFilter
     })
@@ -226,18 +227,25 @@ export default function InventoryPage() {
               Tất cả
             </Button>
             <Button
-              variant={filterTab === 'warehouse' ? 'primary' : 'outline'}
-              onClick={() => setFilterTab('warehouse')}
-              className={filterTab === 'warehouse' ? 'bg-purple-600 hover:bg-purple-700' : ''}
+              variant={filterTab === 'in-stock' ? 'primary' : 'outline'}
+              onClick={() => setFilterTab('in-stock')}
+              className={filterTab === 'in-stock' ? 'bg-green-600 hover:bg-green-700' : ''}
             >
-              Kho
+              Còn hàng
             </Button>
             <Button
-              variant={filterTab === 'store' ? 'primary' : 'outline'}
-              onClick={() => setFilterTab('store')}
-              className={filterTab === 'store' ? 'bg-indigo-600 hover:bg-indigo-700' : ''}
+              variant={filterTab === 'low-stock' ? 'primary' : 'outline'}
+              onClick={() => setFilterTab('low-stock')}
+              className={filterTab === 'low-stock' ? 'bg-orange-600 hover:bg-orange-700' : ''}
             >
-              Cửa hàng
+              Tồn kho thấp
+            </Button>
+            <Button
+              variant={filterTab === 'out-of-stock' ? 'primary' : 'outline'}
+              onClick={() => setFilterTab('out-of-stock')}
+              className={filterTab === 'out-of-stock' ? 'bg-red-600 hover:bg-red-700' : ''}
+            >
+              Hết hàng
             </Button>
           </div>
         </div>
@@ -291,9 +299,6 @@ export default function InventoryPage() {
                   <th className="text-center py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Trạng thái
                   </th>
-                  <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Cập nhật cuối
-                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -334,15 +339,6 @@ export default function InventoryPage() {
                     </td>
                     <td className="py-4 px-6 text-center">
                       <StatusBadge item={item} />
-                    </td>
-                    <td className="py-4 px-6 text-sm text-gray-600">
-                      {new Date(item.updatedAt).toLocaleString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
                     </td>
                   </tr>
                 ))}

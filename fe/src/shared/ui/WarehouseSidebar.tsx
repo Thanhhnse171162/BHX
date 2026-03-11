@@ -53,11 +53,6 @@ const navigationItems: NavItem[] = [
         icon: Warehouse
       },
       {
-        label: 'Giám sát kệ',
-        href: '/warehouse/inventory/shelf',
-        icon: Eye
-      },
-      {
         label: 'Kiểm kê tồn kho',
         href: '/warehouse/checks',
         icon: ClipboardCheck

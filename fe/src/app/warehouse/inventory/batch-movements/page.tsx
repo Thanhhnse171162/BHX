@@ -433,7 +433,8 @@ const movementTypeConfig: Record<MovementType, { label: string; color: string; b
 
 export default function BatchMovementsPage() {
   const [searchTerm, setSearchTerm] = useState('')
-  const [typeFilter, setTypeFilter] = useState<MovementType | 'all'>('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [sortField, setSortField] = useState<'created_at' | 'quantity'>('created_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
@@ -471,25 +472,47 @@ export default function BatchMovementsPage() {
         item.slot_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.reference_id.toLowerCase().includes(searchTerm.toLowerCase())
       
-      const matchesType = typeFilter === 'all' || item.type === typeFilter
+      // Filter by date range - check if either manufacture or expiration date falls within the range
+      let matchesDateRange = true
       
-      return matchesSearch && matchesType
+      if (dateFrom && dateTo) {
+        // Both dates specified - check if either date is within the range
+        const mfgInRange = item.manufacture_date >= dateFrom && item.manufacture_date <= dateTo
+        const expInRange = item.expiration_date >= dateFrom && item.expiration_date <= dateTo
+        matchesDateRange = mfgInRange || expInRange
+      } else if (dateFrom) {
+        // Only from date specified
+        matchesDateRange = item.manufacture_date >= dateFrom || item.expiration_date >= dateFrom
+      } else if (dateTo) {
+        // Only to date specified
+        matchesDateRange = item.manufacture_date <= dateTo || item.expiration_date <= dateTo
+      }
+      
+      return matchesSearch && matchesDateRange
     })
 
     // Sort
     filtered.sort((a, b) => {
-      const aValue = sortField === 'created_at' ? new Date(a.created_at).getTime() : a.quantity
-      const bValue = sortField === 'created_at' ? new Date(b.created_at).getTime() : b.quantity
+      let aValue: number
+      let bValue: number
+      
+      if (sortField === 'created_at') {
+        aValue = new Date(a.created_at).getTime()
+        bValue = new Date(b.created_at).getTime()
+      } else {
+        aValue = Math.abs(a.quantity)
+        bValue = Math.abs(b.quantity)
+      }
       
       if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1
+        return aValue - bValue
       } else {
-        return aValue < bValue ? 1 : -1
+        return bValue - aValue
       }
     })
 
     return filtered
-  }, [searchTerm, typeFilter, sortField, sortOrder])
+  }, [searchTerm, dateFrom, dateTo, sortField, sortOrder])
 
   // Paginated data
   const paginatedData = useMemo(() => {
@@ -503,7 +526,7 @@ export default function BatchMovementsPage() {
   // Reset to page 1 when filters change
   useMemo(() => {
     setCurrentPage(1)
-  }, [searchTerm, typeFilter])
+  }, [searchTerm, dateFrom, dateTo])
 
   const handleSort = (field: 'created_at' | 'quantity') => {
     if (sortField === field) {
@@ -553,37 +576,56 @@ export default function BatchMovementsPage() {
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="space-y-4">
           {/* Search */}
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <Input
+              type="text"
+              placeholder="Tìm theo mã lô, sản phẩm, SKU, kho, kệ, hoặc tham chiếu..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 w-full"
+            />
+          </div>
+
+          {/* Date Filters */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Từ ngày</label>
               <Input
-                type="text"
-                placeholder="Tìm theo mã lô, sản phẩm, SKU, kho, kệ, hoặc tham chiếu..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-full"
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Đến ngày</label>
+              <Input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="w-full"
               />
             </div>
           </div>
 
-          {/* Type Filter */}
-          <div className="sm:w-48">
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value as MovementType | 'all')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2d6e3e]"
-            >
-              <option value="all">Tất cả loại</option>
-              <option value="IMPORT">Nhập kho</option>
-              <option value="TRANSFER_TO_SHELF">Chuyển lên kệ</option>
-              <option value="ADJUST">Điều chỉnh</option>
-              <option value="DAMAGE">Hư hỏng</option>
-              <option value="EXPIRED">Hết hạn</option>
-              <option value="RETURN">Trả lại</option>
-            </select>
-          </div>
+          {/* Clear Filters Button */}
+          {(dateFrom || dateTo) && (
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setDateFrom('')
+                  setDateTo('')
+                }}
+              >
+                Xóa bộ lọc ngày
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -594,9 +636,6 @@ export default function BatchMovementsPage() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  ID
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Mã lô
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -604,12 +643,6 @@ export default function BatchMovementsPage() {
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Kho
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Mã kệ
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Loại
                 </th>
                 <th 
                   className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -643,7 +676,7 @@ export default function BatchMovementsPage() {
             <tbody className="divide-y divide-gray-200">
               {paginatedData.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                     Không tìm thấy di chuyển
                   </td>
                 </tr>
@@ -652,9 +685,6 @@ export default function BatchMovementsPage() {
                   const config = movementTypeConfig[movement.type]
                   return (
                     <tr key={movement.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm text-gray-900 font-mono">
-                        {movement.id.substring(0, 8)}...
-                      </td>
                       <td className="px-4 py-3">
                         <div className="text-sm font-medium text-gray-900">{movement.batch_code}</div>
                         <div className="text-xs text-gray-500">ID: {movement.batch_id}</div>
@@ -666,15 +696,6 @@ export default function BatchMovementsPage() {
                       <td className="px-4 py-3">
                         <div className="text-sm text-gray-900">{movement.warehouse_name}</div>
                         <div className="text-xs text-gray-500">{movement.warehouse_location}</div>
-                      </td>
-                      <td className="px-4 py-3 text-sm font-mono text-gray-900">
-                        {movement.slot_code}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${config.bgColor} ${config.color}`}>
-                          {config.icon}
-                          {config.label}
-                        </span>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`text-sm font-semibold ${
