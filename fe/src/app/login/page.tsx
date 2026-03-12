@@ -119,8 +119,10 @@ export default function LoginPage() {
         router.replace('/admin/dashboard')
       } else if (userRole === 'STORE_MANAGER') {
         router.replace('/store-manager')
-      } else if (userRole === 'WAREHOUSE_MANAGER') {
+      } else if (userRole === 'WAREHOUSE_ADMIN') {
         router.replace('/warehouse')
+      } else if (userRole === 'WAREHOUSE_MANAGER') {
+        router.replace('/404')
       } else if (userRole === 'STAFF') {
         router.replace('/cashier')
       } else if (userRole === 'WAREHOUSE_STAFF') {

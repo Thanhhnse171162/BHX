@@ -43,6 +43,14 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
       // Redirect to appropriate page based on role
       if (user.role === 'ADMIN') router.push('/admin/dashboard')
       else if (user.role === 'CUSTOMER') router.push('/customer')
+      else if (user.role === 'STORE_MANAGER') router.push('/store-manager')
+      else if (user.role === 'WAREHOUSE_ADMIN' || user.roleId === 7) router.push('/warehouse')
+      else if (user.role === 'WAREHOUSE_MANAGER' || user.roleId === 3) {
+        // Role deprecated - logout và redirect về login
+        logout()
+        router.push('/login')
+      }
+      else if (user.roleId === 5) router.push('/warehouse-store')
       else router.push('/ops')
       return
     }
