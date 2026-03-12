@@ -19,16 +19,10 @@ export default function Home() {
     if (!hydrated) return
     if (!isAuthenticated || !user) return
     
-    // Check nếu là WAREHOUSE_MANAGER (role_id = 3, deprecated) thì logout và redirect về login
-    if (user.role === 'WAREHOUSE_MANAGER' || user.roleId === 3) {
-      logout()
-      router.replace('/login')
-      return
-    }
-    
     const portalMap: Partial<Record<typeof user.role, string>> = {
       ADMIN: '/admin/dashboard',
       STORE_MANAGER: '/store-manager',
+      WAREHOUSE_MANAGER: '/warehouse-manager',
       WAREHOUSE_ADMIN: '/warehouse',
       WAREHOUSE_STAFF: '/warehouse-store',
       STAFF: '/cashier',

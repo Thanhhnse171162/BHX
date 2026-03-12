@@ -5,7 +5,7 @@ import { UserRole, ROLE_ID_MAP } from '@/shared/types'
  * Database IdentityDB mapping (7 roles):
  * 1 = Admin
  * 2 = Store Manager
- * 3 = Warehouse Manager (deprecated) ← /404
+ * 3 = Warehouse Manager ← Warehouse Manager Portal (/warehouse-manager)
  * 4 = Store Staff  ← Cashier Portal
  * 5 = Warehouse Staff  ← Warehouse-Store Portal
  * 6 = Customer
@@ -71,7 +71,7 @@ export function getRedirectPath(role: UserRole): string {
   const paths: Record<UserRole, string> = {
     ADMIN: '/admin/dashboard',
     STORE_MANAGER: '/store-manager',   // Store Manager (role 2) → store manager portal
-    WAREHOUSE_MANAGER: '/404',         // Deprecated (role 3) → 404 page
+    WAREHOUSE_MANAGER: '/warehouse-manager',  // Warehouse Manager (role 3) → warehouse manager portal
     WAREHOUSE_ADMIN: '/warehouse',     // Warehouse Admin (role 7) → warehouse portal
     WAREHOUSE_STAFF: '/warehouse-store',
     STAFF: '/cashier',                 // Store Staff (role 4) → cashier portal
