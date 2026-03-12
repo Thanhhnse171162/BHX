@@ -4,9 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { 
   LayoutDashboard, 
   Package, 
-  ShoppingCart,
   ClipboardCheck,
-  UserCircle,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -14,7 +12,14 @@ import {
   ChevronUp,
   Warehouse,
   Eye,
-  LucideIcon
+  LucideIcon,
+  FileText,
+  ArrowLeftRight,
+  RefreshCw,
+  Truck,
+  Building2,
+  BoxIcon,
+  BarChart3
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuthStore } from '@/store/auth.store'
@@ -23,60 +28,101 @@ interface NavItem {
   label: string
   href: string
   icon: LucideIcon
+  subItems?: NavItem[]
 }
 
-interface NavSection {
-  label: string
-  icon: LucideIcon
-  items: NavItem[]
-}
-
-const inventorySection: NavSection = {
-  label: 'Inventory',
-  icon: Package,
-  items: [
-    {
-      label: 'Inventory',
-      href: '/warehouse/inventory',
-      icon: Package
-    },
-    {
-      label: 'Batch-Level Inventory',
-      href: '/warehouse/inventory/batch-movements',
-      icon: Warehouse
-    },
-    {
-      label: 'Shelf Monitoring',
-      href: '/warehouse/inventory/shelf',
-      icon: Eye
-    },
-    {
-      label: 'Stock Movement',
-      href: '/warehouse/stock-movement',
-      icon: ShoppingCart
-    },
-    {
-      label: 'Inventory Check',
-      href: '/warehouse/checks',
-      icon: ClipboardCheck
-    }
-  ]
-}
+const navigationItems: NavItem[] = [
+  {
+    label: 'Tổng quan',
+    href: '/warehouse',
+    icon: LayoutDashboard
+  },
+  {
+    label: 'Tồn kho',
+    href: '/warehouse/inventory',
+    icon: Package,
+    subItems: [
+      {
+        label: 'Tồn kho',
+        href: '/warehouse/inventory',
+        icon: Package
+      },
+      {
+        label: 'Tồn kho theo lô',
+        href: '/warehouse/inventory/batch-movements',
+        icon: Warehouse
+      },
+      {
+        label: 'Kiểm kê tồn kho',
+        href: '/warehouse/checks',
+        icon: ClipboardCheck
+      }
+    ]
+  },
+  {
+    label: 'Yêu cầu kho',
+    href: '/warehouse/requests',
+    icon: FileText
+  },
+  {
+    label: 'Di chuyển hàng',
+    href: '/warehouse/stock-movement',
+    icon: ArrowLeftRight
+  },
+  {
+    label: 'Bổ sung hàng',
+    href: '/warehouse/replenishment',
+    icon: RefreshCw
+  },
+  {
+    label: 'Quản lý NCC',
+    href: '/warehouse/suppliers',
+    icon: Truck
+  },
+  {
+    label: 'Quản lý kho',
+    href: '/warehouse/management',
+    icon: Building2
+  },
+  {
+    label: 'Quản lý sản phẩm',
+    href: '/warehouse/products',
+    icon: BoxIcon
+  },
+  {
+    label: 'Báo cáo',
+    href: '/warehouse/reports',
+    icon: BarChart3
+  }
+]
 
 export function WarehouseSidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const logout = useAuthStore((state) => state.logout)
   const [isCollapsed, setIsCollapsed] = useState(false)
-  const [isInventoryOpen, setIsInventoryOpen] = useState(true)
+  const [expandedItems, setExpandedItems] = useState<string[]>(['Inventory'])
 
   const handleLogout = () => {
     logout()
     router.push('/login')
   }
 
-  // Check if any inventory item is active
-  const isInventoryActive = inventorySection.items.some(item => pathname === item.href)
+  const toggleExpanded = (label: string) => {
+    setExpandedItems(prev => 
+      prev.includes(label) 
+        ? prev.filter(item => item !== label)
+        : [...prev, label]
+    )
+  }
+
+  const isItemActive = (item: NavItem): boolean => {
+    if (pathname === item.href) return true
+    if (item.subItems) {
+      return item.subItems.some(subItem => pathname === subItem.href)
+    }
+    return false
+  }
 
   return (
     <div 
@@ -88,18 +134,18 @@ export function WarehouseSidebar() {
       <div className="h-16 flex items-center justify-between px-4 border-b border-white/10">
         {!isCollapsed ? (
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center border border-white/30">
-              <Warehouse className="text-white" size={20} />
+            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
+              <Warehouse className="text-[#2d6e3e]" size={20} />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white">Warehouse</h2>
-              <p className="text-xs text-white/70">Management</p>
+              <h2 className="text-sm font-bold text-white">Bách hóa xanh</h2>
+              <p className="text-xs text-white/70 uppercase">Quản trị trung tâm</p>
             </div>
           </div>
         ) : (
           <div className="w-full flex justify-center">
-            <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center border border-white/30">
-              <Warehouse className="text-white" size={22} />
+            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
+              <Warehouse className="text-[#2d6e3e]" size={22} />
             </div>
           </div>
         )}
@@ -129,107 +175,73 @@ export function WarehouseSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-        {/* Dashboard */}
-        <button
-          onClick={() => router.push('/warehouse')}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-            pathname === '/warehouse'
-              ? 'bg-white/20 text-white shadow-sm backdrop-blur-sm border border-white/30'
-              : 'text-white/80 hover:bg-white/10 hover:text-white'
-          } ${isCollapsed ? 'justify-center' : ''}`}
-          title={isCollapsed ? 'Dashboard' : undefined}
-        >
-          <LayoutDashboard size={20} className={pathname === '/warehouse' ? 'text-white' : 'text-white/70'} />
-          {!isCollapsed && (
-            <span className="text-sm font-medium">Dashboard</span>
-          )}
-        </button>
+        {navigationItems.map((item) => {
+          const Icon = item.icon
+          const isActive = isItemActive(item)
+          const isExpanded = expandedItems.includes(item.label)
+          const hasSubItems = item.subItems && item.subItems.length > 0
 
-        {/* Inventory Section (Collapsible) */}
-        {!isCollapsed ? (
-          <div className="space-y-1">
-            <button
-              onClick={() => setIsInventoryOpen(!isInventoryOpen)}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all ${
-                isInventoryActive
-                  ? 'bg-white/10 text-white'
-                  : 'text-white/80 hover:bg-white/10 hover:text-white'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Package size={20} className={isInventoryActive ? 'text-white' : 'text-white/70'} />
-                <span className="text-sm font-medium">Inventory</span>
-              </div>
-              {isInventoryOpen ? (
-                <ChevronUp size={16} className="text-white/70" />
-              ) : (
-                <ChevronDown size={16} className="text-white/70" />
-              )}
-            </button>
-            
-            {/* Inventory Sub-items */}
-            {isInventoryOpen && (
-              <div className="ml-3 pl-3 border-l border-white/20 space-y-1">
-                {inventorySection.items.map((item) => {
-                  const Icon = item.icon
-                  const isActive = pathname === item.href
-                  
-                  return (
-                    <button
-                      key={item.href}
-                      onClick={() => router.push(item.href)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-sm ${
-                        isActive
-                          ? 'bg-white/20 text-white shadow-sm backdrop-blur-sm border border-white/30'
-                          : 'text-white/70 hover:bg-white/10 hover:text-white'
-                      }`}
-                    >
-                      <Icon size={18} className={isActive ? 'text-white' : 'text-white/60'} />
-                      <span>{item.label}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        ) : (
-          // Collapsed: Show inventory items directly
-          inventorySection.items.map((item) => {
-            const Icon = item.icon
-            const isActive = pathname === item.href
-            
-            return (
+          return (
+            <div key={item.label}>
               <button
-                key={item.href}
-                onClick={() => router.push(item.href)}
-                className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg transition-all ${
-                  isActive
+                onClick={() => {
+                  if (hasSubItems && !isCollapsed) {
+                    toggleExpanded(item.label)
+                  } else {
+                    router.push(item.href)
+                  }
+                }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
+                  isActive && !hasSubItems
                     ? 'bg-white/20 text-white shadow-sm backdrop-blur-sm border border-white/30'
+                    : isActive && hasSubItems
+                    ? 'bg-white/10 text-white'
                     : 'text-white/80 hover:bg-white/10 hover:text-white'
-                }`}
-                title={item.label}
+                } ${isCollapsed ? 'justify-center' : 'justify-between'}`}
+                title={isCollapsed ? item.label : undefined}
               >
-                <Icon size={20} className={isActive ? 'text-white' : 'text-white/70'} />
+                <div className="flex items-center gap-3 min-w-0">
+                  <Icon size={20} className={`flex-shrink-0 ${isActive ? 'text-white' : 'text-white/70'}`} />
+                  {!isCollapsed && (
+                    <span className="text-sm font-medium whitespace-nowrap">{item.label}</span>
+                  )}
+                </div>
+                {!isCollapsed && hasSubItems && (
+                  isExpanded ? (
+                    <ChevronUp size={16} className="text-white/70" />
+                  ) : (
+                    <ChevronDown size={16} className="text-white/70" />
+                  )
+                )}
               </button>
-            )
-          })
-        )}
-
-        {/* Profile */}
-        <button
-          onClick={() => router.push('/warehouse/profile')}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-            pathname === '/warehouse/profile'
-              ? 'bg-white/20 text-white shadow-sm backdrop-blur-sm border border-white/30'
-              : 'text-white/80 hover:bg-white/10 hover:text-white'
-          } ${isCollapsed ? 'justify-center' : ''}`}
-          title={isCollapsed ? 'Profile' : undefined}
-        >
-          <UserCircle size={20} className={pathname === '/warehouse/profile' ? 'text-white' : 'text-white/70'} />
-          {!isCollapsed && (
-            <span className="text-sm font-medium">Profile</span>
-          )}
-        </button>
+              
+              {/* Sub-items */}
+              {hasSubItems && isExpanded && !isCollapsed && (
+                <div className="ml-3 pl-3 border-l border-white/20 space-y-1 mt-1">
+                  {item.subItems!.map((subItem) => {
+                    const SubIcon = subItem.icon
+                    const isSubActive = pathname === subItem.href
+                    
+                    return (
+                      <button
+                        key={subItem.href}
+                        onClick={() => router.push(subItem.href)}
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-sm ${
+                          isSubActive
+                            ? 'bg-white/20 text-white shadow-sm backdrop-blur-sm border border-white/30'
+                            : 'text-white/70 hover:bg-white/10 hover:text-white'
+                        }`}
+                      >
+                        <SubIcon size={18} className={isSubActive ? 'text-white' : 'text-white/60'} />
+                        <span>{subItem.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </nav>
 
       {/* Logout Button */}
@@ -239,11 +251,11 @@ export function WarehouseSidebar() {
           className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-red-100 hover:bg-red-500/20 transition-colors border border-transparent hover:border-red-400/30 ${
             isCollapsed ? 'justify-center' : ''
           }`}
-          title={isCollapsed ? 'Logout' : undefined}
+          title={isCollapsed ? 'Đăng xuất' : undefined}
         >
           <LogOut size={20} />
           {!isCollapsed && (
-            <span className="text-sm font-medium">Logout</span>
+            <span className="text-sm font-medium">Đăng xuất</span>
           )}
         </button>
       </div>

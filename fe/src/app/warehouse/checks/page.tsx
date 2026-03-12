@@ -100,15 +100,15 @@ export default function InventoryChecksPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Inventory Checks</h1>
-          <p className="text-gray-600 mt-1">Track and manage inventory audit history</p>
+          <h1 className="text-2xl font-bold text-gray-900">Kiểm kê tồn kho</h1>
+          <p className="text-gray-600 mt-1">Theo dõi và quản lý lịch sử kiểm kê tồn kho</p>
         </div>
         <Button 
           className="bg-[#2d6e3e] hover:bg-[#255931] flex items-center gap-2"
           onClick={() => setShowNewCheckModal(true)}
         >
           <Plus size={18} />
-          Start New Check
+          Bắt đầu kiểm tra mới
         </Button>
       </div>
 
@@ -116,7 +116,7 @@ export default function InventoryChecksPage() {
       <div className="bg-gradient-to-br from-[#2d6e3e] to-[#1f5b2e] rounded-xl shadow-lg p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-bold mb-2">Next Scheduled Check</h3>
+            <h3 className="text-lg font-bold mb-2">Kiểm tra đã lên lịch tiếp theo</h3>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Calendar size={18} />
@@ -127,10 +127,10 @@ export default function InventoryChecksPage() {
                 <span className="font-medium">10:00 AM</span>
               </div>
             </div>
-            <p className="text-white/80 text-sm mt-2">Assigned to: Nguyen Van A</p>
+            <p className="text-white/80 text-sm mt-2">Được giao cho: Nguyen Van A</p>
           </div>
           <Button className="bg-white/20 text-white border-2 border-white/30 hover:bg-white/30 hover:border-white/50">
-            Reschedule
+            Sắp lại lịch
           </Button>
         </div>
       </div>
@@ -140,11 +140,11 @@ export default function InventoryChecksPage() {
         <div className="flex flex-col md:flex-row gap-4 items-end">
           <div className="flex-1">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Search by Name
+              Tìm theo tên
             </label>
             <Input
               type="text"
-              placeholder="Enter staff name..."
+              placeholder="Nhập tên nhân viên..."
               value={searchName}
               onChange={(e) => setSearchName(e.target.value)}
               className="w-full"
@@ -152,7 +152,7 @@ export default function InventoryChecksPage() {
           </div>
           <div className="flex-1">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              From Date
+              Từ ngày
             </label>
             <Input
               type="date"
@@ -163,7 +163,7 @@ export default function InventoryChecksPage() {
           </div>
           <div className="flex-1">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              To Date
+              Đến ngày
             </label>
             <Input
               type="date"
@@ -181,17 +181,17 @@ export default function InventoryChecksPage() {
             }}
             className="whitespace-nowrap"
           >
-            Clear Filters
+            Xóa bộ lọc
           </Button>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white rounded-xl shadow-sm border-l-4 border-[#2d6e3e] p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm font-medium mb-1">Total Checks</p>
+              <p className="text-gray-600 text-sm font-medium mb-1">Tổng kiểm tra</p>
               <p className="text-3xl font-bold text-gray-900">{filteredChecks.length}</p>
             </div>
             <div className="w-12 h-12 bg-[#e8f5e9] rounded-xl flex items-center justify-center">
@@ -203,37 +203,11 @@ export default function InventoryChecksPage() {
         <div className="bg-white rounded-xl shadow-sm border-l-4 border-blue-600 p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm font-medium mb-1">Last Check</p>
+              <p className="text-gray-600 text-sm font-medium mb-1">Kiểm tra cuối</p>
               <p className="text-xl font-bold text-gray-900">{filteredChecks[0]?.date || 'N/A'}</p>
             </div>
             <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
               <Calendar className="text-blue-600" size={24} />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border-l-4 border-orange-600 p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm font-medium mb-1">Avg. Duration</p>
-              <p className="text-xl font-bold text-gray-900">2h 20m</p>
-            </div>
-            <div className="w-12 h-12 bg-orange-50 rounded-xl flex items-center justify-center">
-              <Clock className="text-orange-600" size={24} />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border-l-4 border-red-600 p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm font-medium mb-1">Total Discrepancies</p>
-              <p className="text-3xl font-bold text-red-600">
-                {filteredChecks.reduce((sum, check) => sum + check.discrepancies, 0)}
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center text-2xl">
-              ⚠️
             </div>
           </div>
         </div>
@@ -243,15 +217,15 @@ export default function InventoryChecksPage() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-6 border-b border-gray-200 bg-gray-50">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-gray-900">Check History</h2>
+            <h2 className="text-lg font-bold text-gray-900">Lịch sử kiểm tra</h2>
             {!startDate && !endDate && !searchName && (
               <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                Last 30 days
+                30 ngày gần đây
               </span>
             )}
             {(startDate || endDate || searchName) && (
               <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                Filtered
+                Đã lọc
               </span>
             )}
           </div>
@@ -275,46 +249,36 @@ export default function InventoryChecksPage() {
                     </div>
                     <div className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium flex items-center gap-1">
                       <CheckCircle size={14} />
-                      {check.status}
+                      Hoàn thành
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <p className="text-gray-500 mb-1">Checked By</p>
+                      <p className="text-gray-500 mb-1">Người kiểm tra</p>
                       <p className="font-medium text-gray-900">{check.checkedBy}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500 mb-1">Items Checked</p>
+                      <p className="text-gray-500 mb-1">Vật phẩm đã kiểm</p>
                       <p className="font-medium text-gray-900">{check.itemsChecked}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500 mb-1">Duration</p>
-                      <p className="font-medium text-gray-900">{check.duration}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500 mb-1">Discrepancies</p>
-                      <p className={`font-bold ${check.discrepancies > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {check.discrepancies}
-                      </p>
                     </div>
                   </div>
 
                   {selectedCheck === check.id && (
                     <div className="mt-4 pt-4 border-t border-gray-200">
                       <div className="bg-gray-50 rounded-lg p-4">
-                        <h4 className="font-semibold text-gray-900 mb-2">Check Summary</h4>
+                        <h4 className="font-semibold text-gray-900 mb-2">Tóm tắt kiểm tra</h4>
                         <ul className="space-y-2 text-sm">
                           <li className="flex justify-between">
-                            <span className="text-gray-600">Total Items:</span>
+                            <span className="text-gray-600">Tổng vật phẩm:</span>
                             <span className="font-medium">{check.itemsChecked}</span>
                           </li>
                           <li className="flex justify-between">
-                            <span className="text-gray-600">Matched:</span>
+                            <span className="text-gray-600">Khớp:</span>
                             <span className="font-medium text-green-600">{check.itemsChecked - check.discrepancies}</span>
                           </li>
                           <li className="flex justify-between">
-                            <span className="text-gray-600">Mismatched:</span>
+                            <span className="text-gray-600">Không khớp:</span>
                             <span className="font-medium text-red-600">{check.discrepancies}</span>
                           </li>
                         </ul>
@@ -328,9 +292,9 @@ export default function InventoryChecksPage() {
           ) : (
             <div className="flex flex-col items-center justify-center py-16 px-4">
               <Calendar className="text-gray-300 mb-4" size={64} />
-              <h3 className="text-lg font-semibold text-gray-700 mb-2">No checks found</h3>
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">Không tìm thấy kiểm tra</h3>
               <p className="text-gray-500 text-center">
-                No inventory checks found in the selected date range.
+                Không tìm thấy kiểm tra tồn kho trong khoảng thời gian đã chọn.
               </p>
             </div>
           )}
@@ -342,9 +306,9 @@ export default function InventoryChecksPage() {
             <div className="flex items-center justify-between">
               {/* Pagination Info */}
               <div className="text-sm text-gray-600">
-                Showing <span className="font-medium text-gray-900">{startIndex + 1}</span> to{' '}
-                <span className="font-medium text-gray-900">{Math.min(endIndex, filteredChecks.length)}</span> of{' '}
-                <span className="font-medium text-gray-900">{filteredChecks.length}</span> checks
+                Hiển thị <span className="font-medium text-gray-900">{startIndex + 1}</span> đến{' '}
+                <span className="font-medium text-gray-900">{Math.min(endIndex, filteredChecks.length)}</span> trong{' '}
+                <span className="font-medium text-gray-900">{filteredChecks.length}</span> kiểm tra
               </div>
 
               {/* Pagination Buttons */}
@@ -416,7 +380,7 @@ export default function InventoryChecksPage() {
           setCheckSearchQuery('')
           setCheckedItems({})
         }}
-        title="Inventory Check"
+        title="Kiểm tra tồn kho"
         size="xl"
       >
         <div className="space-y-4">

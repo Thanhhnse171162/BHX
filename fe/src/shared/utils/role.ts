@@ -2,13 +2,14 @@ import { UserRole, ROLE_ID_MAP } from '@/shared/types'
 
 /**
  * Convert roleId (số) sang UserRole (string)
- * Database IdentityDB mapping (6 roles):
+ * Database IdentityDB mapping (7 roles):
  * 1 = Admin
  * 2 = Store Manager
- * 3 = Warehouse Manager  ← Warehouse Portal
+ * 3 = Warehouse Manager (deprecated) ← /404
  * 4 = Store Staff  ← Cashier Portal
  * 5 = Warehouse Staff  ← Warehouse-Store Portal
  * 6 = Customer
+ * 7 = Warehouse Admin  ← Warehouse Portal (/warehouse)
  */
 export function getRoleFromId(roleId: number): UserRole {
   return ROLE_ID_MAP[roleId] || 'CUSTOMER'
@@ -70,7 +71,8 @@ export function getRedirectPath(role: UserRole): string {
   const paths: Record<UserRole, string> = {
     ADMIN: '/admin/dashboard',
     STORE_MANAGER: '/store-manager',   // Store Manager (role 2) → store manager portal
-    WAREHOUSE_MANAGER: '/warehouse',
+    WAREHOUSE_MANAGER: '/404',         // Deprecated (role 3) → 404 page
+    WAREHOUSE_ADMIN: '/warehouse',     // Warehouse Admin (role 7) → warehouse portal
     WAREHOUSE_STAFF: '/warehouse-store',
     STAFF: '/cashier',                 // Store Staff (role 4) → cashier portal
     CUSTOMER: '/customer',

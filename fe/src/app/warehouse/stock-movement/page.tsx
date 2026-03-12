@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { 
-  ArrowDownUp, 
   TrendingUp, 
   TrendingDown, 
   Search,
@@ -11,10 +10,8 @@ import {
   XCircle,
   X,
   FileText,
-  AlertTriangle,
-  ArrowRight,
-  ChevronLeft,
-  ChevronRight,
+  Upload,
+  Download
 } from 'lucide-react'
 import { Button } from '@/shared/ui/Button'
 import { Input } from '@/shared/ui/Input'
@@ -166,26 +163,26 @@ const mockStockMovements = [
   },
 ]
 
-const movementTypeConfig: Record<MovementTypeCode, { label: string; badgeCls: string }> = {
-  PURCHASE:       { label: 'Purchase',          badgeCls: 'bg-blue-100 text-blue-700' },
-  TRANSFER_IN:    { label: 'Transfer In',        badgeCls: 'bg-green-100 text-green-700' },
-  TRANSFER_OUT:   { label: 'Transfer Out',       badgeCls: 'bg-orange-100 text-orange-700' },
-  DAMAGE:         { label: 'Damage',             badgeCls: 'bg-red-100 text-red-700' },
-  EXPIRED:        { label: 'Expired',            badgeCls: 'bg-purple-100 text-purple-700' },
-  ADJUSTMENT:     { label: 'Adjustment',         badgeCls: 'bg-gray-100 text-gray-700' },
-  RETURN_SUPPLIER:{ label: 'Return to Supplier', badgeCls: 'bg-yellow-100 text-yellow-700' },
-  SALE_DEDUCTION: { label: 'Sale',               badgeCls: 'bg-cyan-100 text-cyan-700' },
-  PRODUCTION:     { label: 'Production',         badgeCls: 'bg-teal-100 text-teal-700' },
-  SAMPLE:         { label: 'Sample',             badgeCls: 'bg-pink-100 text-pink-700' },
+const movementTypeLabels: Record<MovementTypeCode, { label: string; color: string; icon: JSX.Element }> = {
+  PURCHASE: { label: 'Purchase', color: 'blue', icon: <TrendingUp size={16} /> },
+  TRANSFER_IN: { label: 'Transfer In', color: 'green', icon: <TrendingUp size={16} /> },
+  TRANSFER_OUT: { label: 'Transfer Out', color: 'orange', icon: <TrendingDown size={16} /> },
+  DAMAGE: { label: 'Damage', color: 'red', icon: <XCircle size={16} /> },
+  EXPIRED: { label: 'Expired', color: 'purple', icon: <Clock size={16} /> },
+  ADJUSTMENT: { label: 'Adjustment', color: 'gray', icon: <FileText size={16} /> },
+  RETURN_SUPPLIER: { label: 'Return to Supplier', color: 'yellow', icon: <TrendingDown size={16} /> },
+  SALE_DEDUCTION: { label: 'Sale', color: 'cyan', icon: <TrendingDown size={16} /> },
+  PRODUCTION: { label: 'Production', color: 'teal', icon: <TrendingUp size={16} /> },
+  SAMPLE: { label: 'Sample', color: 'pink', icon: <TrendingDown size={16} /> },
 }
 
-const statusConfig: Record<MovementStatus, { label: string; cls: string }> = {
-  CREATED:          { label: 'Draft',            cls: 'bg-gray-100 text-gray-600' },
-  PENDING_APPROVAL: { label: 'Pending',          cls: 'bg-yellow-100 text-yellow-700' },
-  APPROVED:         { label: 'Approved',         cls: 'bg-green-100 text-green-700' },
-  REJECTED:         { label: 'Rejected',         cls: 'bg-red-100 text-red-700' },
-  COMPLETED:        { label: 'Completed',        cls: 'bg-blue-100 text-blue-700' },
-  CANCELLED:        { label: 'Cancelled',        cls: 'bg-gray-200 text-gray-500' },
+const statusConfig: Record<MovementStatus, { label: string; color: string; bgColor: string }> = {
+  CREATED: { label: 'Draft', color: 'text-gray-700', bgColor: 'bg-gray-100' },
+  PENDING_APPROVAL: { label: 'Pending Approval', color: 'text-yellow-700', bgColor: 'bg-yellow-100' },
+  APPROVED: { label: 'Approved', color: 'text-green-700', bgColor: 'bg-green-100' },
+  REJECTED: { label: 'Rejected', color: 'text-red-700', bgColor: 'bg-red-100' },
+  COMPLETED: { label: 'Completed', color: 'text-blue-700', bgColor: 'bg-blue-100' },
+  CANCELLED: { label: 'Cancelled', color: 'text-gray-700', bgColor: 'bg-gray-200' },
 }
 
 export default function StockMovementPage() {
@@ -295,77 +292,76 @@ export default function StockMovementPage() {
       {/* ── Page Header ── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Stock Movement</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Record and track inventory movements</p>
+          <h1 className="text-2xl font-bold text-gray-900">Stock In / Stock Out</h1>
+          <p className="text-gray-600 mt-1">Record and track inventory movements</p>
         </div>
         <div className="flex gap-2">
           <Button
             className="bg-[#2d6e3e] hover:bg-[#255931] flex items-center gap-1.5 text-sm h-9 px-4"
             onClick={() => { setMovementType('in'); setShowForm(true) }}
           >
-            <TrendingUp size={15} /> Record Stock In
+            <TrendingUp size={18} />
+            Record Stock In
           </Button>
           <Button
             className="bg-red-600 hover:bg-red-700 flex items-center gap-1.5 text-sm h-9 px-4"
             onClick={() => { setMovementType('out'); setShowForm(true) }}
           >
-            <TrendingDown size={15} /> Record Stock Out
+            <TrendingDown size={18} />
+            Record Stock Out
           </Button>
         </div>
       </div>
 
-      {/* ── Low Stock Alert ── */}
-      <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-        <AlertTriangle size={17} className="text-amber-500 flex-shrink-0" />
-        <p className="text-sm text-amber-800 font-medium">
-          <span className="font-bold">3 products</span> are running low on stock and may need replenishment soon.
-        </p>
-        <a href="/warehouse/low-stock" className="ml-auto text-xs font-semibold text-amber-700 hover:underline whitespace-nowrap">
-          View Low Stock →
-        </a>
-      </div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-green-600 p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm font-medium mb-1">Total Stock In</p>
+              <p className="text-3xl font-bold text-green-600">+{totalInTransactions}</p>
+              <p className="text-xs text-gray-500 mt-1">transactions</p>
+            </div>
+            <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
+              <TrendingUp className="text-green-600" size={24} />
+            </div>
+          </div>
+        </div>
 
-      {/* ── Summary Cards ── */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-green-500 px-5 py-4 flex items-center justify-between shadow-sm">
-          <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Stock In</p>
-            <p className="text-2xl font-bold text-green-600 mt-1">+{totalInTransactions}</p>
-            <p className="text-xs text-gray-400 mt-0.5">transactions</p>
-          </div>
-          <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
-            <TrendingUp className="text-green-500" size={20} />
-          </div>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-red-500 px-5 py-4 flex items-center justify-between shadow-sm">
-          <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Stock Out</p>
-            <p className="text-2xl font-bold text-red-600 mt-1">-{totalOutTransactions}</p>
-            <p className="text-xs text-gray-400 mt-0.5">transactions</p>
-          </div>
-          <div className="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center">
-            <TrendingDown className="text-red-500" size={20} />
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-red-600 p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm font-medium mb-1">Total Stock Out</p>
+              <p className="text-3xl font-bold text-red-600">-{totalOutTransactions}</p>
+              <p className="text-xs text-gray-500 mt-1">transactions</p>
+            </div>
+            <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center">
+              <TrendingDown className="text-red-600" size={24} />
+            </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-blue-500 px-5 py-4 flex items-center justify-between shadow-sm">
-          <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Net Movement</p>
-            <p className={`text-2xl font-bold mt-1 ${totalInTransactions - totalOutTransactions >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {totalInTransactions - totalOutTransactions >= 0 ? '+' : ''}{totalInTransactions - totalOutTransactions}
-            </p>
-            <p className="text-xs text-gray-400 mt-0.5">transactions</p>
-          </div>
-          <div className="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center">
-            <ArrowDownUp className="text-gray-500" size={20} />
+
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-blue-500 p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm font-medium mb-1">Net Movement</p>
+              <p className={`text-3xl font-bold ${totalInTransactions - totalOutTransactions >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {totalInTransactions - totalOutTransactions >= 0 ? '+' : ''}{totalInTransactions - totalOutTransactions}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">transactions</p>
+            </div>
+            <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center">
+              <ArrowDownUp className="text-gray-600" size={24} />
+            </div>
           </div>
         </div>
       </div>
 
       {/* ── Record Form ── */}
       {showForm && (
-        <div className="bg-white rounded-xl border-2 border-gray-200 shadow-md p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-gray-900">
+        <div className="bg-white rounded-xl shadow-lg border-2 border-gray-300 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-gray-900">
               Record Stock {movementType === 'in' ? 'In' : 'Out'}
             </h3>
             <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600">
@@ -374,36 +370,37 @@ export default function StockMovementPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Product SKU</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Product SKU</label>
               <Input placeholder="Enter SKU..." />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Quantity</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
               <Input type="number" placeholder="Enter quantity..." />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Movement Type</label>
-              <select className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6e3e]">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Reason</label>
+              <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2d6e3e]">
                 {movementType === 'in' ? (
                   <>
-                    <option>Purchase (Supplier Delivery)</option>
-                    <option>Transfer In</option>
+                    <option>Supplier Delivery</option>
+                    <option>Purchase Order</option>
                     <option>Return from Store</option>
+                    <option>Other</option>
                   </>
                 ) : (
                   <>
-                    <option>Transfer Out (to Store)</option>
-                    <option>Damage</option>
-                    <option>Expired</option>
-                    <option>Adjustment</option>
-                    <option>Return to Supplier</option>
+                    <option>Store Transfer</option>
+                    <option>Customer Order</option>
+                    <option>Damaged Items</option>
+                    <option>Expired Items</option>
+                    <option>Other</option>
                   </>
                 )}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Recorded By</label>
-              <Input placeholder="Staff name..." />
+              <label className="block text-sm font-medium text-gray-700 mb-2">Staff Name</label>
+              <Input placeholder="Your name..." defaultValue="Nguyen Van A" />
             </div>
             {movementType === 'in' && (
               <div>
@@ -418,37 +415,45 @@ export default function StockMovementPage() {
               </div>
             )}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Reason / Notes</label>
-              <textarea
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6e3e]"
-                rows={2}
+              <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+              <textarea 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2d6e3e]"
+                rows={3}
                 placeholder="Additional notes..."
               />
             </div>
           </div>
-          <div className="flex gap-3 mt-4">
-            <Button className={`flex-1 text-sm h-9 ${movementType === 'in' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}>
+
+          <div className="flex gap-3 mt-6">
+            <Button 
+              className={`flex-1 ${movementType === 'in' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+            >
               Record {movementType === 'in' ? 'Stock In' : 'Stock Out'}
             </Button>
-            <Button variant="outline" onClick={() => setShowForm(false)} className="flex-1 text-sm h-9">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowForm(false)}
+              className="flex-1"
+            >
               Cancel
             </Button>
           </div>
         </div>
       )}
 
-      {/* ── Filters ── */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <div className="md:col-span-1">
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Search</label>
+      {/* Search and Date Filter */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Search Box */}
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Search Product / SKU</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
               <Input
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Product name or SKU..."
-                className="pl-9 text-sm h-9"
+                placeholder="Enter product name or SKU..."
+                className="pl-10"
               />
             </div>
           </div>
@@ -470,23 +475,51 @@ export default function StockMovementPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">From Date</label>
-            <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} max={endDate || undefined} className="h-9 text-sm" />
+            <label className="block text-sm font-medium text-gray-700 mb-2">From Date</label>
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              max={endDate || undefined}
+            />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">To Date</label>
-            <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} min={startDate || undefined} className="h-9 text-sm" />
+            <label className="block text-sm font-medium text-gray-700 mb-2">To Date</label>
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              min={startDate || undefined}
+            />
           </div>
         </div>
-        <div className="mt-3 flex items-center justify-between">
-          <p className="text-xs text-gray-500">
-            Showing <span className="font-semibold text-gray-800">{filteredMovements.length}</span> transaction{filteredMovements.length !== 1 ? 's' : ''}
-            {!searchTerm && !startDate && !endDate && <span className="text-gray-400"> (last 30 days)</span>}
-          </p>
-          {(searchTerm || startDate || endDate || typeFilter !== 'all') && (
-            <button onClick={clearFilters} className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 font-medium">
-              <X size={13} /> Clear filters
-            </button>
+
+        {/* Filter Summary & Clear */}
+        <div className="mt-4 flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            {(searchTerm || startDate || endDate) ? (
+              <>
+                Showing <span className="font-bold text-[#2d6e3e]">{filteredMovements.length}</span> transaction{filteredMovements.length !== 1 ? 's' : ''}
+                {searchTerm && <span> matching "{searchTerm}"</span>}
+                {startDate && <span> from {startDate}</span>}
+                {endDate && <span> to {endDate}</span>}
+              </>
+            ) : (
+              <>
+                Showing <span className="font-bold text-[#2d6e3e]">{filteredMovements.length}</span> recent transaction{filteredMovements.length !== 1 ? 's' : ''} <span className="text-gray-500">(last 30 days)</span>
+                <span className="ml-2 text-gray-500">• Use date filter to view older transactions</span>
+              </>
+            )}
+          </div>
+          {(searchTerm || startDate || endDate) && (
+            <Button
+              variant="outline"
+              onClick={clearFilters}
+              className="flex items-center gap-2 text-sm"
+            >
+              <X size={16} />
+              Clear Filters
+            </Button>
           )}
         </div>
       </div>
@@ -495,174 +528,174 @@ export default function StockMovementPage() {
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         {/* Tabs */}
         <div className="flex border-b border-gray-200">
-          {(['all', 'in', 'out'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-3 text-sm font-semibold transition-colors ${
-                activeTab === tab
-                  ? tab === 'out' ? 'bg-red-600 text-white' : tab === 'in' ? 'bg-green-600 text-white' : 'bg-[#2d6e3e] text-white'
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {tab === 'all' ? 'All Movements' : tab === 'in' ? '↑ Stock In' : '↓ Stock Out'}
-            </button>
-          ))}
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`flex-1 px-6 py-4 font-medium transition-colors ${
+              activeTab === 'all' 
+                ? 'bg-[#2d6e3e] text-white' 
+                : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            All Movements
+          </button>
+          <button
+            onClick={() => setActiveTab('in')}
+            className={`flex-1 px-6 py-4 font-medium transition-colors ${
+              activeTab === 'in' 
+                ? 'bg-green-600 text-white' 
+                : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            Stock In
+          </button>
+          <button
+            onClick={() => setActiveTab('out')}
+            className={`flex-1 px-6 py-4 font-medium transition-colors ${
+              activeTab === 'out' 
+                ? 'bg-red-600 text-white' 
+                : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            Stock Out
+          </button>
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200 divide-x divide-gray-200">
-                <th className="text-left py-3 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Movement ID</th>
-                <th className="text-left py-3 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Product</th>
-                <th className="text-left py-3 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide">SKU</th>
-                <th className="text-left py-3 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Qty</th>
-                <th className="text-left py-3 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Type</th>
-                <th className="text-left py-3 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Source → Destination</th>
-                <th className="text-left py-3 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Supplier</th>
-                <th className="text-left py-3 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Date & Time</th>
-                <th className="text-left py-3 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Reason</th>
-                <th className="text-left py-3 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Recorded By</th>
-                <th className="text-left py-3 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {paginatedMovements.length > 0 ? paginatedMovements.map((m, idx) => {
-                const isInbound = inboundTypes.includes(m.type)
-                const typeCfg = movementTypeConfig[m.type]
-                const statusCfg = statusConfig[m.status]
-                return (
-                  <tr
-                    key={m.id}
-                    className={`hover:bg-blue-50/30 transition-colors divide-x divide-gray-100 border-b border-gray-100 ${idx % 2 === 1 ? 'bg-gray-50/40' : 'bg-white'}`}
-                  >
-                    {/* Movement ID */}
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      <span className="font-mono text-[11px] text-gray-500">{m.movementNumber}</span>
-                    </td>
+        {/* Movement History */}
+        <div className="divide-y divide-gray-200">
+          {paginatedMovements.length > 0 ? (
+            paginatedMovements.map((movement) => {
+              const isInbound = isInboundMovement(movement.type)
+              return (
+              <div key={movement.id} className="p-6 hover:bg-gray-50">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-4 flex-1">
+                    <div className={`p-3 rounded-lg ${
+                      isInbound ? 'bg-green-100' : 'bg-red-100'
+                    }`}>
+                      {isInbound ? (
+                        <TrendingUp className="text-green-600" size={24} />
+                      ) : (
+                        <TrendingDown className="text-red-600" size={24} />
+                      )}
+                    </div>
 
-                    {/* Product */}
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 ${isInbound ? 'bg-green-100' : 'bg-red-100'}`}>
-                          {isInbound
-                            ? <TrendingUp size={12} className="text-green-600" />
-                            : <TrendingDown size={12} className="text-red-600" />
-                          }
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h4 className="font-bold text-gray-900 text-lg">{movement.product}</h4>
+                        <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs font-medium">
+                          {movement.sku}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-500 mb-1">Quantity</p>
+                          <p className={`font-bold text-lg ${isInbound ? 'text-green-600' : 'text-red-600'}`}>
+                            {isInbound ? '+' : '-'}{movement.quantity} {movement.unit}
+                          </p>
                         </div>
-                        <span className="font-medium text-gray-900 whitespace-nowrap">{m.product}</span>
+                        <div>
+                          <p className="text-gray-500 mb-1">Date & Time</p>
+                          <p className="font-medium text-gray-900">{movement.date}</p>
+                          <p className="text-gray-600 text-xs">{movement.time}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500 mb-1">Reason</p>
+                          <p className="font-medium text-gray-900">{movement.reason}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500 mb-1">Recorded By</p>
+                          <p className="font-medium text-gray-900">{movement.staff}</p>
+                        </div>
                       </div>
-                    </td>
 
-                    {/* SKU */}
-                    <td className="py-3 px-4">
-                      <span className="font-mono text-[11px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{m.sku}</span>
-                    </td>
-
-                    {/* Quantity */}
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      <span className={`font-bold ${isInbound ? 'text-green-600' : 'text-red-600'}`}>
-                        {isInbound ? '+' : '-'}{Math.abs(m.quantity)} {m.unit}
-                      </span>
-                    </td>
-
-                    {/* Type Badge */}
-                    <td className="py-3 px-4">
-                      <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${typeCfg.badgeCls}`}>
-                        {typeCfg.label}
-                      </span>
-                    </td>
-
-                    {/* Source → Destination */}
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-1 text-xs text-gray-700 whitespace-nowrap">
-                        <span className="bg-gray-100 px-1.5 py-0.5 rounded font-medium">{m.source}</span>
-                        <ArrowRight size={11} className="text-gray-400 flex-shrink-0" />
-                        <span className="bg-gray-100 px-1.5 py-0.5 rounded font-medium">{m.destination}</span>
-                      </div>
-                    </td>
-
-                    {/* Supplier */}
-                    <td className="py-3 px-4 text-xs text-gray-600 whitespace-nowrap">
-                      {m.type === 'PURCHASE'
-                        ? (m.supplier ?? <span className="text-gray-300">—</span>)
-                        : <span className="text-gray-400 italic">Internal</span>}
-                    </td>
-
-                    {/* Date & Time */}
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      <p className="text-xs font-medium text-gray-900">{m.date}</p>
-                      <p className="text-[11px] text-gray-400">{m.time}</p>
-                    </td>
-
-                    {/* Reason */}
-                    <td className="py-3 px-4 max-w-[180px]">
-                      <p className="text-xs text-gray-600 truncate" title={m.reason ?? ''}>{m.reason ?? <span className="text-gray-300">—</span>}</p>
-                    </td>
-
-                    {/* Recorded By */}
-                    <td className="py-3 px-4 whitespace-nowrap text-xs text-gray-700">
-                      {m.createdBy}
-                    </td>
-
-                    {/* Status */}
-                    <td className="py-3 px-4">
-                      <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${statusCfg.cls}`}>
-                        {statusCfg.label}
-                      </span>
-                    </td>
-                  </tr>
-                )
-              }) : (
-                <tr>
-                  <td colSpan={11} className="py-12 text-center text-sm text-gray-400">No transactions found</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                      {movement.notes && (
+                        <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                          <p className="text-sm text-gray-600">
+                            <span className="font-medium text-gray-700">Notes:</span> {movement.notes}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )})
+          ) : (
+            <div className="p-12 text-center">
+              <p className="text-gray-500">No transactions found</p>
+            </div>
+          )}
         </div>
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-5 py-3.5 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
-            <p className="text-xs text-gray-500">
-              Showing <span className="font-semibold text-gray-800">{startIndex + 1}–{Math.min(endIndex, filteredMovements.length)}</span> of <span className="font-semibold text-gray-800">{filteredMovements.length}</span>
-            </p>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="p-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
-                  return (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
-                        currentPage === page ? 'bg-[#2d6e3e] text-white' : 'text-gray-700 border border-gray-300 hover:bg-gray-100'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  )
-                } else if (page === currentPage - 2 || page === currentPage + 2) {
-                  return <span key={page} className="text-gray-400 text-xs">…</span>
-                }
-                return null
-              })}
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="p-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <ChevronRight size={16} />
-              </button>
+          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between">
+              {/* Pagination Info */}
+              <div className="text-sm text-gray-600">
+                Showing <span className="font-medium text-gray-900">{startIndex + 1}</span> to{' '}
+                <span className="font-medium text-gray-900">{Math.min(endIndex, filteredMovements.length)}</span> of{' '}
+                <span className="font-medium text-gray-900">{filteredMovements.length}</span> transactions
+              </div>
+
+              {/* Pagination Buttons */}
+              <div className="flex items-center gap-2">
+                {/* Previous Button */}
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className={`p-2 rounded-lg border transition-colors ${
+                    currentPage === 1
+                      ? 'border-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <ChevronLeft size={20} />
+                </button>
+
+                {/* Page Numbers */}
+                <div className="flex gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    // Show first page, last page, current page, and pages around current
+                    if (
+                      page === 1 ||
+                      page === totalPages ||
+                      (page >= currentPage - 1 && page <= currentPage + 1)
+                    ) {
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                            currentPage === page
+                              ? 'bg-[#2d6e3e] text-white'
+                              : 'text-gray-700 hover:bg-gray-100 border border-gray-300'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      )
+                    } else if (page === currentPage - 2 || page === currentPage + 2) {
+                      return <span key={page} className="px-2 text-gray-400">...</span>
+                    }
+                    return null
+                  })}
+                </div>
+
+                {/* Next Button */}
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`p-2 rounded-lg border transition-colors ${
+                    currentPage === totalPages
+                      ? 'border-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </div>
             </div>
           </div>
         )}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, ArrowUpDown, Package, TrendingUp, TrendingDown, FileText } from 'lucide-react'
+import { Search, ArrowUpDown, TrendingUp, TrendingDown, FileText } from 'lucide-react'
 import { Input } from '@/shared/ui/Input'
 import { Button } from '@/shared/ui/Button'
 
@@ -394,37 +394,37 @@ const batchMovements: BatchMovement[] = [
 // Movement type configuration
 const movementTypeConfig: Record<MovementType, { label: string; color: string; bgColor: string; icon: JSX.Element }> = {
   IMPORT: {
-    label: 'Import',
+    label: 'Nhập kho',
     color: 'text-green-700',
     bgColor: 'bg-green-100 border-green-200',
     icon: <TrendingUp size={14} />
   },
   TRANSFER_TO_SHELF: {
-    label: 'Transfer to Shelf',
+    label: 'Chuyển lên kệ',
     color: 'text-blue-700',
     bgColor: 'bg-blue-100 border-blue-200',
     icon: <ArrowUpDown size={14} />
   },
   ADJUST: {
-    label: 'Adjustment',
+    label: 'Điều chỉnh',
     color: 'text-purple-700',
     bgColor: 'bg-purple-100 border-purple-200',
     icon: <FileText size={14} />
   },
   DAMAGE: {
-    label: 'Damage',
+    label: 'Hư hỏng',
     color: 'text-red-700',
     bgColor: 'bg-red-100 border-red-200',
     icon: <TrendingDown size={14} />
   },
   EXPIRED: {
-    label: 'Expired',
+    label: 'Hết hạn',
     color: 'text-orange-700',
     bgColor: 'bg-orange-100 border-orange-200',
     icon: <TrendingDown size={14} />
   },
   RETURN: {
-    label: 'Return',
+    label: 'Trả lại',
     color: 'text-cyan-700',
     bgColor: 'bg-cyan-100 border-cyan-200',
     icon: <TrendingUp size={14} />
@@ -433,7 +433,8 @@ const movementTypeConfig: Record<MovementType, { label: string; color: string; b
 
 export default function BatchMovementsPage() {
   const [searchTerm, setSearchTerm] = useState('')
-  const [typeFilter, setTypeFilter] = useState<MovementType | 'all'>('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [sortField, setSortField] = useState<'created_at' | 'quantity'>('created_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
@@ -471,25 +472,47 @@ export default function BatchMovementsPage() {
         item.slot_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.reference_id.toLowerCase().includes(searchTerm.toLowerCase())
       
-      const matchesType = typeFilter === 'all' || item.type === typeFilter
+      // Filter by date range - check if either manufacture or expiration date falls within the range
+      let matchesDateRange = true
       
-      return matchesSearch && matchesType
+      if (dateFrom && dateTo) {
+        // Both dates specified - check if either date is within the range
+        const mfgInRange = item.manufacture_date >= dateFrom && item.manufacture_date <= dateTo
+        const expInRange = item.expiration_date >= dateFrom && item.expiration_date <= dateTo
+        matchesDateRange = mfgInRange || expInRange
+      } else if (dateFrom) {
+        // Only from date specified
+        matchesDateRange = item.manufacture_date >= dateFrom || item.expiration_date >= dateFrom
+      } else if (dateTo) {
+        // Only to date specified
+        matchesDateRange = item.manufacture_date <= dateTo || item.expiration_date <= dateTo
+      }
+      
+      return matchesSearch && matchesDateRange
     })
 
     // Sort
     filtered.sort((a, b) => {
-      const aValue = sortField === 'created_at' ? new Date(a.created_at).getTime() : a.quantity
-      const bValue = sortField === 'created_at' ? new Date(b.created_at).getTime() : b.quantity
+      let aValue: number
+      let bValue: number
+      
+      if (sortField === 'created_at') {
+        aValue = new Date(a.created_at).getTime()
+        bValue = new Date(b.created_at).getTime()
+      } else {
+        aValue = Math.abs(a.quantity)
+        bValue = Math.abs(b.quantity)
+      }
       
       if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1
+        return aValue - bValue
       } else {
-        return aValue < bValue ? 1 : -1
+        return bValue - aValue
       }
     })
 
     return filtered
-  }, [searchTerm, typeFilter, sortField, sortOrder])
+  }, [searchTerm, dateFrom, dateTo, sortField, sortOrder])
 
   // Paginated data
   const paginatedData = useMemo(() => {
@@ -503,7 +526,7 @@ export default function BatchMovementsPage() {
   // Reset to page 1 when filters change
   useMemo(() => {
     setCurrentPage(1)
-  }, [searchTerm, typeFilter])
+  }, [searchTerm, dateFrom, dateTo])
 
   const handleSort = (field: 'created_at' | 'quantity') => {
     if (sortField === field) {
@@ -518,18 +541,18 @@ export default function BatchMovementsPage() {
     <div className="space-y-6 p-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Batch-Level Inventory</h1>
-        <p className="text-gray-600 mt-1">Track all batch-level stock movements and transactions</p>
+        <h1 className="text-2xl font-bold text-gray-900">Tồn kho theo lô</h1>
+        <p className="text-gray-600 mt-1">Theo dõi tất cả di chuyển hàng tồn kho cấp lô và giao dịch</p>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Total Stock In</p>
-              <p className="text-3xl font-bold text-green-600 mt-2">+{stats.totalIn}</p>
-              <p className="text-xs text-gray-500 mt-1">transactions</p>
+              <p className="text-sm text-gray-600 font-medium">Tổng nhập kho</p>
+              <p className="text-3xl font-bold text-green-600 mt-2">{stats.totalIn}</p>
+              <p className="text-xs text-gray-500 mt-1">giao dịch</p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
               <TrendingUp className="text-green-600" size={24} />
@@ -540,27 +563,12 @@ export default function BatchMovementsPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Total Stock Out</p>
-              <p className="text-3xl font-bold text-red-600 mt-2">-{stats.totalOut}</p>
-              <p className="text-xs text-gray-500 mt-1">transactions</p>
+              <p className="text-sm text-gray-600 font-medium">Tổng xuất kho</p>
+              <p className="text-3xl font-bold text-red-600 mt-2">{stats.totalOut}</p>
+              <p className="text-xs text-gray-500 mt-1">giao dịch</p>
             </div>
             <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
               <TrendingDown className="text-red-600" size={24} />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 font-medium">Net Movement</p>
-              <p className={`text-3xl font-bold mt-2 ${stats.netMovement >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
-                {stats.netMovement >= 0 ? '+' : ''}{stats.netMovement}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">{stats.totalTransactions} transactions</p>
-            </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Package className="text-blue-600" size={24} />
             </div>
           </div>
         </div>
@@ -568,37 +576,56 @@ export default function BatchMovementsPage() {
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="space-y-4">
           {/* Search */}
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <Input
+              type="text"
+              placeholder="Tìm theo mã lô, sản phẩm, SKU, kho, kệ, hoặc tham chiếu..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 w-full"
+            />
+          </div>
+
+          {/* Date Filters */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Từ ngày</label>
               <Input
-                type="text"
-                placeholder="Search by batch code, product, SKU, warehouse, slot, or reference..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-full"
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Đến ngày</label>
+              <Input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="w-full"
               />
             </div>
           </div>
 
-          {/* Type Filter */}
-          <div className="sm:w-48">
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value as MovementType | 'all')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2d6e3e]"
-            >
-              <option value="all">All Types</option>
-              <option value="IMPORT">Import</option>
-              <option value="TRANSFER_TO_SHELF">Transfer to Shelf</option>
-              <option value="ADJUST">Adjustment</option>
-              <option value="DAMAGE">Damage</option>
-              <option value="EXPIRED">Expired</option>
-              <option value="RETURN">Return</option>
-            </select>
-          </div>
+          {/* Clear Filters Button */}
+          {(dateFrom || dateTo) && (
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setDateFrom('')
+                  setDateTo('')
+                }}
+              >
+                Xóa bộ lọc ngày
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -609,47 +636,38 @@ export default function BatchMovementsPage() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  ID
+                  Mã lô
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Batch Code
+                  Sản phẩm
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Product
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Warehouse
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Slot Code
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Type
+                  Kho
                 </th>
                 <th 
                   className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                   onClick={() => handleSort('quantity')}
                 >
                   <div className="flex items-center gap-1">
-                    Quantity
+                    Số lượng
                     <ArrowUpDown size={14} />
                   </div>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Mfg Date
+                  Ngày SX
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Exp Date
+                  Ngày HSD
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Reference
+                  Tham chiếu
                 </th>
                 <th 
                   className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                   onClick={() => handleSort('created_at')}
                 >
                   <div className="flex items-center gap-1">
-                    Created At
+                    Tạo lúc
                     <ArrowUpDown size={14} />
                   </div>
                 </th>
@@ -658,8 +676,8 @@ export default function BatchMovementsPage() {
             <tbody className="divide-y divide-gray-200">
               {paginatedData.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
-                    No movements found
+                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                    Không tìm thấy di chuyển
                   </td>
                 </tr>
               ) : (
@@ -667,9 +685,6 @@ export default function BatchMovementsPage() {
                   const config = movementTypeConfig[movement.type]
                   return (
                     <tr key={movement.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm text-gray-900 font-mono">
-                        {movement.id.substring(0, 8)}...
-                      </td>
                       <td className="px-4 py-3">
                         <div className="text-sm font-medium text-gray-900">{movement.batch_code}</div>
                         <div className="text-xs text-gray-500">ID: {movement.batch_id}</div>
@@ -682,20 +697,11 @@ export default function BatchMovementsPage() {
                         <div className="text-sm text-gray-900">{movement.warehouse_name}</div>
                         <div className="text-xs text-gray-500">{movement.warehouse_location}</div>
                       </td>
-                      <td className="px-4 py-3 text-sm font-mono text-gray-900">
-                        {movement.slot_code}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${config.bgColor} ${config.color}`}>
-                          {config.icon}
-                          {config.label}
-                        </span>
-                      </td>
                       <td className="px-4 py-3">
                         <span className={`text-sm font-semibold ${
                           movement.quantity > 0 ? 'text-green-600' : 'text-red-600'
                         }`}>
-                          {movement.quantity > 0 ? '+' : ''}{movement.quantity}
+                          {Math.abs(movement.quantity)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
@@ -728,11 +734,11 @@ export default function BatchMovementsPage() {
         <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-700">
-              Showing <span className="font-medium">{filteredAndSortedData.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}</span> to{' '}
+              Hiển thị <span className="font-medium">{filteredAndSortedData.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}</span> đến{' '}
               <span className="font-medium">
                 {Math.min(currentPage * itemsPerPage, filteredAndSortedData.length)}
               </span>{' '}
-              of <span className="font-medium">{filteredAndSortedData.length}</span> results
+              trong <span className="font-medium">{filteredAndSortedData.length}</span> kết quả
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -741,7 +747,7 @@ export default function BatchMovementsPage() {
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
               >
-                Previous
+                Trước
               </Button>
               <div className="flex items-center gap-1">
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
@@ -762,7 +768,7 @@ export default function BatchMovementsPage() {
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
               >
-                Next
+                Tiếp
               </Button>
             </div>
           </div>
