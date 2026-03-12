@@ -12,22 +12,30 @@ import { useAuthStore } from '@/store/auth.store'
 
 export default function Home() {
   const router = useRouter()
-  const { user, isAuthenticated, hydrated } = useAuthStore()
+  const { user, isAuthenticated, hydrated, logout } = useAuthStore()
   const [isCategoryDrawerOpen, setIsCategoryDrawerOpen] = useState(false)
 
   useEffect(() => {
     if (!hydrated) return
     if (!isAuthenticated || !user) return
+    
+    // Check nếu là WAREHOUSE_MANAGER (role_id = 3, deprecated) thì logout và redirect về login
+    if (user.role === 'WAREHOUSE_MANAGER' || user.roleId === 3) {
+      logout()
+      router.replace('/login')
+      return
+    }
+    
     const portalMap: Partial<Record<typeof user.role, string>> = {
       ADMIN: '/admin/dashboard',
       STORE_MANAGER: '/store-manager',
-      WAREHOUSE_MANAGER: '/warehouse',
+      WAREHOUSE_ADMIN: '/warehouse',
       WAREHOUSE_STAFF: '/warehouse-store',
       STAFF: '/cashier',
     }
     const portal = portalMap[user.role]
     if (portal) router.replace(portal)
-  }, [hydrated, isAuthenticated, user, router])
+  }, [hydrated, isAuthenticated, user, router, logout])
 
   return (
     <div className="min-h-screen bg-gray-50">

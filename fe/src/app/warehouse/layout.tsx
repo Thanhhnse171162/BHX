@@ -11,7 +11,7 @@ export default function WarehouseLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { user, isAuthenticated, isLoading, hydrated } = useAuth()
+  const { user, isAuthenticated, isLoading, hydrated, logout } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
@@ -26,13 +26,21 @@ export default function WarehouseLayout({
         return
       }
       
-      // Kiểm tra role_id phải là 3 (Warehouse Manager) và email có @company.com
-      if (user && (user.roleId !== 3 || !user.email?.endsWith('@company.com'))) {
+      // Nếu là WAREHOUSE_MANAGER (role_id = 3, deprecated) thì logout và redirect về login
+      if (user && (user.role === 'WAREHOUSE_MANAGER' || user.roleId === 3)) {
+        logout()
+        router.push('/login')
+        return
+      }
+      
+      // Kiểm tra role_id phải là 7 (Warehouse Admin) hoặc role là WAREHOUSE_ADMIN
+      const isWarehouseAdmin = user?.roleId === 7 || user?.role === 'WAREHOUSE_ADMIN'
+      if (user && !isWarehouseAdmin) {
         router.push('/')
         return
       }
     }
-  }, [isAuthenticated, isLoading, user, router, hydrated])
+  }, [isAuthenticated, isLoading, user, router, hydrated, logout])
 
   if (isLoading || !hydrated) {
     return (
@@ -42,7 +50,8 @@ export default function WarehouseLayout({
     )
   }
 
-  if (!isAuthenticated || !user || user.roleId !== 3) {
+  const isWarehouseAdmin = user?.roleId === 7 || user?.role === 'WAREHOUSE_ADMIN'
+  if (!isAuthenticated || !user || !isWarehouseAdmin) {
     return null
   }
 

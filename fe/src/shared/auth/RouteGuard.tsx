@@ -13,7 +13,7 @@ interface RouteGuardProps {
 
 export function RouteGuard({ children, allowedRoles, fallback }: RouteGuardProps) {
   const router = useRouter()
-  const { user, isAuthenticated, hydrated } = useAuthStore()
+  const { user, isAuthenticated, hydrated, logout } = useAuthStore()
   const [isChecking, setIsChecking] = useState(true)
 
   useEffect(() => {
@@ -23,12 +23,19 @@ export function RouteGuard({ children, allowedRoles, fallback }: RouteGuardProps
       return
     }
 
+    // Nếu là WAREHOUSE_MANAGER (role_id = 3, deprecated) thì logout và redirect về login
+    if (user.role === 'WAREHOUSE_MANAGER' || user.roleId === 3) {
+      logout()
+      router.replace('/login')
+      return
+    }
+
     if (!allowedRoles.includes(user.role)) {
       // Redirect to the correct portal for this role
       const rolePortalMap: Partial<Record<typeof user.role, string>> = {
         ADMIN: '/admin/dashboard',
         STORE_MANAGER: '/store-manager',
-        WAREHOUSE_MANAGER: '/warehouse',
+        WAREHOUSE_ADMIN: '/warehouse',
         WAREHOUSE_STAFF: '/warehouse-store',
         STAFF: '/cashier',
         CUSTOMER: '/customer',
@@ -39,7 +46,7 @@ export function RouteGuard({ children, allowedRoles, fallback }: RouteGuardProps
     }
 
     setIsChecking(false)
-  }, [isAuthenticated, user, allowedRoles, router, hydrated])
+  }, [isAuthenticated, user, allowedRoles, router, hydrated, logout])
 
   if (isChecking || !hydrated) {
     return fallback || <div className="flex items-center justify-center min-h-screen">Loading...</div>
