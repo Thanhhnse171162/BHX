@@ -28,6 +28,7 @@ localApiClient.interceptors.request.use((config) => {
 export interface ProductFromAPI {
   id: string
   sku: string
+  barcode?: string
   name: string
   description: string | null
   categoryId: string

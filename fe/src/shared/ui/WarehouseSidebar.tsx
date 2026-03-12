@@ -11,7 +11,6 @@ import {
   ChevronDown,
   ChevronUp,
   Warehouse,
-  Eye,
   LucideIcon,
   FileText,
   ArrowLeftRight,
@@ -19,10 +18,12 @@ import {
   Truck,
   Building2,
   BoxIcon,
-  BarChart3
+  BarChart3,
+  MapPin
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuthStore } from '@/store/auth.store'
+import { useAuth } from '@/shared/hooks/useAuth'
 
 interface NavItem {
   label: string
@@ -100,8 +101,27 @@ export function WarehouseSidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const logout = useAuthStore((state) => state.logout)
+  const { user } = useAuth()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [expandedItems, setExpandedItems] = useState<string[]>(['Inventory'])
+
+  // Warehouse mapping dựa trên workplace_id từ database (chữ thường)
+  const warehouseNames: { [key: string]: string } = {
+    'a0000001-0001-0001-0001-000000000001': 'Kho HCM',
+    'a0000001-0001-0001-0001-000000000002': 'Kho Chi Nhánh Quận 12',
+    'a0000001-0001-0001-0001-000000000003': 'Kho Chi Nhánh Bình Dương',
+    'a0000001-0001-0001-0001-000000000004': 'Kho Chi Nhánh Long An',
+    'b0000001-0001-0001-0001-000000000001': 'Cửa Hàng Thủ Đức',
+    'b0000001-0001-0001-0001-000000000002': 'Cửa Hàng Giải Phóng HCM',
+    'b0000001-0001-0001-0001-000000000003': 'Cửa Hàng Bình Dương',
+    'b0000001-0001-0001-0001-000000000004': 'Cửa Hàng Củ Chi',
+    'b0000001-0001-0001-0001-000000000005': 'Cửa Hàng Biên Hòa',
+    'b0000001-0001-0001-0001-000000000006': 'Cửa Hàng Quận 7',
+  }
+  
+  const selectedLocation = user?.workplaceId 
+    ? (warehouseNames[user.workplaceId.toLowerCase()] || warehouseNames[user.workplaceId] || 'Kho Chưa Xác Định')
+    : 'Kho Chưa Xác Định'
 
   const handleLogout = () => {
     logout()
@@ -159,6 +179,24 @@ export function WarehouseSidebar() {
           </button>
         )}
       </div>
+
+      {/* Location Selector */}
+      {!isCollapsed && (
+        <div className="px-3 py-3 border-b border-white/10">
+          <label className="text-xs font-medium text-white/60 uppercase tracking-wider block mb-2">
+            Vị trí hiện tại
+          </label>
+          <button className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors backdrop-blur-sm border border-white/20">
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4" />
+              <span className="text-sm font-medium text-left">
+                {selectedLocation}
+              </span>
+            </div>
+            <ChevronDown className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Expand Button (when collapsed) */}
       {isCollapsed && (

@@ -1,5 +1,9 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/shared/hooks/useAuth'
+import { InventoryAPIService } from '@/services/inventory-api.service'
 import {
   Package,
   AlertTriangle,
@@ -9,124 +13,154 @@ import {
 } from 'lucide-react'
 
 export default function WarehouseManagerDashboard() {
+  const { user } = useAuth()
+  const router = useRouter()
+  const [inventory, setInventory] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Mock data
+  // Fetch inventory data
+  const fetchInventory = async () => {
+    if (!user?.workplaceId) return
+
+    try {
+      setLoading(true)
+      const data = await InventoryAPIService.getInventoryByWarehouse(user.workplaceId)
+      setInventory(data)
+    } catch (error) {
+      console.error('Error fetching inventory:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchInventory()
+  }, [user?.workplaceId])
+
+  // Calculate metrics from real data
+  const totalProducts = inventory.length
+  const totalStock = inventory.reduce((sum, item) => sum + item.quantity, 0)
+  const lowStockItems = inventory.filter(item => item.isLowStock).length
+
   const metrics = [
     {
-      label: 'Total Products',
-      value: '12,450',
+      label: 'Tổng sản phẩm',
+      value: totalProducts.toString(),
       change: '+2.5%',
       trend: 'up',
       icon: Package,
       color: 'emerald',
+      onClick: () => router.push('/warehouse-manager/inventory'),
     },
     {
-      label: 'Total Stock',
-      value: '856.2k',
+      label: 'Tổng hàng tồn kho',
+      value: totalStock >= 1000 ? `${(totalStock / 1000).toFixed(1)}k` : totalStock.toString(),
       change: '+2%',
       trend: 'up',
       icon: Package,
       color: 'blue',
+      onClick: () => router.push('/warehouse-manager/inventory'),
     },
     {
-      label: 'Low Stock Items',
-      value: '42',
-      change: 'Critical',
-      trend: 'down',
+      label: 'Sản phẩm sắp hết',
+      value: lowStockItems.toString(),
+      change: lowStockItems > 0 ? 'Nghiêm trọng' : 'Bình thường',
+      trend: lowStockItems > 0 ? 'down' : 'up',
       icon: AlertTriangle,
       color: 'red',
+      onClick: () => router.push('/warehouse-manager/inventory'),
     },
     {
-      label: 'Store Refills',
+      label: 'Yêu cầu bổ sung',
       value: '18',
-      change: 'Pending',
+      change: 'Đang chờ',
       trend: 'neutral',
       icon: RefreshCw,
       color: 'orange',
+      onClick: () => router.push('/warehouse-manager/shipments'),
     },
     {
-      label: 'Transfers',
+      label: 'Chuyển kho',
       value: '7',
-      change: 'Active',
+      change: 'Đang xử lý',
       trend: 'neutral',
       icon: ArrowRight,
       color: 'purple',
+      onClick: () => router.push('/warehouse-manager/transfers'),
     },
-  ]
-
-  const staffOnline = [
-    { name: 'Mark Thompson', role: 'Floor Manager', status: 'online' },
-    { name: 'Sarah Jenkins', role: 'Inventory Clerk', status: 'online' },
-    { name: 'David Chen', role: 'Loading Bay Lead', status: 'online' },
-    { name: 'Elena Rodriguez', role: 'Safety Officer', status: 'online' },
   ]
 
   const pendingRefills = [
     {
-      id: 'Store #44-Downtown',
-      items: '12 SKUs - Electronics, Home Office',
+      id: 'Cửa hàng #44-Trung tâm',
+      items: '12 SKUs - Điện tử, Văn phòng',
       status: 'urgent',
-      urgency: 'URGENT',
+      urgency: 'KHẨN CẤP',
     },
     {
-      id: 'Store #12-Northside Mall',
-      items: '42 SKUs - Apparel, Accessories',
+      id: 'Cửa hàng #12-Trung tâm thương mại Bắc',
+      items: '42 SKUs - Thời trang, Phụ kiện',
       status: 'routine',
-      urgency: 'ROUTINE',
+      urgency: 'THƯỜNG XUYÊN',
     },
   ]
 
   const transferRequests = [
     {
-      id: 'WH-2 East to WH-1',
-      description: 'Requested: Today 16:00',
-      item: 'Bulk Storage Pallets x120',
+      id: 'KH-2 Đông đến KH-1',
+      description: 'Yêu cầu: Hôm nay 16:00',
+      item: 'Pallet lưu trữ số lượng lớn x120',
       status: 'in-transit',
     },
     {
-      id: 'WH-1 to WH-4 Coastal',
-      description: 'Requested: 2d Ago',
-      item: 'Winter Season Stock (+650 units)',
+      id: 'KH-1 đến KH-4 Ven biển',
+      description: 'Yêu cầu: 2 ngày trước',
+      item: 'Hàng mùa đông (+650 đơn vị)',
       status: 'action-required',
     },
   ]
 
   const dailyMovementData = [
-    { day: 'Mon', inbound: 210, outbound: 180 },
-    { day: 'Tue', inbound: 260, outbound: 220 },
-    { day: 'Wed', inbound: 190, outbound: 240 },
-    { day: 'Thu', inbound: 340, outbound: 280 },
-    { day: 'Fri', inbound: 310, outbound: 380 },
-    { day: 'Sat', inbound: 240, outbound: 320 },
-    { day: 'Sun', inbound: 280, outbound: 180 },
+    { day: 'T2', inbound: 210, outbound: 180 },
+    { day: 'T3', inbound: 260, outbound: 220 },
+    { day: 'T4', inbound: 190, outbound: 240 },
+    { day: 'T5', inbound: 340, outbound: 280 },
+    { day: 'T6', inbound: 310, outbound: 380 },
+    { day: 'T7', inbound: 240, outbound: 320 },
+    { day: 'CN', inbound: 280, outbound: 180 },
   ]
 
   const maxValue = Math.max(
     ...dailyMovementData.flatMap((d) => [d.inbound, d.outbound])
   )
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2d6e3e]"></div>
+          <p className="text-gray-600">Đang tải dữ liệu...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Operational Overview</h1>
-          <p className="text-gray-600 mt-1">Real-time status for regional distribution</p>
+          <h1 className="text-3xl font-bold text-gray-900">Tổng quan vận hành</h1>
+          <p className="text-gray-600 mt-1">Trạng thái thời gian thực cho phân phối khu vực</p>
         </div>
-        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg">
-          {['Dashboard', 'Real-time Log', 'Audit'].map((tab) => (
-            <button
-              key={tab}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                tab === 'Dashboard'
-                  ? 'bg-[#2d6e3e] text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
+        <button
+          onClick={fetchInventory}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-[#2d6e3e] text-white rounded-lg hover:bg-[#1e4d2b] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          Làm mới
+        </button>
       </div>
 
       {/* Metrics Grid */}
@@ -136,7 +170,8 @@ export default function WarehouseManagerDashboard() {
           return (
             <div
               key={index}
-              className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow"
+              onClick={metric.onClick}
+              className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow cursor-pointer"
             >
               <div className="flex items-start justify-between mb-4">
                 <div
@@ -190,21 +225,21 @@ export default function WarehouseManagerDashboard() {
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {/* Daily Stock Movement Chart */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-bold text-gray-900">
-              Daily Stock Movement
+              Biến động hàng tồn kho hàng ngày
             </h2>
             <div className="flex items-center gap-4 text-sm">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-[#ff6b35] rounded"></div>
-                <span className="text-gray-600">Inbound</span>
+                <span className="text-gray-600">Nhập kho</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-gray-300 rounded"></div>
-                <span className="text-gray-600">Outbound</span>
+                <span className="text-gray-600">Xuất kho</span>
               </div>
             </div>
           </div>
@@ -218,7 +253,7 @@ export default function WarehouseManagerDashboard() {
                       height: `${(data.inbound / maxValue) * 100}%`,
                       minHeight: '8px',
                     }}
-                    title={`Inbound: ${data.inbound}`}
+                    title={`Nhập kho: ${data.inbound}`}
                   ></div>
                   <div
                     className="w-full bg-gray-300 rounded-t transition-all hover:opacity-80"
@@ -226,7 +261,7 @@ export default function WarehouseManagerDashboard() {
                       height: `${(data.outbound / maxValue) * 100}%`,
                       minHeight: '8px',
                     }}
-                    title={`Outbound: ${data.outbound}`}
+                    title={`Xuất kho: ${data.outbound}`}
                   ></div>
                 </div>
                 <span className="text-xs font-medium text-gray-600">
@@ -236,56 +271,6 @@ export default function WarehouseManagerDashboard() {
             ))}
           </div>
         </div>
-
-        {/* Staff Online */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-gray-900">Staff Online</h2>
-            <span className="text-sm font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
-              {staffOnline.length} Active
-            </span>
-          </div>
-          <div className="space-y-3">
-            {staffOnline.map((staff, index) => (
-              <div
-                key={index}
-                className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <div className="relative">
-                  <div className="w-10 h-10 bg-gradient-to-br from-[#2d6e3e] to-[#1e4d2b] rounded-full flex items-center justify-center text-white font-semibold">
-                    {staff.name[0]}
-                  </div>
-                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-gray-900 truncate">
-                    {staff.name}
-                  </div>
-                  <div className="text-xs text-gray-500">{staff.role}</div>
-                </div>
-                <button className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M8 12h.01M12 12h.01M16 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </button>
-              </div>
-            ))}
-          </div>
-          <button className="w-full mt-4 py-2 text-sm font-medium text-[#2d6e3e] hover:bg-gray-50 rounded-lg transition-colors flex items-center justify-center gap-2">
-            View All Staff
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
       </div>
 
       {/* Bottom Grid */}
@@ -294,10 +279,13 @@ export default function WarehouseManagerDashboard() {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-gray-900">
-              Pending Store Refills
+              Yêu cầu bổ sung cửa hàng đang chờ
             </h2>
-            <button className="text-sm font-medium text-[#2d6e3e] hover:underline">
-              View All
+            <button 
+              onClick={() => router.push('/warehouse-manager/shipments')}
+              className="text-sm font-medium text-[#2d6e3e] hover:underline"
+            >
+              Xem tất cả
             </button>
           </div>
           <div className="space-y-4">
@@ -323,10 +311,10 @@ export default function WarehouseManagerDashboard() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button className="flex-1 px-4 py-2 bg-[#ff6b35] text-white text-sm font-medium rounded-lg hover:bg-[#e55a2a] transition-colors">
-                    Approve
+                    Phê duyệt
                   </button>
                   <button className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
-                    Details
+                    Chi tiết
                   </button>
                 </div>
               </div>
@@ -337,9 +325,12 @@ export default function WarehouseManagerDashboard() {
         {/* Transfer Requests */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-gray-900">Transfer Requests</h2>
-            <button className="text-sm font-medium text-[#2d6e3e] hover:underline">
-              View All
+            <h2 className="text-lg font-bold text-gray-900">Yêu cầu chuyển kho</h2>
+            <button 
+              onClick={() => router.push('/warehouse-manager/transfers')}
+              className="text-sm font-medium text-[#2d6e3e] hover:underline"
+            >
+              Xem tất cả
             </button>
           </div>
           <div className="space-y-4">
@@ -373,15 +364,15 @@ export default function WarehouseManagerDashboard() {
                 <div className="flex items-center gap-2">
                   {transfer.status === 'in-transit' ? (
                     <span className="flex-1 px-3 py-2 bg-blue-50 text-blue-700 text-sm font-medium text-center rounded-lg">
-                      In Transit
+                      Đang vận chuyển
                     </span>
                   ) : (
                     <>
                       <button className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors">
-                        Accept
+                        Chấp nhận
                       </button>
                       <button className="flex-1 px-4 py-2 bg-[#ff6b35] text-white text-sm font-medium rounded-lg hover:bg-[#e55a2a] transition-colors">
-                        Action Required
+                        Cần xử lý
                       </button>
                     </>
                   )}
