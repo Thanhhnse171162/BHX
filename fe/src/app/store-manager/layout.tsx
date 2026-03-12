@@ -16,6 +16,8 @@ import {
   Settings,
   LogOut,
   Bell,
+  ShoppingBag,
+  PackagePlus,
 } from 'lucide-react'
 
 interface StoreManagerLayoutProps {
@@ -23,27 +25,29 @@ interface StoreManagerLayoutProps {
 }
 
 const PRIMARY_NAV = [
-  { href: '/store-manager',            label: 'Tổng quan',            icon: LayoutDashboard, exact: true  },
-  { href: '/store-manager/reports',    label: 'Doanh số',             icon: TrendingUp,      exact: false },
-  { href: '/store-manager/inventory',  label: 'Tồn kho kệ hàng',     icon: Archive,         exact: false },
-  { href: '/store-manager/inventory',  label: 'Tồn kho kho phụ',     icon: Warehouse,       exact: false },
-  { href: '/store-manager/orders',     label: 'Quản lý đơn hàng',     icon: ClipboardList,   exact: false },
-  { href: '/store-manager/incidents',  label: 'Báo cáo sự cố',       icon: AlertTriangle,   exact: false, badge: 'incident' },
+  { href: '/store-manager',                          label: 'Tổng quan',            icon: LayoutDashboard, exact: true  },
+  { href: '/store-manager/reports',                  label: 'Doanh số',             icon: TrendingUp,      exact: false },
+  { href: '/store-manager/inventory',                label: 'Tồn kho kệ hàng',     icon: Archive,         exact: false },
+  { href: '/store-manager/inventory-aux',            label: 'Tồn kho kho phụ',     icon: Warehouse,       exact: false },
+  { href: '/store-manager/purchase-requests',        label: 'Yêu cầu nhập hàng',   icon: PackagePlus,     exact: false },
+  { href: '/store-manager/incidents',                label: 'Báo cáo sự cố',       icon: AlertTriangle,   exact: false, badge: 'incident' },
 ]
 
 const MANAGEMENT_NAV = [
-  { href: '/store-manager/customers',  label: 'Quản lý khách hàng',  icon: Users,           exact: false },
-  { href: '/store-manager',            label: 'Cài đặt',             icon: Settings,        exact: false },
+  { href: '/store-manager/orders',     label: 'Quản lý đơn hàng',   icon: ShoppingBag, exact: false },
+  { href: '/store-manager/customers',  label: 'Quản lý khách hàng', icon: Users,       exact: false },
+  { href: '/store-manager/settings',   label: 'Cài đặt',            icon: Settings,    exact: false },
 ]
 
-// Map pathname → page title
 function getPageTitle(pathname: string): string {
   if (pathname === '/store-manager') return 'Tổng Quan'
-  if (pathname.startsWith('/store-manager/reports'))   return 'Doanh Số'
-  if (pathname.startsWith('/store-manager/inventory')) return 'Tồn Kho'
-  if (pathname.startsWith('/store-manager/incidents')) return 'Báo Cáo Sự Cố'
-  if (pathname.startsWith('/store-manager/orders'))    return 'Quản Lý Đơn Hàng'
-  if (pathname.startsWith('/store-manager/customers')) return 'Quản Lý Khách Hàng'
+  if (pathname.startsWith('/store-manager/reports'))           return 'Doanh Số'
+  if (pathname.startsWith('/store-manager/inventory-aux'))     return 'Tồn Kho Phụ'
+  if (pathname.startsWith('/store-manager/inventory'))         return 'Tồn Kho Kệ Hàng'
+  if (pathname.startsWith('/store-manager/purchase-requests')) return 'Yêu Cầu Nhập Hàng'
+  if (pathname.startsWith('/store-manager/incidents'))         return 'Báo Cáo Sự Cố'
+  if (pathname.startsWith('/store-manager/orders'))            return 'Quản Lý Đơn Hàng'
+  if (pathname.startsWith('/store-manager/customers'))         return 'Quản Lý Khách Hàng'
   return 'Quản Lý Cửa Hàng'
 }
 
@@ -133,7 +137,7 @@ export default function StoreManagerLayout({ children }: StoreManagerLayoutProps
             const Icon = item.icon
             const isActive = item.exact
               ? pathname === item.href
-              : pathname === item.href
+              : pathname === item.href || pathname.startsWith(item.href + '/')
             const badgeCount = item.badge === 'incident' ? incidentCount : null
             return (
               <Link
@@ -166,7 +170,7 @@ export default function StoreManagerLayout({ children }: StoreManagerLayoutProps
           </p>
           {MANAGEMENT_NAV.map((item) => {
             const Icon = item.icon
-            const isActive = pathname.startsWith(item.href) && item.href !== '/store-manager'
+            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
             return (
               <Link
                 key={item.label}
