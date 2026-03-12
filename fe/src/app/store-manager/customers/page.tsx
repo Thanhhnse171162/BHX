@@ -15,10 +15,14 @@ import {
   X,
   Crown,
   UserCheck,
+  ArrowUpDown,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type MemberTier = 'Bạch kim' | 'Vàng' | 'Bạc' | 'Đồng'
+type SortKey = 'default' | 'spent_desc' | 'spent_asc' | 'points_desc'
 
 interface Customer {
   id: string
@@ -122,8 +126,16 @@ function Row({ label, value }: { label: React.ReactNode; value: React.ReactNode 
 export default function CustomersPage() {
   const [search, setSearch] = useState('')
   const [tierFilter, setTierFilter] = useState<string>('Tất cả')
+  const [sortKey, setSortKey] = useState<SortKey>('default')
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Customer | null>(null)
+
+  const SORT_OPTIONS: { key: SortKey; label: string; icon: React.ReactNode }[] = [
+    { key: 'default',    label: 'Mặc định',          icon: <ArrowUpDown size={12} /> },
+    { key: 'spent_desc', label: 'Chi tiêu cao nhất',  icon: <TrendingUp size={12} /> },
+    { key: 'spent_asc',  label: 'Chi tiêu thấp nhất', icon: <TrendingDown size={12} /> },
+    { key: 'points_desc',label: 'Điểm thưởng',        icon: <Star size={12} /> },
+  ]
 
   const filtered = useMemo(() => {
     let list = ALL_CUSTOMERS
@@ -138,8 +150,13 @@ export default function CustomersPage() {
           c.id.toLowerCase().includes(q),
       )
     }
-    return list
-  }, [search, tierFilter])
+    // Sort
+    const sorted = [...list]
+    if (sortKey === 'spent_desc')  sorted.sort((a, b) => b.totalSpent - a.totalSpent)
+    if (sortKey === 'spent_asc')   sorted.sort((a, b) => a.totalSpent - b.totalSpent)
+    if (sortKey === 'points_desc') sorted.sort((a, b) => b.points - a.points)
+    return sorted
+  }, [search, tierFilter, sortKey])
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -154,55 +171,77 @@ export default function CustomersPage() {
   return (
     <div className="p-6 space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Users size={20} className="text-green-600" />
-            Khách hàng
-          </h1>
-          <p className="text-[13px] text-gray-500 mt-0.5">Quản lý thông tin và chương trình tích điểm khách hàng</p>
-        </div>
+      <div>
+        <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+          <Users size={20} className="text-green-600" />
+          Khách hàng
+        </h1>
+        <p className="text-[13px] text-gray-500 mt-0.5">Quản lý thông tin và chương trình tích điểm khách hàng</p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-4 gap-4">
         {[
-          { label: 'Tổng khách hàng', value: stats.total, cls: 'text-gray-800' },
-          { label: 'Bạch kim', value: stats.platinum, cls: 'text-purple-700' },
-          { label: 'Vàng', value: stats.gold, cls: 'text-yellow-600' },
-          { label: 'Mới tháng này', value: stats.newThisMonth, cls: 'text-green-600' },
+          { label: 'Tổng khách hàng', value: stats.total,       cls: 'text-gray-800',   accent: 'bg-gray-50',   border: 'border-gray-200' },
+          { label: 'Bạch kim',        value: stats.platinum,    cls: 'text-purple-700', accent: 'bg-purple-50', border: 'border-purple-100' },
+          { label: 'Vàng',            value: stats.gold,        cls: 'text-yellow-600', accent: 'bg-yellow-50', border: 'border-yellow-100' },
+          { label: 'Mới tháng này',   value: stats.newThisMonth,cls: 'text-green-600',  accent: 'bg-green-50',  border: 'border-green-100' },
         ].map((s) => (
-          <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-            <p className="text-[11px] text-gray-500 uppercase tracking-wide">{s.label}</p>
-            <p className={`text-2xl font-bold mt-1 ${s.cls}`}>{s.value}</p>
+          <div key={s.label} className={`${s.accent} rounded-xl border ${s.border} p-4 shadow-sm`}>
+            <p className="text-[11px] text-gray-500 uppercase tracking-wide font-semibold">{s.label}</p>
+            <p className={`text-3xl font-bold mt-1 ${s.cls}`}>{s.value}</p>
           </div>
         ))}
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px]">
+      {/* Filters + Sort */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+        {/* Search */}
+        <div className="relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-            placeholder="Tìm tên, SĐT, email..."
-            className="w-full pl-9 pr-3 py-2 text-[13px] bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-green-400 focus:bg-white transition-all"
+            placeholder="Tìm tên, SĐT, email, mã KH..."
+            className="w-full pl-9 pr-4 py-2.5 text-[13px] bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-green-400 focus:bg-white transition-all"
           />
         </div>
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {['Tất cả', ...TIERS].map((t) => (
-            <button
-              key={t}
-              onClick={() => { setTierFilter(t); setPage(1) }}
-              className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${
-                tierFilter === t ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {t}
-            </button>
-          ))}
+
+        {/* Tier filter + Sort */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Tier filter */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] text-gray-400 font-semibold uppercase tracking-wide mr-1">Hạng:</span>
+            {['Tất cả', ...TIERS].map((t) => (
+              <button
+                key={t}
+                onClick={() => { setTierFilter(t); setPage(1) }}
+                className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors ${
+                  tierFilter === t ? 'bg-green-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+
+          {/* Sort */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] text-gray-400 font-semibold uppercase tracking-wide mr-1">Sắp xếp:</span>
+            {SORT_OPTIONS.map((s) => (
+              <button
+                key={s.key}
+                onClick={() => { setSortKey(s.key); setPage(1) }}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors ${
+                  sortKey === s.key ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {s.icon}
+                {s.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -212,53 +251,77 @@ export default function CustomersPage() {
           <table className="w-full text-[13px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                {['Khách hàng', 'SĐT / Email', 'Hạng', 'Điểm', 'Tổng đơn', 'Chi tiêu', 'Lần ghé cuối', ''].map((h) => (
-                  <th key={h} className="text-left py-3 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
-                    {h}
-                  </th>
-                ))}
+                <th className="text-left py-3.5 px-5 text-[11px] font-semibold text-gray-500 uppercase tracking-wide w-[240px]">Khách hàng</th>
+                <th className="text-left py-3.5 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide w-[120px]">Hạng</th>
+                <th className="text-right py-3.5 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide w-[140px]">Chi tiêu</th>
+                <th className="text-right py-3.5 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide w-[100px]">Điểm</th>
+                <th className="text-right py-3.5 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide w-[100px]">Tổng đơn</th>
+                <th className="text-left py-3.5 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Liên hệ</th>
+                <th className="text-center py-3.5 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide w-[120px]">Lần ghé cuối</th>
+                <th className="py-3.5 px-4 w-[48px]"></th>
               </tr>
             </thead>
             <tbody>
               {paged.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-gray-400 text-[13px]">
+                  <td colSpan={8} className="py-14 text-center text-gray-400 text-[13px]">
                     Không tìm thấy khách hàng
                   </td>
                 </tr>
               ) : (
-                paged.map((c, idx) => {
+                paged.map((c) => {
                   const tc = tierConfig[c.tier]
                   return (
-                    <tr key={c.id} className={`border-t border-gray-50 hover:bg-green-50/30 transition-colors ${idx % 2 === 1 ? 'bg-gray-50/20' : ''}`}>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-sm font-bold flex-shrink-0">
+                    <tr key={c.id} className="border-t border-gray-50 hover:bg-green-50/30 transition-colors">
+                      {/* Khách hàng */}
+                      <td className="py-3.5 px-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-sm font-bold flex-shrink-0">
                             {c.name.charAt(0)}
                           </div>
-                          <div>
-                            <div className="font-semibold text-gray-800">{c.name}</div>
+                          <div className="min-w-0">
+                            <div className="font-semibold text-gray-800 truncate">{c.name}</div>
                             <div className="text-[11px] text-gray-400">{c.id}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="py-3 px-4">
-                        <div className="text-gray-700">{c.phone}</div>
-                        <div className="text-[11px] text-gray-400">{c.email}</div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${tc.cls}`}>
+
+                      {/* Hạng */}
+                      <td className="py-3.5 px-4">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${tc.cls}`}>
                           {tc.icon} {c.tier}
                         </span>
                       </td>
-                      <td className="py-3 px-4 font-semibold text-green-600">{c.points.toLocaleString()}</td>
-                      <td className="py-3 px-4 text-gray-600">{c.totalOrders}</td>
-                      <td className="py-3 px-4 font-semibold text-gray-800 whitespace-nowrap">{c.totalSpent.toLocaleString('vi-VN')} ₫</td>
-                      <td className="py-3 px-4 text-gray-500">{c.lastVisit}</td>
-                      <td className="py-3 px-4">
+
+                      {/* Chi tiêu */}
+                      <td className="py-3.5 px-4 text-right">
+                        <span className="font-bold text-gray-800 whitespace-nowrap">
+                          {c.totalSpent.toLocaleString('vi-VN')} ₫
+                        </span>
+                      </td>
+
+                      {/* Điểm */}
+                      <td className="py-3.5 px-4 text-right">
+                        <span className="font-bold text-green-600">{c.points.toLocaleString()}</span>
+                      </td>
+
+                      {/* Tổng đơn */}
+                      <td className="py-3.5 px-4 text-right text-gray-600 font-medium">{c.totalOrders}</td>
+
+                      {/* Liên hệ */}
+                      <td className="py-3.5 px-4">
+                        <div className="text-gray-700 font-medium">{c.phone}</div>
+                        <div className="text-[11px] text-gray-400">{c.email}</div>
+                      </td>
+
+                      {/* Lần ghé cuối */}
+                      <td className="py-3.5 px-4 text-center text-gray-500">{c.lastVisit}</td>
+
+                      {/* Action */}
+                      <td className="py-3.5 px-4">
                         <button
                           onClick={() => setSelected(c)}
-                          className="p-1.5 rounded-lg hover:bg-green-50 text-gray-400 hover:text-green-600 transition-colors"
+                          className="p-1.5 rounded-lg hover:bg-green-100 text-gray-400 hover:text-green-600 transition-colors"
                           title="Xem chi tiết"
                         >
                           <Eye size={15} />
@@ -273,20 +336,34 @@ export default function CustomersPage() {
         </div>
 
         {/* Pagination */}
-        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+        <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
           <p className="text-[12px] text-gray-500">
-            {Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(page * PAGE_SIZE, filtered.length)} / {filtered.length} khách hàng
+            Hiển thị <span className="font-semibold text-gray-700">{Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(page * PAGE_SIZE, filtered.length)}</span> / {filtered.length} khách hàng
           </p>
           <div className="flex items-center gap-1">
-            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 disabled:opacity-30">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 disabled:opacity-30 transition-colors"
+            >
               <ChevronLeft size={16} />
             </button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <button key={p} onClick={() => setPage(p)} className={`w-8 h-8 rounded-lg text-[12px] font-medium transition-colors ${p === page ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+              <button
+                key={p}
+                onClick={() => setPage(p)}
+                className={`w-8 h-8 rounded-lg text-[12px] font-semibold transition-colors ${
+                  p === page ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
                 {p}
               </button>
             ))}
-            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 disabled:opacity-30">
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages || totalPages === 0}
+              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 disabled:opacity-30 transition-colors"
+            >
               <ChevronRight size={16} />
             </button>
           </div>

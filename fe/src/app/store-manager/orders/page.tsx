@@ -34,22 +34,22 @@ interface Order {
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 const ALL_ORDERS: Order[] = [
-  { id: 'DH-5821', customer: 'Nguyễn Thị Lan Anh',   phone: '0912 345 678', date: '10/03/2026', time: '10:52', items: 6,  total: 385000,  status: 'Thành công',   paymentMethod: 'Thẻ',       cashier: 'Minh Tuấn' },
-  { id: 'DH-5820', customer: 'Trần Văn Hùng',         phone: '0987 654 321', date: '10/03/2026', time: '10:41', items: 2,  total: 122000,  status: 'Đang xử lý',  paymentMethod: 'Tiền mặt',  cashier: 'Thu Hà' },
-  { id: 'DH-5819', customer: 'Lê Thị Hoa',            phone: '0909 111 222', date: '10/03/2026', time: '10:28', items: 9,  total: 540000,  status: 'Thành công',   paymentMethod: 'Ví điện tử', cashier: 'Minh Tuấn' },
-  { id: 'DH-5818', customer: 'Phạm Quốc Tuấn',        phone: '0933 456 789', date: '10/03/2026', time: '10:15', items: 1,  total: 89000,   status: 'Đã hủy',       paymentMethod: 'Tiền mặt',  cashier: 'Thu Hà' },
-  { id: 'DH-5817', customer: 'Hoàng Minh Đức',        phone: '0976 234 567', date: '10/03/2026', time: '09:58', items: 4,  total: 278000,  status: 'Thành công',   paymentMethod: 'Thẻ',       cashier: 'Quang Huy' },
-  { id: 'DH-5816', customer: 'Võ Thị Thu Thảo',       phone: '0901 987 654', date: '10/03/2026', time: '09:40', items: 11, total: 630000,  status: 'Thành công',   paymentMethod: 'Ví điện tử', cashier: 'Minh Tuấn' },
-  { id: 'DH-5815', customer: 'Bùi Thanh Nam',         phone: '0944 321 098', date: '10/03/2026', time: '09:22', items: 3,  total: 195000,  status: 'Đã trả hàng', paymentMethod: 'Thẻ',       cashier: 'Thu Hà' },
-  { id: 'DH-5814', customer: 'Đinh Thị Kiều My',      phone: '0918 765 432', date: '10/03/2026', time: '09:10', items: 7,  total: 421000,  status: 'Thành công',   paymentMethod: 'Tiền mặt',  cashier: 'Quang Huy' },
-  { id: 'DH-5813', customer: 'Lý Văn Phát',           phone: '0962 543 210', date: '10/03/2026', time: '08:55', items: 2,  total: 67000,   status: 'Thành công',   paymentMethod: 'Tiền mặt',  cashier: 'Minh Tuấn' },
-  { id: 'DH-5812', customer: 'Hồ Thị Ngọc Bích',     phone: '0905 876 543', date: '10/03/2026', time: '08:40', items: 5,  total: 314000,  status: 'Đã hủy',       paymentMethod: 'Thẻ',       cashier: 'Thu Hà' },
-  { id: 'DH-5811', customer: 'Trương Minh Khải',      phone: '0981 234 567', date: '09/03/2026', time: '17:30', items: 8,  total: 502000,  status: 'Thành công',   paymentMethod: 'Ví điện tử', cashier: 'Quang Huy' },
+  { id: 'DH-5821', customer: 'Nguyễn Thị Lan Anh',   phone: '0912 345 678', date: '12/03/2026', time: '10:52', items: 6,  total: 385000,  status: 'Thành công',   paymentMethod: 'Mã QR',     cashier: 'Minh Tuấn' },
+  { id: 'DH-5820', customer: 'Trần Văn Hùng',         phone: '0987 654 321', date: '12/03/2026', time: '10:41', items: 2,  total: 122000,  status: 'Đang xử lý',  paymentMethod: 'Tiền mặt',  cashier: 'Thu Hà' },
+  { id: 'DH-5819', customer: 'Lê Thị Hoa',            phone: '0909 111 222', date: '12/03/2026', time: '10:28', items: 9,  total: 540000,  status: 'Thành công',   paymentMethod: 'Mã QR',     cashier: 'Minh Tuấn' },
+  { id: 'DH-5818', customer: 'Phạm Quốc Tuấn',        phone: '0933 456 789', date: '12/03/2026', time: '10:15', items: 1,  total: 89000,   status: 'Đã hủy',       paymentMethod: 'Tiền mặt',  cashier: 'Thu Hà' },
+  { id: 'DH-5817', customer: 'Hoàng Minh Đức',        phone: '0976 234 567', date: '12/03/2026', time: '09:58', items: 4,  total: 278000,  status: 'Thành công',   paymentMethod: 'Mã QR',     cashier: 'Quang Huy' },
+  { id: 'DH-5816', customer: 'Võ Thị Thu Thảo',       phone: '0901 987 654', date: '12/03/2026', time: '09:40', items: 11, total: 630000,  status: 'Thành công',   paymentMethod: 'Tiền mặt',  cashier: 'Minh Tuấn' },
+  { id: 'DH-5815', customer: 'Bùi Thanh Nam',         phone: '0944 321 098', date: '12/03/2026', time: '09:22', items: 3,  total: 195000,  status: 'Đã trả hàng', paymentMethod: 'Mã QR',     cashier: 'Thu Hà' },
+  { id: 'DH-5814', customer: 'Đinh Thị Kiều My',      phone: '0918 765 432', date: '12/03/2026', time: '09:10', items: 7,  total: 421000,  status: 'Thành công',   paymentMethod: 'Tiền mặt',  cashier: 'Quang Huy' },
+  { id: 'DH-5813', customer: 'Lý Văn Phát',           phone: '0962 543 210', date: '12/03/2026', time: '08:55', items: 2,  total: 67000,   status: 'Thành công',   paymentMethod: 'Tiền mặt',  cashier: 'Minh Tuấn' },
+  { id: 'DH-5812', customer: 'Hồ Thị Ngọc Bích',     phone: '0905 876 543', date: '12/03/2026', time: '08:40', items: 5,  total: 314000,  status: 'Đã hủy',       paymentMethod: 'Mã QR',     cashier: 'Thu Hà' },
+  { id: 'DH-5811', customer: 'Trương Minh Khải',      phone: '0981 234 567', date: '09/03/2026', time: '17:30', items: 8,  total: 502000,  status: 'Thành công',   paymentMethod: 'Mã QR',     cashier: 'Quang Huy' },
   { id: 'DH-5810', customer: 'Phan Thị Mai Liên',     phone: '0928 765 432', date: '09/03/2026', time: '17:15', items: 4,  total: 248000,  status: 'Thành công',   paymentMethod: 'Tiền mặt',  cashier: 'Minh Tuấn' },
   { id: 'DH-5809', customer: 'Đỗ Quang Vinh',         phone: '0953 987 654', date: '09/03/2026', time: '17:00', items: 1,  total: 45000,   status: 'Thành công',   paymentMethod: 'Tiền mặt',  cashier: 'Thu Hà' },
-  { id: 'DH-5808', customer: 'Ngô Thị Thanh Vân',     phone: '0934 123 456', date: '09/03/2026', time: '16:45', items: 6,  total: 389000,  status: 'Đã trả hàng', paymentMethod: 'Thẻ',       cashier: 'Quang Huy' },
-  { id: 'DH-5807', customer: 'Vũ Đăng Khoa',          phone: '0916 456 789', date: '09/03/2026', time: '16:30', items: 3,  total: 163000,  status: 'Thành công',   paymentMethod: 'Ví điện tử', cashier: 'Thu Hà' },
-  { id: 'DH-5806', customer: 'Châu Thị Bảo Ngọc',    phone: '0906 789 012', date: '09/03/2026', time: '16:15', items: 10, total: 715000,  status: 'Thành công',   paymentMethod: 'Thẻ',       cashier: 'Minh Tuấn' },
+  { id: 'DH-5808', customer: 'Ngô Thị Thanh Vân',     phone: '0934 123 456', date: '09/03/2026', time: '16:45', items: 6,  total: 389000,  status: 'Đã trả hàng', paymentMethod: 'Mã QR',     cashier: 'Quang Huy' },
+  { id: 'DH-5807', customer: 'Vũ Đăng Khoa',          phone: '0916 456 789', date: '09/03/2026', time: '16:30', items: 3,  total: 163000,  status: 'Thành công',   paymentMethod: 'Tiền mặt',  cashier: 'Thu Hà' },
+  { id: 'DH-5806', customer: 'Châu Thị Bảo Ngọc',    phone: '0906 789 012', date: '09/03/2026', time: '16:15', items: 10, total: 715000,  status: 'Thành công',   paymentMethod: 'Mã QR',     cashier: 'Minh Tuấn' },
 ]
 
 const STATUS_OPTIONS: OrderStatus[] = ['Thành công', 'Đang xử lý', 'Đã hủy', 'Đã trả hàng']
@@ -124,6 +124,8 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState<string>('Tất cả')
   const [page, setPage] = useState(1)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+
+  const todayStr = new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
   const filtered = useMemo(() => {
     let list = ALL_ORDERS
@@ -217,7 +219,7 @@ export default function OrdersPage() {
 
         <div className="flex items-center gap-2 ml-auto text-[12px] text-gray-500">
           <Calendar size={13} />
-          <span>Hôm nay: 10/03/2026</span>
+          <span>Hôm nay: {todayStr}</span>
         </div>
       </div>
 
@@ -257,7 +259,15 @@ export default function OrdersPage() {
                       <td className="py-3 px-4 text-gray-500 whitespace-nowrap">{order.date} {order.time}</td>
                       <td className="py-3 px-4 text-gray-600">{order.items}</td>
                       <td className="py-3 px-4 font-semibold text-gray-800 whitespace-nowrap">{order.total.toLocaleString('vi-VN')} ₫</td>
-                      <td className="py-3 px-4 text-gray-500">{order.paymentMethod}</td>
+                      <td className="py-3 px-4">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold ${
+                          order.paymentMethod === 'Mã QR'
+                            ? 'bg-violet-50 text-violet-700'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {order.paymentMethod === 'Mã QR' ? '▦' : '₫'} {order.paymentMethod}
+                        </span>
+                      </td>
                       <td className="py-3 px-4 text-gray-500">{order.cashier}</td>
                       <td className="py-3 px-4">
                         <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${sc.cls}`}>

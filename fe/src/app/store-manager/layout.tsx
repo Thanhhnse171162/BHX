@@ -11,7 +11,7 @@ import {
   Warehouse,
   ClipboardList,
   AlertTriangle,
-  Package,
+  Users,
   Settings,
   LogOut,
   Bell,
@@ -23,28 +23,28 @@ interface StoreManagerLayoutProps {
 }
 
 const PRIMARY_NAV = [
-  { href: '/store-manager',            label: 'Dashboard',           icon: LayoutDashboard, exact: true  },
-  { href: '/store-manager/reports',    label: 'Sales Overview',      icon: TrendingUp,      exact: false },
-  { href: '/store-manager/inventory',  label: 'Shelf Inventory',     icon: Archive,         exact: false },
-  { href: '/store-manager/inventory',  label: 'Backroom Inventory',  icon: Warehouse,       exact: false },
-  { href: '/store-manager/orders',     label: 'Stock Requests',      icon: ClipboardList,   exact: false },
-  { href: '/store-manager/incidents',  label: 'Incident Reports',    icon: AlertTriangle,   exact: false, badge: 'incident' },
+  { href: '/store-manager',            label: 'Bảng điều khiển',      icon: LayoutDashboard, exact: true  },
+  { href: '/store-manager/reports',    label: 'Doanh số',             icon: TrendingUp,      exact: false },
+  { href: '/store-manager/inventory',  label: 'Tồn kho kệ hàng',     icon: Archive,         exact: false },
+  { href: '/store-manager/inventory',  label: 'Tồn kho kho phụ',     icon: Warehouse,       exact: false },
+  { href: '/store-manager/orders',     label: 'Yêu cầu nhập hàng',   icon: ClipboardList,   exact: false },
+  { href: '/store-manager/incidents',  label: 'Báo cáo sự cố',       icon: AlertTriangle,   exact: false, badge: 'incident' },
 ]
 
 const MANAGEMENT_NAV = [
-  { href: '/store-manager/customers',  label: 'Product Management',  icon: Package,         exact: false },
-  { href: '/store-manager',            label: 'Settings',            icon: Settings,        exact: false },
+  { href: '/store-manager/customers',  label: 'Quản lý khách hàng',  icon: Users,           exact: false },
+  { href: '/store-manager',            label: 'Cài đặt',             icon: Settings,        exact: false },
 ]
 
 // Map pathname → page title
 function getPageTitle(pathname: string): string {
-  if (pathname === '/store-manager') return 'Store Manager Dashboard'
-  if (pathname.startsWith('/store-manager/reports'))   return 'Sales Overview'
-  if (pathname.startsWith('/store-manager/inventory')) return 'Shelf Inventory'
-  if (pathname.startsWith('/store-manager/incidents')) return 'Incident Reports'
-  if (pathname.startsWith('/store-manager/orders'))    return 'Stock Requests'
-  if (pathname.startsWith('/store-manager/customers')) return 'Customers'
-  return 'Store Manager'
+  if (pathname === '/store-manager') return 'Bảng Điều Khiển'
+  if (pathname.startsWith('/store-manager/reports'))   return 'Doanh Số'
+  if (pathname.startsWith('/store-manager/inventory')) return 'Tồn Kho'
+  if (pathname.startsWith('/store-manager/incidents')) return 'Báo Cáo Sự Cố'
+  if (pathname.startsWith('/store-manager/orders'))    return 'Yêu Cầu Nhập Hàng'
+  if (pathname.startsWith('/store-manager/customers')) return 'Quản Lý Khách Hàng'
+  return 'Quản Lý Cửa Hàng'
 }
 
 export default function StoreManagerLayout({ children }: StoreManagerLayoutProps) {
@@ -164,7 +164,7 @@ export default function StoreManagerLayout({ children }: StoreManagerLayoutProps
 
           {/* Management section */}
           <p className="text-[10px] font-semibold text-gray-400 tracking-widest px-3 mt-5 mb-2 uppercase">
-            Management
+            Quản lý
           </p>
           {MANAGEMENT_NAV.map((item) => {
             const Icon = item.icon
@@ -193,7 +193,7 @@ export default function StoreManagerLayout({ children }: StoreManagerLayoutProps
             className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-[13px] font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all"
           >
             <LogOut size={17} strokeWidth={1.8} />
-            Logout
+            Đăng xuất
           </button>
         </div>
       </aside>
@@ -225,7 +225,7 @@ export default function StoreManagerLayout({ children }: StoreManagerLayoutProps
               </div>
               <div>
                 <p className="text-[13px] font-semibold text-gray-900 leading-tight">{displayName}</p>
-                <p className="text-[11px] text-gray-400">Store Manager</p>
+                <p className="text-[11px] text-gray-400">Quản Lý Cửa Hàng</p>
               </div>
             </div>
           </div>
