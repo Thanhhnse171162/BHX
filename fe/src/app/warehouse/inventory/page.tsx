@@ -27,6 +27,24 @@ export default function InventoryPage() {
 
   const { user, hydrated } = useAuthStore()
 
+  // Warehouse mapping dựa trên workplace_id từ database (chữ thường)
+  const warehouseNames: { [key: string]: string } = {
+    'a0000001-0001-0001-0001-000000000001': 'Kho HCM',
+    'a0000001-0001-0001-0001-000000000002': 'Kho Chi Nhánh Quận 12',
+    'a0000001-0001-0001-0001-000000000003': 'Kho Chi Nhánh Bình Dương',
+    'a0000001-0001-0001-0001-000000000004': 'Kho Chi Nhánh Long An',
+    'b0000001-0001-0001-0001-000000000001': 'Cửa Hàng Thủ Đức',
+    'b0000001-0001-0001-0001-000000000002': 'Cửa Hàng Giải Phóng HCM',
+    'b0000001-0001-0001-0001-000000000003': 'Cửa Hàng Bình Dương',
+    'b0000001-0001-0001-0001-000000000004': 'Cửa Hàng Củ Chi',
+    'b0000001-0001-0001-0001-000000000005': 'Cửa Hàng Biên Hòa',
+    'b0000001-0001-0001-0001-000000000006': 'Cửa Hàng Quận 7',
+  }
+  
+  const locationName = user?.workplaceId 
+    ? (warehouseNames[user.workplaceId.toLowerCase()] || warehouseNames[user.workplaceId] || 'Địa điểm chưa xác định')
+    : 'Địa điểm chưa xác định'
+
   useEffect(() => {
     if (!hydrated) return
     fetchData()
@@ -43,6 +61,13 @@ export default function InventoryPage() {
         return
       }
 
+      // Debug log
+      console.log('Fetching inventory for:', {
+        workplaceType: user.workplaceType,
+        workplaceId: user.workplaceId,
+        locationName: locationName
+      })
+
       const [inventoryData, productsData] = await Promise.all([
         InventoryAPIService.getInventoryByLocation(
           user.workplaceType as 'WAREHOUSE' | 'STORE',
@@ -50,6 +75,8 @@ export default function InventoryPage() {
         ),
         ProductAPIService.getAllProducts().catch(() => [] as ProductFromAPI[])
       ])
+
+      console.log('Inventory data received:', inventoryData.length, 'items')
 
       // Create product map for quick lookup
       const productMap = new Map(
@@ -146,7 +173,9 @@ export default function InventoryPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Quản lý tồn kho</h1>
-        <p className="text-gray-600 mt-1">Xem tất cả sản phẩm tồn kho qua các địa điểm</p>
+        <p className="text-gray-600 mt-1">
+          Tồn kho của <span className="font-semibold text-[#2d6e3e]">{locationName}</span> - Hiển thị {filteredData.length} sản phẩm
+        </p>
       </div>
 
       {/* KPI Cards */}

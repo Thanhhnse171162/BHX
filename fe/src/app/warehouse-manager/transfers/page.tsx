@@ -4,8 +4,8 @@ export default function WarehouseManagerTransfersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Transfers</h1>
-        <p className="text-gray-600 mt-1">Manage warehouse transfers and distribution</p>
+        <h1 className="text-3xl font-bold text-gray-900">Chuyển kho</h1>
+        <p className="text-gray-600 mt-1">Quản lý chuyển kho và phân phối</p>
       </div>
       <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
         <div className="max-w-md mx-auto">
@@ -14,8 +14,8 @@ export default function WarehouseManagerTransfersPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Transfers Page</h2>
-          <p className="text-gray-600">This page is under development. Check back soon!</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Trang chuyển kho</h2>
+          <p className="text-gray-600">Trang này đang được phát triển. Vui lòng quay lại sau!</p>
         </div>
       </div>
     </div>

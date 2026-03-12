@@ -11,7 +11,6 @@ import {
   Truck,
   ArrowLeftRight,
   BarChart3,
-  Users,
   ChevronDown,
   Bell,
   Settings,
@@ -27,7 +26,24 @@ export default function WarehouseManagerLayout({
   const { user, isAuthenticated, isLoading, hydrated, logout } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
-  const selectedLocation = 'Warehouse 1 (Regional Hub)'
+  
+  // Warehouse mapping dựa trên workplace_id từ database (chữ thường)
+  const warehouseNames: { [key: string]: string } = {
+    'a0000001-0001-0001-0001-000000000001': 'Kho HCM',
+    'a0000001-0001-0001-0001-000000000002': 'Kho Chi Nhánh Quận 12',
+    'a0000001-0001-0001-0001-000000000003': 'Kho Chi Nhánh Bình Dương',
+    'a0000001-0001-0001-0001-000000000004': 'Kho Chi Nhánh Long An',
+    'b0000001-0001-0001-0001-000000000001': 'Cửa Hàng Thủ Đức',
+    'b0000001-0001-0001-0001-000000000002': 'Cửa Hàng Giải Phóng HCM',
+    'b0000001-0001-0001-0001-000000000003': 'Cửa Hàng Bình Dương',
+    'b0000001-0001-0001-0001-000000000004': 'Cửa Hàng Củ Chi',
+    'b0000001-0001-0001-0001-000000000005': 'Cửa Hàng Biên Hòa',
+    'b0000001-0001-0001-0001-000000000006': 'Cửa Hàng Quận 7',
+  }
+  
+  const selectedLocation = user?.workplaceId 
+    ? (warehouseNames[user.workplaceId.toLowerCase()] || warehouseNames[user.workplaceId] || 'Kho Chưa Xác Định')
+    : 'Kho Chưa Xác Định'
 
   useEffect(() => {
     if (!hydrated) return
@@ -66,12 +82,11 @@ export default function WarehouseManagerLayout({
   }
 
   const navigation = [
-    { name: 'Dashboard', href: '/warehouse-manager', icon: LayoutDashboard },
-    { name: 'Inventory', href: '/warehouse-manager/inventory', icon: Package },
-    { name: 'Shipments', href: '/warehouse-manager/shipments', icon: Truck },
-    { name: 'Transfers', href: '/warehouse-manager/transfers', icon: ArrowLeftRight },
-    { name: 'Reports', href: '/warehouse-manager/reports', icon: BarChart3 },
-    { name: 'Staff', href: '/warehouse-manager/staff', icon: Users },
+    { name: 'Bảng điều khiển', href: '/warehouse-manager', icon: LayoutDashboard },
+    { name: 'Tồn kho', href: '/warehouse-manager/inventory', icon: Package },
+    { name: 'Lô hàng', href: '/warehouse-manager/shipments', icon: Truck },
+    { name: 'Chuyển kho', href: '/warehouse-manager/transfers', icon: ArrowLeftRight },
+    { name: 'Báo cáo', href: '/warehouse-manager/reports', icon: BarChart3 },
   ]
 
   return (
@@ -84,14 +99,14 @@ export default function WarehouseManagerLayout({
             <Package className="w-6 h-6 text-white" />
           </div>
           <div>
-            <div className="font-bold text-gray-900 text-sm">Warehouse Dashboard</div>
+            <div className="font-bold text-gray-900 text-sm">Quản Lý Kho Chi Nhánh</div>
           </div>
         </div>
 
         {/* Location Selector */}
         <div className="px-4 py-3 border-b border-gray-200">
           <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-2">
-            Current Location
+            Vị trí hiện tại
           </label>
           <button className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-[#2d6e3e] text-white rounded-lg hover:bg-[#1e4d2b] transition-colors">
             <div className="flex items-center gap-2">
@@ -136,7 +151,7 @@ export default function WarehouseManagerLayout({
               <div className="text-sm font-medium text-gray-900 truncate">
                 {user.name}
               </div>
-              <div className="text-xs text-gray-500">Warehouse Manager</div>
+              <div className="text-xs text-gray-500">Quản lý kho</div>
             </div>
           </div>
           <button
@@ -144,7 +159,7 @@ export default function WarehouseManagerLayout({
             className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
           >
             <LogOut className="w-4 h-4" />
-            Logout
+            Đăng xuất
           </button>
         </div>
       </aside>
@@ -152,14 +167,7 @@ export default function WarehouseManagerLayout({
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
-          <div>
-            <input
-              type="text"
-              placeholder="Search inventory..."
-              className="w-80 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2d6e3e] focus:border-transparent"
-            />
-          </div>
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-end px-6">
           <div className="flex items-center gap-4">
             <button className="relative p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
               <Bell className="w-5 h-5" />
