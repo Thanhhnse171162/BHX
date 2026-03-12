@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import Link from 'next/link'
+import Image from 'next/image'
 import {
   LayoutDashboard,
   TrendingUp,
@@ -15,7 +16,6 @@ import {
   Settings,
   LogOut,
   Bell,
-  Store,
 } from 'lucide-react'
 
 interface StoreManagerLayoutProps {
@@ -23,7 +23,7 @@ interface StoreManagerLayoutProps {
 }
 
 const PRIMARY_NAV = [
-  { href: '/store-manager',            label: 'Bảng điều khiển',      icon: LayoutDashboard, exact: true  },
+  { href: '/store-manager',            label: 'Tổng quan',            icon: LayoutDashboard, exact: true  },
   { href: '/store-manager/reports',    label: 'Doanh số',             icon: TrendingUp,      exact: false },
   { href: '/store-manager/inventory',  label: 'Tồn kho kệ hàng',     icon: Archive,         exact: false },
   { href: '/store-manager/inventory',  label: 'Tồn kho kho phụ',     icon: Warehouse,       exact: false },
@@ -38,7 +38,7 @@ const MANAGEMENT_NAV = [
 
 // Map pathname → page title
 function getPageTitle(pathname: string): string {
-  if (pathname === '/store-manager') return 'Bảng Điều Khiển'
+  if (pathname === '/store-manager') return 'Tổng Quan'
   if (pathname.startsWith('/store-manager/reports'))   return 'Doanh Số'
   if (pathname.startsWith('/store-manager/inventory')) return 'Tồn Kho'
   if (pathname.startsWith('/store-manager/incidents')) return 'Báo Cáo Sự Cố'
@@ -117,14 +117,12 @@ export default function StoreManagerLayout({ children }: StoreManagerLayoutProps
         {/* Brand */}
         <div className="px-5 py-5 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
-              <Store size={18} className="text-white" />
+            <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 bg-white">
+              <Image src="/logocty.png" alt="Bách Hóa Xanh" width={36} height={36} className="w-full h-full object-contain" />
             </div>
             <div className="min-w-0">
-              <p className="text-[12.5px] font-bold text-gray-900 leading-tight">
-                Main Street<br />Supermarket
-              </p>
-              <p className="text-[10px] text-gray-400 mt-0.5">Retail ERP v2.0</p>
+              <p className="text-[13px] font-bold text-gray-900 leading-tight">Bách Hóa Xanh</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">Quản Lý Cửa Hàng</p>
             </div>
           </div>
         </div>
