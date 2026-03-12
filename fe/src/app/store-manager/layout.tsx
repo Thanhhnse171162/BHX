@@ -27,7 +27,7 @@ const PRIMARY_NAV = [
   { href: '/store-manager/reports',    label: 'Doanh số',             icon: TrendingUp,      exact: false },
   { href: '/store-manager/inventory',  label: 'Tồn kho kệ hàng',     icon: Archive,         exact: false },
   { href: '/store-manager/inventory',  label: 'Tồn kho kho phụ',     icon: Warehouse,       exact: false },
-  { href: '/store-manager/orders',     label: 'Yêu cầu nhập hàng',   icon: ClipboardList,   exact: false },
+  { href: '/store-manager/orders',     label: 'Quản lý đơn hàng',     icon: ClipboardList,   exact: false },
   { href: '/store-manager/incidents',  label: 'Báo cáo sự cố',       icon: AlertTriangle,   exact: false, badge: 'incident' },
 ]
 
@@ -42,7 +42,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith('/store-manager/reports'))   return 'Doanh Số'
   if (pathname.startsWith('/store-manager/inventory')) return 'Tồn Kho'
   if (pathname.startsWith('/store-manager/incidents')) return 'Báo Cáo Sự Cố'
-  if (pathname.startsWith('/store-manager/orders'))    return 'Yêu Cầu Nhập Hàng'
+  if (pathname.startsWith('/store-manager/orders'))    return 'Quản Lý Đơn Hàng'
   if (pathname.startsWith('/store-manager/customers')) return 'Quản Lý Khách Hàng'
   return 'Quản Lý Cửa Hàng'
 }

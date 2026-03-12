@@ -246,85 +246,76 @@ export default function CustomersPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden max-w-[1200px]">
         <div className="overflow-x-auto">
           <table className="w-full text-[13px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="text-left py-3.5 px-5 text-[11px] font-semibold text-gray-500 uppercase tracking-wide w-[240px]">Khách hàng</th>
-                <th className="text-left py-3.5 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide w-[120px]">Hạng</th>
-                <th className="text-right py-3.5 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide w-[140px]">Chi tiêu</th>
-                <th className="text-right py-3.5 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide w-[100px]">Điểm</th>
-                <th className="text-right py-3.5 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide w-[100px]">Tổng đơn</th>
-                <th className="text-left py-3.5 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Liên hệ</th>
-                <th className="text-center py-3.5 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide w-[120px]">Lần ghé cuối</th>
-                <th className="py-3.5 px-4 w-[48px]"></th>
+                <th className="text-left py-2.5 px-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wide w-[260px]">Khách hàng</th>
+                <th className="text-right py-2.5 px-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wide w-[140px]">Chi tiêu</th>
+                <th className="text-right py-2.5 px-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wide w-[120px]">Điểm</th>
+                <th className="text-right py-2.5 px-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wide w-[100px]">Tổng đơn</th>
+                <th className="text-left py-2.5 px-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wide w-[200px]">Liên hệ</th>
+                <th className="text-center py-2.5 px-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wide w-[120px]">Lần ghé cuối</th>
+                <th className="py-2.5 px-3 w-[60px]"></th>
               </tr>
             </thead>
             <tbody>
               {paged.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-14 text-center text-gray-400 text-[13px]">
+                  <td colSpan={7} className="py-10 text-center text-gray-400 text-[13px]">
                     Không tìm thấy khách hàng
                   </td>
                 </tr>
               ) : (
-                paged.map((c) => {
-                  const tc = tierConfig[c.tier]
+                paged.map((c, idx) => {
                   return (
-                    <tr key={c.id} className="border-t border-gray-50 hover:bg-green-50/30 transition-colors">
+                    <tr key={c.id} className={`border-t border-gray-50 hover:bg-green-50/40 transition-colors ${idx % 2 === 1 ? 'bg-gray-50/40' : ''}`}>
                       {/* Khách hàng */}
-                      <td className="py-3.5 px-5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-sm font-bold flex-shrink-0">
+                      <td className="py-2.5 px-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-xs font-bold flex-shrink-0">
                             {c.name.charAt(0)}
                           </div>
                           <div className="min-w-0">
-                            <div className="font-semibold text-gray-800 truncate">{c.name}</div>
+                            <div className="font-semibold text-gray-800 truncate text-[13px]">{c.name}</div>
                             <div className="text-[11px] text-gray-400">{c.id}</div>
                           </div>
                         </div>
                       </td>
 
-                      {/* Hạng */}
-                      <td className="py-3.5 px-4">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${tc.cls}`}>
-                          {tc.icon} {c.tier}
-                        </span>
-                      </td>
-
                       {/* Chi tiêu */}
-                      <td className="py-3.5 px-4 text-right">
-                        <span className="font-bold text-gray-800 whitespace-nowrap">
+                      <td className="py-2.5 px-3 text-right">
+                        <span className="font-semibold text-gray-800 whitespace-nowrap text-[13px]">
                           {c.totalSpent.toLocaleString('vi-VN')} ₫
                         </span>
                       </td>
 
                       {/* Điểm */}
-                      <td className="py-3.5 px-4 text-right">
-                        <span className="font-bold text-green-600">{c.points.toLocaleString()}</span>
+                      <td className="py-2.5 px-3 text-right">
+                        <span className="font-semibold text-green-600 text-[13px]">{c.points.toLocaleString()}</span>
                       </td>
 
                       {/* Tổng đơn */}
-                      <td className="py-3.5 px-4 text-right text-gray-600 font-medium">{c.totalOrders}</td>
+                      <td className="py-2.5 px-3 text-right text-gray-600 font-medium text-[13px]">{c.totalOrders}</td>
 
                       {/* Liên hệ */}
-                      <td className="py-3.5 px-4">
-                        <div className="text-gray-700 font-medium">{c.phone}</div>
+                      <td className="py-2.5 px-3">
+                        <div className="text-gray-700 font-medium text-[13px]">{c.phone}</div>
                         <div className="text-[11px] text-gray-400">{c.email}</div>
                       </td>
 
                       {/* Lần ghé cuối */}
-                      <td className="py-3.5 px-4 text-center text-gray-500">{c.lastVisit}</td>
+                      <td className="py-2.5 px-3 text-center text-gray-500 text-[13px]">{c.lastVisit}</td>
 
                       {/* Action */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-2.5 px-3 text-center">
                         <button
                           onClick={() => setSelected(c)}
-                          className="p-1.5 rounded-lg hover:bg-green-100 text-gray-400 hover:text-green-600 transition-colors"
+                          className="p-1 rounded-lg hover:bg-green-100 text-gray-400 hover:text-green-600 transition-colors"
                           title="Xem chi tiết"
                         >
-                          <Eye size={15} />
+                          <Eye size={14} />
                         </button>
                       </td>
                     </tr>
@@ -336,7 +327,7 @@ export default function CustomersPage() {
         </div>
 
         {/* Pagination */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
+        <div className="flex items-center justify-between px-4 py-2.5 border-t border-gray-100">
           <p className="text-[12px] text-gray-500">
             Hiển thị <span className="font-semibold text-gray-700">{Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(page * PAGE_SIZE, filtered.length)}</span> / {filtered.length} khách hàng
           </p>
@@ -352,7 +343,7 @@ export default function CustomersPage() {
               <button
                 key={p}
                 onClick={() => setPage(p)}
-                className={`w-8 h-8 rounded-lg text-[12px] font-semibold transition-colors ${
+                className={`w-7 h-7 rounded-lg text-[12px] font-semibold transition-colors ${
                   p === page ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
