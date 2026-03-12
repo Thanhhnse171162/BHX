@@ -4,51 +4,48 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import Link from 'next/link'
-import Image from 'next/image'
 import {
   LayoutDashboard,
-  ShoppingCart,
-  Users,
+  TrendingUp,
+  Archive,
   Warehouse,
+  ClipboardList,
   AlertTriangle,
-  BarChart2,
-  LogOut,
+  Package,
   Settings,
+  LogOut,
   Bell,
+  Store,
 } from 'lucide-react'
 
 interface StoreManagerLayoutProps {
   children: React.ReactNode
 }
 
-const NAV_SECTIONS = [
-  {
-    label: 'CHÍNH',
-    items: [
-      { href: '/store-manager', label: 'Màn hình chính', icon: LayoutDashboard, exact: true },
-    ],
-  },
-  {
-    label: 'CỬA HÀNG',
-    items: [
-      { href: '/store-manager/orders', label: 'Quản lí đơn hàng', icon: ShoppingCart, exact: false },
-      { href: '/store-manager/customers', label: 'Khách hàng', icon: Users, exact: false },
-    ],
-  },
-  {
-    label: 'VẬN HÀNH',
-    items: [
-      { href: '/store-manager/inventory', label: 'Kho hàng', icon: Warehouse, exact: false },
-      { href: '/store-manager/incidents', label: 'Sự cố', icon: AlertTriangle, exact: false, badge: 'incident' },
-    ],
-  },
-  {
-    label: 'BÁO CÁO',
-    items: [
-      { href: '/store-manager/reports', label: 'Báo cáo doanh thu', icon: BarChart2, exact: false },
-    ],
-  },
+const PRIMARY_NAV = [
+  { href: '/store-manager',            label: 'Dashboard',           icon: LayoutDashboard, exact: true  },
+  { href: '/store-manager/reports',    label: 'Sales Overview',      icon: TrendingUp,      exact: false },
+  { href: '/store-manager/inventory',  label: 'Shelf Inventory',     icon: Archive,         exact: false },
+  { href: '/store-manager/inventory',  label: 'Backroom Inventory',  icon: Warehouse,       exact: false },
+  { href: '/store-manager/orders',     label: 'Stock Requests',      icon: ClipboardList,   exact: false },
+  { href: '/store-manager/incidents',  label: 'Incident Reports',    icon: AlertTriangle,   exact: false, badge: 'incident' },
 ]
+
+const MANAGEMENT_NAV = [
+  { href: '/store-manager/customers',  label: 'Product Management',  icon: Package,         exact: false },
+  { href: '/store-manager',            label: 'Settings',            icon: Settings,        exact: false },
+]
+
+// Map pathname → page title
+function getPageTitle(pathname: string): string {
+  if (pathname === '/store-manager') return 'Store Manager Dashboard'
+  if (pathname.startsWith('/store-manager/reports'))   return 'Sales Overview'
+  if (pathname.startsWith('/store-manager/inventory')) return 'Shelf Inventory'
+  if (pathname.startsWith('/store-manager/incidents')) return 'Incident Reports'
+  if (pathname.startsWith('/store-manager/orders'))    return 'Stock Requests'
+  if (pathname.startsWith('/store-manager/customers')) return 'Customers'
+  return 'Store Manager'
+}
 
 export default function StoreManagerLayout({ children }: StoreManagerLayoutProps) {
   const router = useRouter()
@@ -99,156 +96,136 @@ export default function StoreManagerLayout({ children }: StoreManagerLayoutProps
     router.push('/login')
   }
 
-  if (!hydrated || !isAuthenticated || !user) return <div className="flex items-center justify-center min-h-screen"><div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin" /></div>
+  if (!hydrated || !isAuthenticated || !user) return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
 
-  const userInitial = user.name ? user.name.charAt(0).toUpperCase() : 'S'
+  const userInitial = user.name ? user.name.charAt(0).toUpperCase() : 'A'
+  const displayName = user.name || 'Alex Rivera'
+  const pageTitle   = getPageTitle(pathname)
+  const headerDate  = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
   return (
-    <div className="min-h-screen bg-[#F8F9FB] flex font-sans">
+    <div className="min-h-screen bg-[#F4F6F9] flex font-sans">
+
       {/* ── Sidebar ─────────────────────────────────────────── */}
-      <aside className="fixed left-0 top-0 h-screen w-[230px] bg-white border-r border-gray-100 flex flex-col z-40 shadow-sm">
+      <aside className="fixed left-0 top-0 h-screen w-[220px] bg-white border-r border-gray-200 flex flex-col z-40">
+
         {/* Brand */}
-        <div className="px-5 pt-5 pb-4 border-b border-gray-100">
+        <div className="px-5 py-5 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-green-500 flex items-center justify-center flex-shrink-0">
-              <Image
-                src="/logocty.png"
-                alt="Logo"
-                width={28}
-                height={28}
-                className="rounded-lg object-contain"
-                onError={(e) => {
-                  ;(e.currentTarget as HTMLImageElement).style.display = 'none'
-                }}
-              />
+            <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
+              <Store size={18} className="text-white" />
             </div>
-            <div>
-              <p className="text-[15px] font-bold text-gray-900 leading-tight">Bách Hóa Xanh</p>
-              <p className="text-[11px] text-green-600 font-medium mt-0.5">Quản lý cửa hàng</p>
+            <div className="min-w-0">
+              <p className="text-[12.5px] font-bold text-gray-900 leading-tight">
+                Main Street<br />Supermarket
+              </p>
+              <p className="text-[10px] text-gray-400 mt-0.5">Retail ERP v2.0</p>
             </div>
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 py-3 overflow-y-auto px-2">
-          {NAV_SECTIONS.map((section) => (
-            <div key={section.label} className="mb-1">
-              <p className="text-[10px] font-semibold text-gray-400 tracking-widest px-3 py-1.5 uppercase">
-                {section.label}
-              </p>
-              {section.items.map((item) => {
-                const Icon = item.icon
-                const isActive = item.exact
-                  ? pathname === item.href
-                  : pathname.startsWith(item.href)
-                const badgeCount = item.badge === 'incident' ? incidentCount : null
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-all mb-0.5
-                      ${
-                        isActive
-                          ? 'bg-green-50 text-green-700'
-                          : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
-                      }`}
-                  >
-                    <Icon
-                      size={18}
-                      className={`flex-shrink-0 ${isActive ? 'text-green-600' : 'text-gray-400'}`}
-                      strokeWidth={isActive ? 2.2 : 1.8}
-                    />
-                    <span className="flex-1 truncate">{item.label}</span>
-                    {badgeCount != null && badgeCount > 0 && (
-                      <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full bg-red-500 text-white text-[11px] font-bold">
-                        {badgeCount}
-                      </span>
-                    )}
-                  </Link>
-                )
-              })}
-            </div>
-          ))}
+        {/* Navigation – primary items */}
+        <nav className="flex-1 overflow-y-auto py-4 px-3">
+          {PRIMARY_NAV.map((item) => {
+            const Icon = item.icon
+            const isActive = item.exact
+              ? pathname === item.href
+              : pathname === item.href
+            const badgeCount = item.badge === 'incident' ? incidentCount : null
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all mb-0.5
+                  ${isActive
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
+                  }`}
+              >
+                <Icon
+                  size={17}
+                  className={`flex-shrink-0 ${isActive ? 'text-blue-600' : 'text-gray-400'}`}
+                  strokeWidth={isActive ? 2.2 : 1.8}
+                />
+                <span className="flex-1 truncate">{item.label}</span>
+                {badgeCount != null && badgeCount > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                    {badgeCount}
+                  </span>
+                )}
+              </Link>
+            )
+          })}
+
+          {/* Management section */}
+          <p className="text-[10px] font-semibold text-gray-400 tracking-widest px-3 mt-5 mb-2 uppercase">
+            Management
+          </p>
+          {MANAGEMENT_NAV.map((item) => {
+            const Icon = item.icon
+            const isActive = pathname.startsWith(item.href) && item.href !== '/store-manager'
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all mb-0.5
+                  ${isActive
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
+                  }`}
+              >
+                <Icon size={17} className={`flex-shrink-0 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} strokeWidth={1.8} />
+                <span className="flex-1 truncate">{item.label}</span>
+              </Link>
+            )
+          })}
         </nav>
 
-        {/* User profile at bottom */}
-        <div className="border-t border-gray-100 px-3 py-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-              {userInitial}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-semibold text-gray-900 truncate">{user.name || 'Store Manager'}</p>
-              <p className="text-[11px] text-gray-400 truncate">Quản lý cửa hàng</p>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                title="Cài đặt"
-                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-              >
-                <Settings size={14} />
-              </button>
-              <button
-                onClick={handleLogout}
-                title="Đăng xuất"
-                className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-              >
-                <LogOut size={14} />
-              </button>
-            </div>
-          </div>
+        {/* Logout */}
+        <div className="border-t border-gray-100 px-3 py-4">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-[13px] font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all"
+          >
+            <LogOut size={17} strokeWidth={1.8} />
+            Logout
+          </button>
         </div>
       </aside>
 
       {/* ── Main content ─────────────────────────────────────── */}
-      <div className="ml-[230px] flex-1 flex flex-col min-h-screen">
+      <div className="ml-[220px] flex-1 flex flex-col min-h-screen">
+
         {/* Top header */}
-        <header className="sticky top-0 z-30 bg-white border-b border-gray-100 h-14 flex items-center gap-4 px-6 shadow-sm">
-          {/* Search */}
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <svg
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.35-4.35" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Tìm đơn hàng, hàng hóa..."
-                className="w-full pl-9 pr-4 py-2 text-[13px] bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-green-400 focus:bg-white transition-all placeholder:text-gray-400"
-              />
-            </div>
+        <header className="sticky top-0 z-30 bg-white border-b border-gray-200 h-16 flex items-center px-6 gap-4">
+          {/* Page title + date */}
+          <div>
+            <h1 className="text-[16px] font-bold text-gray-900 leading-tight">{pageTitle}</h1>
+            <p className="text-[12px] text-gray-400">{headerDate}</p>
           </div>
 
           <div className="flex items-center gap-3 ml-auto">
             {/* Notification bell */}
-            <button className="relative p-2 rounded-xl text-gray-500 hover:bg-gray-50 transition-colors">
+            <button className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors">
               <Bell size={20} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500" />
+              {incidentCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500" />
+              )}
             </button>
 
-            {/* Branch info */}
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-100 rounded-xl">
-              <svg
-                className="text-green-600"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                <polyline points="9 22 9 12 15 12 15 22" />
-              </svg>
-              <span className="text-[13px] font-semibold text-green-700">Chi nhánh Trung tâm #402</span>
+            {/* User info */}
+            <div className="flex items-center gap-2.5 pl-3 border-l border-gray-200">
+              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                {userInitial}
+              </div>
+              <div>
+                <p className="text-[13px] font-semibold text-gray-900 leading-tight">{displayName}</p>
+                <p className="text-[11px] text-gray-400">Store Manager</p>
+              </div>
             </div>
           </div>
         </header>
