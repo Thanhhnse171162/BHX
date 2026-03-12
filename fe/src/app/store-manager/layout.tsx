@@ -85,12 +85,8 @@ export default function StoreManagerLayout({ children }: StoreManagerLayoutProps
     if (!isAllowed) {
       if (user.role === 'STAFF' || user.roleId === 4) router.push('/cashier')
       else if (user.role === 'CUSTOMER') router.push('/customer')
+      else if (user.role === 'WAREHOUSE_MANAGER' || user.roleId === 3) router.push('/warehouse-manager')
       else if (user.role === 'WAREHOUSE_ADMIN' || user.roleId === 7) router.push('/warehouse')
-      else if (user.role === 'WAREHOUSE_MANAGER' || user.roleId === 3) {
-        // Role deprecated - logout và redirect về login
-        logout()
-        router.push('/login')
-      }
       else if (user.roleId === 5) router.push('/warehouse-store')
       else router.push('/login')
     }

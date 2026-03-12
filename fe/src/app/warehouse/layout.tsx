@@ -26,10 +26,9 @@ export default function WarehouseLayout({
         return
       }
       
-      // Nếu là WAREHOUSE_MANAGER (role_id = 3, deprecated) thì logout và redirect về login
+      // Nếu là WAREHOUSE_MANAGER (role_id = 3) thì redirect về /warehouse-manager
       if (user && (user.role === 'WAREHOUSE_MANAGER' || user.roleId === 3)) {
-        logout()
-        router.push('/login')
+        router.push('/warehouse-manager')
         return
       }
       
