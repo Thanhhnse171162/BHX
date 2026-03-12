@@ -40,9 +40,8 @@ const TOP_PRODUCTS = [
 ]
 
 const PAYMENT_METHODS = [
-  { method: 'Tiền mặt',   pct: 42, amount: 104370000, color: 'bg-green-500' },
-  { method: 'Thẻ ngân hàng', pct: 35, amount: 86975000, color: 'bg-blue-500' },
-  { method: 'Ví điện tử', pct: 23, amount: 57155000,  color: 'bg-purple-500' },
+  { method: 'Tiền mặt', pct: 58, amount: 144388000, color: 'from-green-500 to-green-400',   dot: 'bg-green-500',  light: 'bg-green-50 text-green-700' },
+  { method: 'Mã QR',    pct: 42, amount: 104512000, color: 'from-violet-500 to-violet-400', dot: 'bg-violet-500', light: 'bg-violet-50 text-violet-700' },
 ]
 
 const CATEGORY_REVENUE = [
@@ -81,7 +80,7 @@ export default function ReportsPage() {
         <div>
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
             <BarChart3 size={20} className="text-green-600" />
-            Báo cáo doanh thu
+            Doanh thu
           </h1>
           <p className="text-[13px] text-gray-500 mt-0.5">Phân tích hiệu quả kinh doanh cửa hàng</p>
         </div>
@@ -153,70 +152,104 @@ export default function ReportsPage() {
       {/* Revenue chart */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-[14px] font-semibold text-gray-800">Biểu đồ doanh thu</h2>
-          <div className="flex items-center gap-4 text-[12px] text-gray-500">
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-green-400 inline-block" />Doanh thu (₫)</span>
+          <div>
+            <h2 className="text-[14px] font-semibold text-gray-800">Biểu đồ doanh thu 7 ngày</h2>
+            <p className="text-[12px] text-gray-400 mt-0.5">Thống kê theo ngày trong tuần qua</p>
           </div>
+          <span className="flex items-center gap-1.5 text-[12px] text-gray-500">
+            <span className="w-3 h-3 rounded-sm bg-green-500 inline-block" />
+            Doanh thu (₫)
+          </span>
         </div>
-        <div className="flex items-end gap-2 h-40">
-          {shown.map((d, i) => (
-            <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
-              <div className="relative w-full">
-                <div
-                  className="w-full rounded-t-lg bg-green-400 group-hover:bg-green-500 transition-colors cursor-default"
-                  style={{ height: `${(d.revenue / maxRevenue) * 140}px` }}
-                  title={`${d.day}: ${fmt(d.revenue)} ₫ · ${d.orders} đơn`}
-                />
-              </div>
-              <span className="text-[10px] text-gray-400 whitespace-nowrap">{d.day}</span>
-            </div>
-          ))}
-        </div>
-        {/* Revenue labels */}
-        <div className="flex gap-2 mt-2">
-          {shown.map((d, i) => (
-            <div key={i} className="flex-1 text-center">
-              <span className="text-[9px] text-gray-400">{(d.revenue / 1000000).toFixed(1)}M</span>
-            </div>
-          ))}
+        {/* Grid + Bars */}
+        <div className="relative">
+          {/* Horizontal grid lines */}
+          <div className="absolute left-0 right-0 top-0 bottom-10 flex flex-col justify-between pointer-events-none">
+            {[0,1,2,3,4].map((i) => (
+              <div key={i} className="border-t border-dashed border-gray-100 w-full" />
+            ))}
+          </div>
+          {/* Bar columns */}
+          <div className="flex items-stretch gap-2 h-64">
+            {shown.map((d, i) => {
+              const barPct = d.revenue / maxRevenue
+              const barH   = Math.round(barPct * 170)
+              return (
+                <div key={i} className="flex-1 flex flex-col items-center">
+                  <div className="flex-1 flex flex-col justify-end items-center w-full gap-1">
+                    {/* Value label above bar */}
+                    <span className="text-[10px] font-bold text-green-700 bg-green-50 px-1.5 py-0.5 rounded-md whitespace-nowrap">
+                      {(d.revenue / 1000000).toFixed(1)}M
+                    </span>
+                    {/* Bar */}
+                    <div
+                      className="w-full rounded-t-xl bg-gradient-to-t from-green-600 to-green-400 hover:from-green-700 hover:to-green-500 transition-all duration-200 shadow-sm"
+                      style={{ height: `${barH}px` }}
+                      title={`${d.day}: ${fmt(d.revenue)} ₫ · ${d.orders} đơn`}
+                    />
+                  </div>
+                  {/* Bottom labels */}
+                  <div className="pt-2 text-center">
+                    <div className="text-[11px] text-gray-500 font-medium">{d.day}</div>
+                    <div className="text-[10px] text-gray-300">{d.orders} đơn</div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
 
-      {/* 3-col row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* 2-col row: payment + category */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Payment methods */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h2 className="text-[14px] font-semibold text-gray-800 mb-4">Phương thức thanh toán</h2>
-          <div className="space-y-3">
+          <h2 className="text-[14px] font-semibold text-gray-800 mb-1">Phương thức thanh toán</h2>
+          <p className="text-[12px] text-gray-400 mb-5">Tổng doanh thu kỳ này</p>
+          <div className="space-y-5">
             {PAYMENT_METHODS.map((pm) => (
               <div key={pm.method}>
-                <div className="flex items-center justify-between text-[12.5px] mb-1">
-                  <span className="text-gray-700 font-medium">{pm.method}</span>
-                  <span className="font-bold text-gray-800">{pm.pct}%</span>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2.5 h-2.5 rounded-full ${pm.dot}`} />
+                    <span className="text-[13px] text-gray-700 font-medium">{pm.method}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${pm.light}`}>{pm.pct}%</span>
+                    <span className="text-[12px] font-semibold text-gray-700">{fmt(pm.amount)} ₫</span>
+                  </div>
                 </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className={`h-full rounded-full ${pm.color}`} style={{ width: `${pm.pct}%` }} />
+                <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full bg-gradient-to-r ${pm.color} transition-all`} style={{ width: `${pm.pct}%` }} />
                 </div>
-                <p className="text-[11px] text-gray-400 mt-0.5">{fmt(pm.amount)} ₫</p>
               </div>
             ))}
+          </div>
+          {/* Total */}
+          <div className="mt-5 pt-4 border-t border-gray-100 flex items-center justify-between">
+            <span className="text-[12px] text-gray-500">Tổng doanh thu</span>
+            <span className="text-[14px] font-bold text-green-700">{fmt(PAYMENT_METHODS.reduce((s, p) => s + p.amount, 0))} ₫</span>
           </div>
         </div>
 
         {/* Category revenue */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h2 className="text-[14px] font-semibold text-gray-800 mb-4">Doanh thu theo danh mục</h2>
-          <div className="space-y-2.5">
-            {CATEGORY_REVENUE.map((cat) => (
-              <div key={cat.name} className="flex items-center gap-3">
-                <span className="text-[12.5px] text-gray-700 w-36 flex-shrink-0">{cat.name}</span>
-                <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-green-400 rounded-full" style={{ width: `${cat.pct}%` }} />
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h2 className="text-[14px] font-semibold text-gray-800 mb-1">Doanh thu theo danh mục</h2>
+          <p className="text-[12px] text-gray-400 mb-5">Tỷ trọng từng nhóm hàng</p>
+          <div className="space-y-3">
+            {CATEGORY_REVENUE.map((cat, i) => {
+              const colors = ['bg-green-500','bg-blue-500','bg-violet-500','bg-orange-400','bg-pink-400','bg-teal-500','bg-gray-400']
+              return (
+                <div key={cat.name} className="flex items-center gap-3">
+                  <span className="text-[12.5px] text-gray-700 w-32 flex-shrink-0">{cat.name}</span>
+                  <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${colors[i % colors.length]}`} style={{ width: `${(cat.pct / 25) * 100}%` }} />
+                  </div>
+                  <span className="text-[12px] font-semibold text-gray-600 w-9 text-right">{cat.pct}%</span>
+                  <span className="text-[11px] text-gray-400 w-24 text-right whitespace-nowrap">{fmt(cat.amount)} ₫</span>
                 </div>
-                <span className="text-[12px] font-semibold text-gray-700 w-10 text-right">{cat.pct}%</span>
-                <span className="text-[11px] text-gray-400 w-28 text-right">{fmt(cat.amount)} ₫</span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </div>

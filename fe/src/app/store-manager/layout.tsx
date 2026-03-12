@@ -26,7 +26,7 @@ interface StoreManagerLayoutProps {
 
 const PRIMARY_NAV = [
   { href: '/store-manager',                          label: 'Tổng quan',            icon: LayoutDashboard, exact: true  },
-  { href: '/store-manager/reports',                  label: 'Doanh số',             icon: TrendingUp,      exact: false },
+  { href: '/store-manager/reports',                  label: 'Doanh thu',            icon: TrendingUp,      exact: false },
   { href: '/store-manager/inventory',                label: 'Tồn kho kệ hàng',     icon: Archive,         exact: false },
   { href: '/store-manager/inventory-aux',            label: 'Tồn kho kho phụ',     icon: Warehouse,       exact: false },
   { href: '/store-manager/purchase-requests',        label: 'Yêu cầu nhập hàng',   icon: PackagePlus,     exact: false },
@@ -41,7 +41,7 @@ const MANAGEMENT_NAV = [
 
 function getPageTitle(pathname: string): string {
   if (pathname === '/store-manager') return 'Tổng Quan'
-  if (pathname.startsWith('/store-manager/reports'))           return 'Doanh Số'
+  if (pathname.startsWith('/store-manager/reports'))           return 'Doanh Thu'
   if (pathname.startsWith('/store-manager/inventory-aux'))     return 'Tồn Kho Phụ'
   if (pathname.startsWith('/store-manager/inventory'))         return 'Tồn Kho Kệ Hàng'
   if (pathname.startsWith('/store-manager/purchase-requests')) return 'Yêu Cầu Nhập Hàng'
