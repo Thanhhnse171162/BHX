@@ -8,53 +8,71 @@ import {
   ClipboardList,
   AlertTriangle,
   TrendingUp,
+  TrendingDown,
+  ArrowUpRight,
+  Download,
 } from 'lucide-react'
 
-// â”€â”€ KPI cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// KPI cards
 const KPI_CARDS = [
   {
     label: "Today's Revenue",
     value: '$4,250.00',
     trend: '+12.5%',
     trendUp: true,
+    sub: 'vs yesterday',
     icon: DollarSign,
+    accent: 'from-blue-500 to-blue-600',
     iconBg: 'bg-blue-50',
     iconColor: 'text-blue-600',
+    border: 'border-blue-100',
   },
   {
     label: 'Total Orders',
     value: '124',
     trend: '+8.2%',
     trendUp: true,
+    sub: 'vs yesterday',
     icon: ShoppingCart,
-    iconBg: 'bg-blue-50',
-    iconColor: 'text-blue-600',
+    accent: 'from-violet-500 to-violet-600',
+    iconBg: 'bg-violet-50',
+    iconColor: 'text-violet-600',
+    border: 'border-violet-100',
   },
   {
     label: 'Low Stock Products',
     value: '12',
     warning: true,
+    sub: 'Need restocking',
     icon: Package,
-    iconBg: 'bg-yellow-50',
-    iconColor: 'text-yellow-500',
+    accent: 'from-amber-400 to-amber-500',
+    iconBg: 'bg-amber-50',
+    iconColor: 'text-amber-500',
+    border: 'border-amber-100',
   },
   {
     label: 'Stock Requests',
     value: '3',
+    sub: 'Pending approval',
     icon: ClipboardList,
-    iconBg: 'bg-blue-50',
-    iconColor: 'text-blue-600',
+    accent: 'from-cyan-500 to-cyan-600',
+    iconBg: 'bg-cyan-50',
+    iconColor: 'text-cyan-600',
+    border: 'border-cyan-100',
   },
   {
     label: 'Incidents',
     value: '2',
+    sub: 'Unresolved',
     icon: AlertTriangle,
+    accent: 'from-red-400 to-red-500',
     iconBg: 'bg-red-50',
     iconColor: 'text-red-500',
+    border: 'border-red-100',
   },
 ]
 
-// â”€â”€ Chart data (Monâ€“Sun) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Chart data
 const CHART_POINTS = [
   { day: 'Mon', value: 900  },
   { day: 'Tue', value: 1500 },
@@ -65,34 +83,39 @@ const CHART_POINTS = [
   { day: 'Sun', value: 5400 },
 ]
 
-// â”€â”€ Top selling products â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Top selling products
 const TOP_PRODUCTS = [
-  { name: 'Whole Milk 1L',        units: 142, revenue: '$355.00' },
-  { name: 'Organic Bananas (kg)', units: 98,  revenue: '$245.00' },
-  { name: 'Whole Wheat Bread',    units: 86,  revenue: '$215.00' },
+  { name: 'Whole Milk 1L',        units: 142, revenue: '$355.00', pct: 92 },
+  { name: 'Organic Bananas (kg)', units: 98,  revenue: '$245.00', pct: 63 },
+  { name: 'Whole Wheat Bread',    units: 86,  revenue: '$215.00', pct: 56 },
+  { name: 'Orange Juice 1L',      units: 74,  revenue: '$185.00', pct: 48 },
+  { name: 'Greek Yogurt 500g',    units: 61,  revenue: '$152.00', pct: 39 },
 ]
 
-// â”€â”€ Low stock items â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Low stock items
 const LOW_STOCK = [
   { product: 'Free Range Eggs 12pk', shelf: 0, back: 0, status: 'Out' },
   { product: 'Hass Avocado',         shelf: 4, back: 0, status: 'Low' },
+  { product: 'Sourdough Loaf',       shelf: 3, back: 2, status: 'Low' },
+  { product: 'Cheddar Cheese 500g',  shelf: 2, back: 0, status: 'Low' },
 ]
 
-// â”€â”€ Pending incidents â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Pending incidents
 const INCIDENTS = [
-  { reporter: 'Sarah Jenkins',  type: 'Spillage',  date: 'Oct 24' },
-  { reporter: 'Mike Thompson',  type: 'Equipment', date: 'Oct 23' },
+  { reporter: 'Sarah Jenkins',  type: 'Spillage',  date: 'Mar 12', severity: 'Medium' },
+  { reporter: 'Mike Thompson',  type: 'Equipment', date: 'Mar 11', severity: 'High'   },
+  { reporter: 'Lisa Nguyen',    type: 'Complaint', date: 'Mar 10', severity: 'Low'    },
 ]
 
-// â”€â”€ SVG smooth line chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// SVG smooth line chart
 function SalesChart() {
-  const MAX_VAL  = 6000
-  const SVG_W    = 520
-  const SVG_H    = 170
-  const PAD_L    = 38
-  const PAD_B    = 22
-  const PAD_T    = 8
-  const PAD_R    = 10
+  const MAX_VAL = 6000
+  const SVG_W   = 680
+  const SVG_H   = 300
+  const PAD_L   = 50
+  const PAD_B   = 32
+  const PAD_T   = 16
+  const PAD_R   = 20
 
   const chartW = SVG_W - PAD_L - PAD_R
   const chartH = SVG_H - PAD_B - PAD_T
@@ -102,7 +125,6 @@ function SalesChart() {
     y: PAD_T + chartH - (d.value / MAX_VAL) * chartH,
   }))
 
-  // Build smooth cubic-bezier path
   let lineD = `M${pts[0].x},${pts[0].y}`
   for (let i = 1; i < pts.length; i++) {
     const prev = pts[i - 1]
@@ -113,65 +135,53 @@ function SalesChart() {
   const areaD = `${lineD} L${pts[pts.length - 1].x},${PAD_T + chartH} L${pts[0].x},${PAD_T + chartH} Z`
 
   const yTicks = [
-    { v: 0,    label: '$0'  },
-    { v: 2000, label: '$2k' },
-    { v: 4000, label: '$4k' },
-    { v: 6000, label: '$6k' },
+    { v: 0,    label: '$0'    },
+    { v: 1500, label: '$1.5k' },
+    { v: 3000, label: '$3k'   },
+    { v: 4500, label: '$4.5k' },
+    { v: 6000, label: '$6k'   },
   ]
 
   return (
-    <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full" style={{ height: 170 }}>
+    <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full block" preserveAspectRatio="xMidYMid meet">
       <defs>
-        <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor="#3B82F6" stopOpacity="0.22" />
-          <stop offset="100%" stopColor="#3B82F6" stopOpacity="0.01" />
+        <linearGradient id="chartGrad2" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#3B82F6" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
         </linearGradient>
+        <filter id="dot-shadow">
+          <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#3B82F6" floodOpacity="0.4" />
+        </filter>
       </defs>
 
-      {/* Y-axis grid lines + labels */}
       {yTicks.map(({ v, label }) => {
         const y = PAD_T + chartH - (v / MAX_VAL) * chartH
         return (
           <g key={label}>
             <line
               x1={PAD_L} y1={y} x2={SVG_W - PAD_R} y2={y}
-              stroke="#E2E8F0" strokeWidth="1"
+              stroke={v === 0 ? '#CBD5E1' : '#F1F5F9'}
+              strokeWidth={v === 0 ? 1.5 : 1}
+              strokeDasharray={v !== 0 ? '4 4' : undefined}
             />
-            <text x={PAD_L - 5} y={y + 4} textAnchor="end" fontSize="9.5" fill="#94A3B8">
+            <text x={PAD_L - 6} y={y + 4} textAnchor="end" fontSize="10" fill="#94A3B8" fontFamily="system-ui">
               {label}
             </text>
           </g>
         )
       })}
 
-      {/* Area fill */}
-      <path d={areaD} fill="url(#chartGrad)" />
+      <path d={areaD} fill="url(#chartGrad2)" />
+      <path d={lineD} fill="none" stroke="#3B82F6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
 
-      {/* Line */}
-      <path
-        d={lineD}
-        fill="none"
-        stroke="#3B82F6"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-
-      {/* Dots */}
       {pts.map((pt, i) => (
-        <circle key={i} cx={pt.x} cy={pt.y} r="3.5" fill="white" stroke="#3B82F6" strokeWidth="2" />
+        <g key={i}>
+          <circle cx={pt.x} cy={pt.y} r="5" fill="white" stroke="#3B82F6" strokeWidth="2.5" filter="url(#dot-shadow)" />
+        </g>
       ))}
 
-      {/* X-axis labels */}
       {CHART_POINTS.map((d, i) => (
-        <text
-          key={d.day}
-          x={pts[i].x}
-          y={SVG_H - 5}
-          textAnchor="middle"
-          fontSize="10"
-          fill="#94A3B8"
-        >
+        <text key={d.day} x={pts[i].x} y={SVG_H - 6} textAnchor="middle" fontSize="11" fill="#94A3B8" fontFamily="system-ui">
           {d.day}
         </text>
       ))}
@@ -179,56 +189,66 @@ function SalesChart() {
   )
 }
 
-// â”€â”€ Page component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Page component
 export default function StoreManagerDashboard() {
   const [activeFilter, setActiveFilter] = useState<'Today' | 'Yesterday' | 'Last 7 Days'>('Today')
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-6 space-y-5 min-h-full">
 
-      {/* â”€â”€ KPI cards â”€â”€ */}
+      {/* KPI cards */}
       <div className="grid grid-cols-5 gap-4">
         {KPI_CARDS.map((card) => {
           const Icon = card.icon
           return (
             <div
               key={card.label}
-              className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm"
+              className={`bg-white rounded-2xl border ${card.border} p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden`}
             >
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide leading-tight">
+              <div className={`absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r ${card.accent}`} />
+
+              <div className="flex items-start justify-between mb-3">
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider leading-tight mt-1">
                   {card.label}
                 </p>
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${card.iconBg}`}>
-                  <Icon size={16} className={card.iconColor} />
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${card.iconBg} flex-shrink-0`}>
+                  <Icon size={17} className={card.iconColor} />
                 </div>
               </div>
 
-              <p className="text-[22px] font-bold text-gray-900">{card.value}</p>
+              <p className="text-[26px] font-bold text-gray-900 leading-none mb-2">{card.value}</p>
 
-              {card.trend && (
-                <p className={`flex items-center gap-1 text-[12px] font-semibold mt-1 ${card.trendUp ? 'text-green-600' : 'text-red-500'}`}>
-                  <TrendingUp size={12} />
-                  {card.trend}
-                </p>
-              )}
-              {card.warning && (
-                <p className="flex items-center gap-1 text-[12px] font-semibold mt-1 text-yellow-500">
-                  <AlertTriangle size={11} />
-                  Warning
-                </p>
-              )}
+              <div className="flex items-center gap-1.5">
+                {card.trend && (
+                  <>
+                    <span className={`inline-flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded-md ${
+                      card.trendUp ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
+                    }`}>
+                      {card.trendUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                      {card.trend}
+                    </span>
+                    <span className="text-[11px] text-gray-400">{card.sub}</span>
+                  </>
+                )}
+                {card.warning && (
+                  <span className="inline-flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-600">
+                    <AlertTriangle size={10} />
+                    {card.sub}
+                  </span>
+                )}
+                {!card.trend && !card.warning && (
+                  <span className="text-[11px] text-gray-400">{card.sub}</span>
+                )}
+              </div>
             </div>
           )
         })}
       </div>
 
-      {/* â”€â”€ Chart + Top Products â”€â”€ */}
-      <div className="grid grid-cols-3 gap-4">
-
-        {/* Sales Performance chart */}
-        <div className="col-span-2 bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-          <div className="flex items-start justify-between mb-4">
+      {/* Chart + Top Products */}
+      <div className="grid grid-cols-5 gap-4 items-stretch">
+        <div className="col-span-3 bg-white rounded-2xl border border-gray-100 p-6 shadow-sm flex flex-col">
+          <div className="flex items-start justify-between mb-4 flex-shrink-0">
             <div>
               <h2 className="text-[15px] font-bold text-gray-900">Sales Performance</h2>
               <p className="text-[12px] text-gray-400 mt-0.5">Daily revenue trend</p>
@@ -238,143 +258,160 @@ export default function StoreManagerDashboard() {
                 <button
                   key={f}
                   onClick={() => setActiveFilter(f)}
-                  className={`text-[12px] px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                  className={`text-[12px] px-3 py-1.5 rounded-lg font-semibold transition-all ${
                     activeFilter === f
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                   }`}
                 >
                   {f}
                 </button>
               ))}
-              <button className="text-[12px] px-3 py-1.5 rounded-lg font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+              <button className="inline-flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-lg font-semibold bg-gray-100 text-gray-500 hover:bg-gray-200 transition-all">
+                <Download size={12} />
                 Export
               </button>
             </div>
           </div>
-          <SalesChart />
+          <div className="flex-1 min-h-0 flex items-center">
+            <SalesChart />
+          </div>
         </div>
 
-        {/* Top Selling Products */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-          <h2 className="text-[15px] font-bold text-gray-900 mb-4">Top Selling Products</h2>
-          <table className="w-full">
-            <thead>
-              <tr>
-                <th className="text-left text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide pb-2.5">
-                  Product Name
-                </th>
-                <th className="text-right text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide pb-2.5">
-                  Units Sold
-                </th>
-                <th className="text-right text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide pb-2.5">
-                  Revenue
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {TOP_PRODUCTS.map((p, i) => (
-                <tr key={i} className="border-t border-gray-100">
-                  <td className="py-2.5 text-[13px] text-gray-800 pr-2">{p.name}</td>
-                  <td className="py-2.5 text-[13px] text-gray-600 text-right">{p.units}</td>
-                  <td className="py-2.5 text-[13px] font-semibold text-gray-900 text-right">{p.revenue}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="col-span-2 bg-white rounded-2xl border border-gray-100 p-6 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-5 flex-shrink-0">
+            <div>
+              <h2 className="text-[15px] font-bold text-gray-900">Top Selling Products</h2>
+              <p className="text-[12px] text-gray-400 mt-0.5">This week</p>
+            </div>
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:underline cursor-pointer">
+              View all <ArrowUpRight size={12} />
+            </span>
+          </div>
+          <div className="flex-1 flex flex-col justify-between gap-3">
+            {TOP_PRODUCTS.map((p, i) => (
+              <div key={i}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-[11px] font-bold text-gray-400 w-4 flex-shrink-0">#{i + 1}</span>
+                    <span className="text-[13px] font-medium text-gray-800 truncate">{p.name}</span>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0 ml-2">
+                    <span className="text-[12px] text-gray-400">{p.units} sold</span>
+                    <span className="text-[13px] font-bold text-gray-900">{p.revenue}</span>
+                  </div>
+                </div>
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full"
+                    style={{ width: `${p.pct}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* â”€â”€ Low Stock Alert + Pending Incidents â”€â”€ */}
-      <div className="grid grid-cols-2 gap-4">
+      {/* Low Stock Alert + Pending Incidents */}
+      <div className="grid grid-cols-2 gap-4 items-stretch">
 
-        {/* Low Stock Alert */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-[15px] font-bold text-gray-900">Low Stock Alert</h2>
-            <span className="text-[10.5px] font-bold text-orange-600 bg-orange-50 border border-orange-100 px-2.5 py-1 rounded-lg uppercase tracking-wide">
+        <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-5 flex-shrink-0">
+            <div>
+              <h2 className="text-[15px] font-bold text-gray-900">Low Stock Alert</h2>
+              <p className="text-[12px] text-gray-400 mt-0.5">Items needing restock</p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-orange-600 bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-lg uppercase tracking-wide">
+              <AlertTriangle size={11} />
               Action Required
             </span>
           </div>
-          <table className="w-full">
-            <thead>
-              <tr>
-                <th className="text-left text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide pb-2.5">
-                  Product
-                </th>
-                <th className="text-center text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide pb-2.5">
-                  Shelf / Back
-                </th>
-                <th className="text-center text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide pb-2.5">
-                  Status
-                </th>
-                <th className="text-center text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide pb-2.5">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {LOW_STOCK.map((item, i) => (
-                <tr key={i} className="border-t border-gray-100">
-                  <td className="py-3 text-[13px] text-gray-800">{item.product}</td>
-                  <td className="py-3 text-[13px] text-gray-600 text-center">{item.shelf} / {item.back}</td>
-                  <td className="py-3 text-center">
-                    <span
-                      className={`inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
-                        item.status === 'Out'
-                          ? 'bg-red-100 text-red-600'
-                          : 'bg-yellow-100 text-yellow-700'
-                      }`}
-                    >
-                      {item.status}
-                    </span>
-                  </td>
-                  <td className="py-3 text-center">
-                    <button className="text-[12px] font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors">
-                      Request Stock
-                    </button>
-                  </td>
+          <div className="flex-1">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide pb-3">Product</th>
+                  <th className="text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wide pb-3">Shelf / Back</th>
+                  <th className="text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wide pb-3">Status</th>
+                  <th className="text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wide pb-3">Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {LOW_STOCK.map((item, i) => (
+                  <tr key={i} className="hover:bg-gray-50 transition-colors">
+                    <td className="py-3.5 text-[13px] font-medium text-gray-800">{item.product}</td>
+                    <td className="py-3.5 text-[13px] text-gray-500 text-center font-mono">{item.shelf} / {item.back}</td>
+                    <td className="py-3.5 text-center">
+                      <span className={`inline-flex items-center justify-center text-[11px] font-bold px-2.5 py-0.5 rounded-full min-w-[40px] ${
+                        item.status === 'Out'
+                          ? 'bg-red-50 text-red-600 border border-red-100'
+                          : 'bg-amber-50 text-amber-700 border border-amber-100'
+                      }`}>
+                        {item.status}
+                      </span>
+                    </td>
+                    <td className="py-3.5 text-right">
+                      <button className="text-[12px] font-semibold text-blue-600 hover:text-blue-800 transition-colors">
+                        Request Stock
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        {/* Pending Incident Reports */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-          <h2 className="text-[15px] font-bold text-gray-900 mb-4">Pending Incident Reports</h2>
-          <table className="w-full">
-            <thead>
-              <tr>
-                <th className="text-left text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide pb-2.5">
-                  Reported By
-                </th>
-                <th className="text-left text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide pb-2.5">
-                  Type
-                </th>
-                <th className="text-left text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide pb-2.5">
-                  Date
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {INCIDENTS.map((inc, i) => (
-                <tr key={i} className="border-t border-gray-100">
-                  <td className="py-3 text-[13px] text-gray-800">{inc.reporter}</td>
-                  <td className="py-3 text-[13px] text-gray-600">{inc.type}</td>
-                  <td className="py-3 text-[13px] text-gray-600">{inc.date}</td>
+        <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-5 flex-shrink-0">
+            <div>
+              <h2 className="text-[15px] font-bold text-gray-900">Pending Incident Reports</h2>
+              <p className="text-[12px] text-gray-400 mt-0.5">Awaiting resolution</p>
+            </div>
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:underline cursor-pointer">
+              View all <ArrowUpRight size={12} />
+            </span>
+          </div>
+          <div className="flex-1">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide pb-3">Reported By</th>
+                  <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide pb-3">Type</th>
+                  <th className="text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wide pb-3">Severity</th>
+                  <th className="text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wide pb-3">Date</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {INCIDENTS.map((inc, i) => (
+                  <tr key={i} className="hover:bg-gray-50 transition-colors">
+                    <td className="py-4 text-[13px] font-medium text-gray-800">{inc.reporter}</td>
+                    <td className="py-4 text-[13px] text-gray-600">{inc.type}</td>
+                    <td className="py-4 text-center">
+                      <span className={`inline-flex items-center justify-center text-[11px] font-bold px-2.5 py-0.5 rounded-full min-w-[48px] ${
+                        inc.severity === 'High'
+                          ? 'bg-red-50 text-red-600 border border-red-100'
+                          : inc.severity === 'Medium'
+                          ? 'bg-amber-50 text-amber-700 border border-amber-100'
+                          : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                      }`}>
+                        {inc.severity}
+                      </span>
+                    </td>
+                    <td className="py-4 text-[13px] text-gray-400 text-right">{inc.date}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
       {/* Footer */}
-      <p className="text-center text-[11px] text-gray-400 pb-2">
-        Â© 2023 RetailCore Systems Inc. All rights reserved. Main Street Supermarket Admin Portal.
+      <p className="text-center text-[11px] text-gray-300 pb-2">
+        © 2025 RetailCore Systems Inc. All rights reserved. Main Street Supermarket Admin Portal.
       </p>
     </div>
   )
 }
-

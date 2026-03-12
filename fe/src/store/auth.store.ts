@@ -2,6 +2,9 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { User, AuthState, Permission, UserRole } from '@/shared/types'
 
+// Flag: login() was called before hydration completes → skip stale setUser() in onRehydrateStorage
+let _freshLoginBeforeHydration = false
+
 interface AuthStore extends AuthState {
   setUser: (user: User | null) => void
   setToken: (token: string | null) => void
@@ -44,6 +47,11 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       login: (user, token) => {
+        // If hydration hasn't finished yet, record that a fresh login is happening.
+        // onRehydrateStorage must NOT overwrite this new user with stale localStorage data.
+        if (!get().hydrated) {
+          _freshLoginBeforeHydration = true
+        }
         set({
           user,
           token,
@@ -53,6 +61,10 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       logout: () => {
+        // Xóa cả localStorage để tránh stale role sau khi logout
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('auth-storage')
+        }
         set({
           user: null,
           token: null,
@@ -86,13 +98,25 @@ export const useAuthStore = create<AuthStore>()(
         token: state.token,
         isAuthenticated: state.isAuthenticated,
       }),
-      onRehydrateStorage: () => (state, error) => {
+      onRehydrateStorage: (fullState) => (persistedState, error) => {
         if (error) {
           console.error('Failed to rehydrate auth storage:', error)
         }
+        // NOTE: `persistedState` is the partial persisted state (user, token, isAuthenticated only).
+        // `fullState` (outer param) is the full store with all actions — use it to call actions.
+
+        // If login() was called before hydration (e.g. autofill + instant submit),
+        // the store already has the fresh user — do NOT overwrite with stale localStorage data.
+        if (_freshLoginBeforeHydration) {
+          _freshLoginBeforeHydration = false
+          fullState?.setHydrated()
+          return
+        }
+        _freshLoginBeforeHydration = false
+
         // Normalize/migrate legacy user shape so workplace-based pages work reliably
-        const u: any = state?.user
-        if (u) {
+        const u: any = (persistedState as any)?.user
+        if (u && fullState) {
           const normalizedWorkplaceType =
             u.workplaceType ??
             u.workplace_type ??
@@ -108,14 +132,15 @@ export const useAuthStore = create<AuthStore>()(
             null
 
           if (u.workplaceType !== normalizedWorkplaceType || u.workplaceId !== normalizedWorkplaceId) {
-            state?.setUser({
+            fullState.setUser({
               ...u,
               workplaceType: normalizedWorkplaceType,
               workplaceId: normalizedWorkplaceId,
             })
           }
         }
-        state?.setHydrated()
+        // fullState has the actual store actions — state?.setHydrated() on persistedState was a no-op
+        fullState?.setHydrated()
       },
     }
   )

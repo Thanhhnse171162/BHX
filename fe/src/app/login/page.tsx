@@ -12,9 +12,15 @@ import { authService } from '@/services/auth.service'
 import { getRoleFromId } from '@/shared/utils/role'
 import type { User } from '@/shared/types'
 
+// Xóa session ngay khi module load (trước cả khi React render)
+// Tránh zustand rehydrate stale role rồi page.tsx redirect sai trước khi login xong
+if (typeof window !== 'undefined') {
+  localStorage.removeItem('auth-storage')
+}
+
 export default function LoginPage() {
   const router = useRouter()
-  const { login } = useAuth()
+  const { login, logout } = useAuth()
 
   const [emailOrPhone, setEmailOrPhone] = useState('')
   const [password, setPassword] = useState('')
@@ -22,6 +28,12 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [hasError, setHasError] = useState(false)
+
+  // Khi mở trang login → xóa session cũ để tránh redirect sai từ stale role
+  useEffect(() => {
+    logout()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Prefetch routes để giảm độ trễ khi chuyển trang
   useEffect(() => {
@@ -72,12 +84,28 @@ export default function LoginPage() {
         throw new Error('Không nhận được token từ server')
       }
 
-      const roleId = responseData.roleId || 4
+      // Handle camelCase / snake_case / PascalCase from different backend versions
+      const rawRoleId =
+        responseData.roleId ??
+        (responseData as any).role_id ??
+        (responseData as any).RoleId ??
+        data.roleId ??
+        (data as any).role_id ??
+        4
+      const roleId = typeof rawRoleId === 'string' ? parseInt(rawRoleId, 10) || 4 : rawRoleId || 4
       const userEmail = responseData.email || emailOrPhone.trim()
+
       // Use getRoleFromId directly — trust the backend roleId.
-      // resolveRole() was silently downgrading internal users to CUSTOMER
-      // when their email domain didn't match '@company.com'.
       const userRole = getRoleFromId(roleId)
+
+      // Debug log — check browser console if redirect is wrong
+      console.log('🔑 Login response debug:', {
+        rawResponse: data,
+        responseData,
+        rawRoleId,
+        roleId,
+        userRole,
+      })
 
       // Tạo user object và login song song
       const user: User = {
@@ -110,7 +138,7 @@ export default function LoginPage() {
         updatedAt: responseData.updatedAt || new Date().toISOString(),
       }
 
-      // Update auth state
+      // Update auth state (login() atomically overwrites any stale session)
       login(user, token)
 
       // Redirect based on userRole string (more robust than numeric roleId comparison).

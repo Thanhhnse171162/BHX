@@ -5,6 +5,7 @@ import { WarehouseSidebar } from '@/shared/ui/WarehouseSidebar'
 import { WarehouseHeader } from '@/shared/ui/WarehouseHeader'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
+import { getRedirectPath } from '@/shared/utils/role'
 
 export default function WarehouseLayout({
   children,
@@ -35,7 +36,10 @@ export default function WarehouseLayout({
       // Kiểm tra role_id phải là 7 (Warehouse Admin) hoặc role là WAREHOUSE_ADMIN
       const isWarehouseAdmin = user?.roleId === 7 || user?.role === 'WAREHOUSE_ADMIN'
       if (user && !isWarehouseAdmin) {
-        router.push('/')
+        // Redirect thẳng đến đúng portal của role thay vì về '/'
+        const correctPath = getRedirectPath(user.role)
+        console.warn(`⚠️ warehouse/layout: user role=${user.role} roleId=${user.roleId} không phải WAREHOUSE_ADMIN → redirect sang ${correctPath}`)
+        router.replace(correctPath)
         return
       }
     }
