@@ -13,7 +13,6 @@ import {
   ClipboardList,
   AlertTriangle,
   Users,
-  Settings,
   LogOut,
   Bell,
   ShoppingBag,
@@ -38,7 +37,6 @@ const PRIMARY_NAV = [
 const MANAGEMENT_NAV = [
   { href: '/store-manager/orders',     label: 'Quản lý đơn hàng',   icon: ShoppingBag, exact: false },
   { href: '/store-manager/customers',  label: 'Quản lý khách hàng', icon: Users,       exact: false },
-  { href: '/store-manager/settings',   label: 'Cài đặt',            icon: Settings,    exact: false },
 ]
 
 function getPageTitle(pathname: string): string {

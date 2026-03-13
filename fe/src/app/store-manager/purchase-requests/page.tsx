@@ -13,10 +13,11 @@ import {
   Plus,
   Eye,
   X,
+  PackageCheck,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type RequestStatus = 'Đã duyệt' | 'Chờ duyệt' | 'Từ chối'
+type RequestStatus = 'Đã duyệt' | 'Chờ duyệt' | 'Từ chối' | 'Đã hoàn thành'
 
 interface PurchaseRequest {
   id: string
@@ -48,12 +49,13 @@ const ALL_REQUESTS: PurchaseRequest[] = [
   { id: 'YC-0010', product: 'Kem đánh răng Colgate 230g',      sku: 'CLG-KDR-230',  category: 'Vệ sinh',     quantity: 4,  unit: 'Thùng', reason: 'Bổ sung',    requestedBy: 'Quang Huy', date: '07/03/2026', status: 'Chờ duyệt' },
 ]
 
-const STATUS_OPTS: RequestStatus[] = ['Đã duyệt', 'Chờ duyệt', 'Từ chối']
+const STATUS_OPTS: RequestStatus[] = ['Đã duyệt', 'Chờ duyệt', 'Từ chối', 'Đã hoàn thành']
 
 const statusConfig: Record<RequestStatus, { icon: React.ReactNode; cls: string }> = {
-  'Đã duyệt':  { icon: <CheckCircle size={12} />, cls: 'bg-green-50 text-green-700' },
-  'Chờ duyệt': { icon: <Clock size={12} />,       cls: 'bg-blue-50 text-blue-700' },
-  'Từ chối':   { icon: <XCircle size={12} />,     cls: 'bg-red-50 text-red-600' },
+  'Đã duyệt':       { icon: <CheckCircle size={12} />,  cls: 'bg-green-50 text-green-700' },
+  'Chờ duyệt':      { icon: <Clock size={12} />,        cls: 'bg-blue-50 text-blue-700' },
+  'Từ chối':        { icon: <XCircle size={12} />,      cls: 'bg-red-50 text-red-600' },
+  'Đã hoàn thành':  { icon: <PackageCheck size={12} />, cls: 'bg-purple-50 text-purple-700' },
 }
 
 const PAGE_SIZE = 10
@@ -113,6 +115,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function PurchaseRequestsPage() {
+  const [requests, setRequests]       = useState<PurchaseRequest[]>(ALL_REQUESTS)
   const [search, setSearch]           = useState('')
   const [statusFilter, setStatus]     = useState<string>('Tất cả')
   const [page, setPage]               = useState(1)
@@ -120,8 +123,14 @@ export default function PurchaseRequestsPage() {
 
   const todayStr = new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
+  function handleConfirmDelivery(id: string) {
+    setRequests((prev) =>
+      prev.map((r) => r.id === id ? { ...r, status: 'Đã hoàn thành' as RequestStatus } : r)
+    )
+  }
+
   const filtered = useMemo(() => {
-    let list = ALL_REQUESTS
+    let list = requests
     if (statusFilter !== 'Tất cả') list = list.filter((r) => r.status === statusFilter)
     if (search.trim()) {
       const q = search.toLowerCase()
@@ -136,11 +145,12 @@ export default function PurchaseRequestsPage() {
   const paged      = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const stats = useMemo(() => ({
-    total:    ALL_REQUESTS.length,
-    approved: ALL_REQUESTS.filter((r) => r.status === 'Đã duyệt').length,
-    pending:  ALL_REQUESTS.filter((r) => r.status === 'Chờ duyệt').length,
-    rejected: ALL_REQUESTS.filter((r) => r.status === 'Từ chối').length,
-  }), [])
+    total:     requests.length,
+    approved:  requests.filter((r) => r.status === 'Đã duyệt').length,
+    pending:   requests.filter((r) => r.status === 'Chờ duyệt').length,
+    rejected:  requests.filter((r) => r.status === 'Từ chối').length,
+    completed: requests.filter((r) => r.status === 'Đã hoàn thành').length,
+  }), [requests])
 
   return (
     <div className="p-6 space-y-5">
@@ -160,12 +170,13 @@ export default function PurchaseRequestsPage() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
-          { label: 'Tổng yêu cầu', value: stats.total,    cls: 'text-gray-800' },
-          { label: 'Đã duyệt',     value: stats.approved, cls: 'text-green-700' },
-          { label: 'Chờ duyệt',    value: stats.pending,  cls: 'text-blue-600' },
-          { label: 'Từ chối',      value: stats.rejected, cls: 'text-red-500' },
+          { label: 'Tổng yêu cầu',   value: stats.total,     cls: 'text-gray-800' },
+          { label: 'Đã duyệt',       value: stats.approved,  cls: 'text-green-700' },
+          { label: 'Chờ duyệt',      value: stats.pending,   cls: 'text-blue-600' },
+          { label: 'Từ chối',        value: stats.rejected,  cls: 'text-red-500' },
+          { label: 'Đã hoàn thành',  value: stats.completed, cls: 'text-purple-600' },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
             <p className="text-[11px] text-gray-500 uppercase tracking-wide">{s.label}</p>
@@ -255,13 +266,24 @@ export default function PurchaseRequestsPage() {
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        <button
-                          onClick={() => setSelected(req)}
-                          className="p-1.5 rounded-lg hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 transition-colors"
-                          title="Xem chi tiết"
-                        >
-                          <Eye size={15} />
-                        </button>
+                        {req.status === 'Đã duyệt' ? (
+                          <button
+                            onClick={() => handleConfirmDelivery(req.id)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[12px] font-medium transition-colors whitespace-nowrap"
+                            title="Xác nhận đã giao hàng"
+                          >
+                            <PackageCheck size={13} />
+                            Xác nhận đã giao
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setSelected(req)}
+                            className="p-1.5 rounded-lg hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 transition-colors"
+                            title="Xem chi tiết"
+                          >
+                            <Eye size={15} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   )
