@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const CATALOG_SERVICE_URL = process.env.NEXT_PUBLIC_CATALOG_URL || 'http://localhost:5001'
 
+async function parseResponseBody(response: Response) {
+  const raw = await response.text()
+  if (!raw || !raw.trim()) {
+    return null
+  }
+
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return raw
+  }
+}
+
 /**
  * GET /api/categories - Lấy tất cả categories từ backend
  */
@@ -82,14 +95,26 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(body),
     })
 
-    const data = await response.json()
+    const data = await parseResponseBody(response)
     
     if (!response.ok) {
-      return NextResponse.json(data, { status: response.status })
+      return NextResponse.json(
+        data ?? { success: false, error: `Backend returned ${response.status}` },
+        { status: response.status }
+      )
     }
 
-    console.log('✅ Category created:', data.id)
-    return NextResponse.json(data, { status: response.status })
+    if (typeof data === 'string') {
+      return NextResponse.json(
+        {
+          success: true,
+          message: data,
+        },
+        { status: response.status }
+      )
+    }
+
+    return NextResponse.json(data ?? { success: true }, { status: response.status })
   } catch (error: any) {
     console.error('❌ Create Category Error:', error.message)
     return NextResponse.json(

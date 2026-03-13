@@ -23,19 +23,38 @@ localApiClient.interceptors.request.use((config) => {
   return config
 })
 
-// Types cho Category từ backend - Đúng với database schema
+// Types cho Category từ backend.
+// BE hiện tại có thể trả camelCase (createdAt) hoặc snake_case (created_at),
+// và một số endpoint có thể không trả id.
 export interface CategoryFromAPI {
-  id: string
+  id?: string
+  Id?: string
+  categoryId?: string
+  CategoryId?: string
+  categoryID?: string
+  CategoryID?: string
+  category_id?: string
+  Category_Id?: string
+  _id?: string
   name: string
   status: string  // ACTIVE hoặc INACTIVE
-  is_deleted: number  // 0 hoặc 1
-  created_at: string
-  updated_at: string | null
+  is_deleted?: number  // 0 hoặc 1
+  created_at?: string
+  updated_at?: string | null
+  createdAt?: string
+  updatedAt?: string | null
 }
 
 export interface CreateCategoryDTO {
   name: string
   status?: string  // 'ACTIVE' hoặc 'INACTIVE'
+  isDeleted?: boolean
+}
+
+export interface CreateCategoryResponse {
+  success?: boolean
+  message?: string
+  data?: CategoryFromAPI
 }
 
 /**
@@ -50,7 +69,15 @@ export class CategoryAPIService {
   static async getAllCategories(): Promise<CategoryFromAPI[]> {
     try {
       const response = await localApiClient.get<CategoryFromAPI[]>(this.baseURL)
-      return response.data
+      const payload = response.data as unknown
+      if (Array.isArray(payload)) {
+        return payload as CategoryFromAPI[]
+      }
+      if (payload && typeof payload === 'object' && 'data' in (payload as any)) {
+        const nested = (payload as any).data
+        return Array.isArray(nested) ? (nested as CategoryFromAPI[]) : []
+      }
+      return []
     } catch (error) {
       console.error('Error fetching categories:', error)
       throw error
@@ -73,9 +100,9 @@ export class CategoryAPIService {
   /**
    * Tạo category mới
    */
-  static async createCategory(data: CreateCategoryDTO): Promise<CategoryFromAPI> {
+  static async createCategory(data: CreateCategoryDTO): Promise<CreateCategoryResponse | CategoryFromAPI> {
     try {
-      const response = await localApiClient.post<CategoryFromAPI>(this.baseURL, data)
+      const response = await localApiClient.post<CreateCategoryResponse | CategoryFromAPI>(this.baseURL, data)
       return response.data
     } catch (error) {
       console.error('Error creating category:', error)
@@ -89,7 +116,11 @@ export class CategoryAPIService {
   static async updateCategory(id: string, data: Partial<CreateCategoryDTO>): Promise<CategoryFromAPI> {
     try {
       const response = await localApiClient.put<CategoryFromAPI>(`${this.baseURL}/${id}`, data)
-      return response.data
+      const payload = response.data as unknown
+      if (payload && typeof payload === 'object' && 'data' in (payload as any)) {
+        return (payload as any).data as CategoryFromAPI
+      }
+      return payload as CategoryFromAPI
     } catch (error) {
       console.error(`Error updating category ${id}:`, error)
       throw error

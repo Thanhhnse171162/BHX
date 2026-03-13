@@ -8,9 +8,6 @@ import { useAuthStore } from '@/store/auth.store'
 const localApiClient: AxiosInstance = axios.create({
   baseURL: '/api', // Gọi Next.js API routes
   timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 })
 
 // Request interceptor to attach token
@@ -78,9 +75,13 @@ export interface CreateProductDTO {
   slug?: string
   metaTitle?: string
   metaDescription?: string
+  metaKeywords?: string
+  // Backward-compatible aliases for legacy typo fields
   maxKeywords?: string
-  maxImage?: string  // Base64 string hoặc URL
-  additionalImages?: string[]  // Array of image URLs/Base64
+  mainImage?: File | Blob | string
+  // Backward-compatible alias for legacy typo fields
+  maxImage?: File | Blob | string
+  additionalImages?: Array<File | Blob | string>
 }
 
 export interface UpdateProductDTO extends Partial<CreateProductDTO> {
@@ -126,8 +127,97 @@ export class ProductAPIService {
    */
   static async createProduct(data: CreateProductDTO): Promise<ProductFromAPI> {
     try {
-      const response = await localApiClient.post<ProductFromAPI>(this.baseURL, data)
-      return response.data
+      const formData = new FormData()
+
+      const appendIfDefined = (key: string, value: unknown) => {
+        if (value === undefined || value === null || value === '') return
+        formData.append(key, String(value))
+      }
+
+      appendIfDefined('Sku', data.sku)
+      appendIfDefined('Name', data.name)
+      appendIfDefined('CategoryId', data.categoryId)
+      appendIfDefined('Price', data.price)
+      appendIfDefined('Unit', data.unit)
+      appendIfDefined('Barcode', data.barcode)
+      appendIfDefined('Description', data.description)
+      appendIfDefined('Brand', data.brand)
+      appendIfDefined('Origin', data.origin)
+      appendIfDefined('OriginalPrice', data.originalPrice)
+      appendIfDefined('CostPrice', data.costPrice)
+      appendIfDefined('Weight', data.weight)
+      appendIfDefined('Volume', data.volume)
+      appendIfDefined('QuantityPerUnit', data.quantityPerUnit)
+      appendIfDefined('MinOrderQuantity', data.minOrderQuantity)
+      appendIfDefined('MaxOrderQuantity', data.maxOrderQuantity)
+      appendIfDefined('ExpirationDate', data.expirationDate)
+      appendIfDefined('ShelfLifeDays', data.shelfLifeDays)
+      appendIfDefined('StorageInstructions', data.storageInstructions)
+      appendIfDefined('IsPerishable', data.isPerishable)
+      appendIfDefined('IsAvailable', data.isAvailable)
+      appendIfDefined('IsFeatured', data.isFeatured)
+      appendIfDefined('IsNew', data.isNew)
+      appendIfDefined('IsOnSale', data.isOnSale)
+      appendIfDefined('Slug', data.slug)
+      appendIfDefined('MetaTitle', data.metaTitle)
+      appendIfDefined('MetaDescription', data.metaDescription)
+      appendIfDefined('MetaKeywords', data.metaKeywords ?? data.maxKeywords)
+
+      const mainImage = data.mainImage ?? data.maxImage
+      if (mainImage !== undefined && mainImage !== null && mainImage !== '') {
+        if (mainImage instanceof File) {
+          formData.append('MainImage', mainImage)
+        } else if (mainImage instanceof Blob) {
+          formData.append('MainImage', mainImage, 'main-image')
+        } else {
+          appendIfDefined('MainImage', mainImage)
+        }
+      }
+
+      if (Array.isArray(data.additionalImages)) {
+        data.additionalImages.forEach((image) => {
+          if (image instanceof File) {
+            formData.append('AdditionalImages', image)
+          } else if (image instanceof Blob) {
+            formData.append('AdditionalImages', image, 'additional-image')
+          } else if (image) {
+            formData.append('AdditionalImages', image)
+          }
+        })
+      }
+
+      const headers: HeadersInit = {}
+      if (typeof window !== 'undefined') {
+        const token = useAuthStore.getState().token
+        if (token) {
+          headers.Authorization = `Bearer ${token}`
+        }
+      }
+
+      const response = await fetch(`/api${this.baseURL}`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      })
+
+      const responseContentType = response.headers.get('content-type') || ''
+      const result = responseContentType.includes('application/json')
+        ? await response.json().catch(() => null)
+        : await response.text().catch(() => null)
+
+      if (!response.ok) {
+        const errorMessage =
+          (result && typeof result === 'object' && ('error' in result || 'message' in result)
+            ? ((result as any).error || (result as any).message)
+            : null) || `Create product failed with status ${response.status}`
+        throw new Error(errorMessage)
+      }
+
+      if (result && typeof result === 'object' && 'data' in result) {
+        return (result as any).data as ProductFromAPI
+      }
+
+      return result as ProductFromAPI
     } catch (error) {
       console.error('Error creating product:', error)
       throw error

@@ -11,7 +11,7 @@ import {
   Truck,
   ArrowLeftRight,
   BarChart3,
-  ChevronDown,
+  ClipboardList,
   Bell,
   Settings,
   LogOut,
@@ -83,6 +83,7 @@ export default function WarehouseManagerLayout({
 
   const navigation = [
     { name: 'Bảng điều khiển', href: '/warehouse-manager', icon: LayoutDashboard },
+    { name: 'Quản lý yêu cầu', href: '/warehouse-manager/requests', icon: ClipboardList },
     { name: 'Tồn kho', href: '/warehouse-manager/inventory', icon: Package },
     { name: 'Lô hàng', href: '/warehouse-manager/shipments', icon: Truck },
     { name: 'Chuyển kho', href: '/warehouse-manager/transfers', icon: ArrowLeftRight },
@@ -108,14 +109,13 @@ export default function WarehouseManagerLayout({
           <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-2">
             Vị trí hiện tại
           </label>
-          <button className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-[#2d6e3e] text-white rounded-lg hover:bg-[#1e4d2b] transition-colors">
+          <button className="w-full flex items-center justify-start gap-2 px-3 py-2 bg-[#2d6e3e] text-white rounded-lg hover:bg-[#1e4d2b] transition-colors">
             <div className="flex items-center gap-2">
               <MapPin className="w-4 h-4" />
               <span className="text-sm font-medium text-left">
                 {selectedLocation}
               </span>
             </div>
-            <ChevronDown className="w-4 h-4" />
           </button>
         </div>
 

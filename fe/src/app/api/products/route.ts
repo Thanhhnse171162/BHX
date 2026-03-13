@@ -2,6 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const CATALOG_SERVICE_URL = process.env.NEXT_PUBLIC_CATALOG_URL || 'http://localhost:5001'
 
+async function parseResponseBody(response: Response) {
+  const raw = await response.text()
+
+  // Some backend endpoints can return an empty body (e.g. 201/204)
+  // or a non-JSON payload even when request succeeded.
+  if (!raw || !raw.trim()) {
+    return null
+  }
+
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return raw
+  }
+}
+
 /**
  * GET /api/products - Lấy tất cả products
  * Proxy request đến Product Service để tránh CORS
@@ -36,9 +52,13 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const result = await response.json()
+    const result = await parseResponseBody(response)
     // Backend trả về { success, message, data: [...] }
-    const products = result.data || []
+    const products = result && typeof result === 'object' && 'data' in result
+      ? (result as any).data || []
+      : Array.isArray(result)
+        ? result
+        : []
     console.log('✅ Products fetched:', products.length, 'items')
     
     return NextResponse.json(products, { status: 200 })
@@ -60,34 +80,59 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
     console.log('🔍 Forwarding POST /api/products to:', CATALOG_SERVICE_URL)
 
     // Lấy token từ request headers
     const authHeader = request.headers.get('authorization')
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    }
+    const incomingContentType = request.headers.get('content-type')
+    const incomingContentLength = request.headers.get('content-length')
+    const headers: HeadersInit = {}
     if (authHeader) {
       headers['Authorization'] = authHeader
     }
 
+    console.log('📦 Incoming create product content-type:', incomingContentType)
+    console.log('📏 Incoming create product content-length:', incomingContentLength)
+
+    if (incomingContentType) {
+      headers['Content-Type'] = incomingContentType
+    }
+
+    // Forward raw body to preserve multipart boundary and exact payload format.
+    const rawBody = await request.arrayBuffer()
+    const backendBody: BodyInit | undefined = rawBody.byteLength > 0 ? rawBody : undefined
+
     const response = await fetch(`${CATALOG_SERVICE_URL}/api/Product/Add-Product`, {
       method: 'POST',
       headers,
-      body: JSON.stringify(body),
+      body: backendBody,
     })
 
-    const result = await response.json()
+    const result = await parseResponseBody(response)
     
     if (!response.ok) {
-      return NextResponse.json(result, { status: response.status })
+      console.error('❌ Backend create product failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        contentType: response.headers.get('content-type'),
+        body: result,
+      })
+      return NextResponse.json(
+        result ?? { success: false, error: `Backend returned ${response.status}` },
+        { status: response.status }
+      )
     }
 
     // Backend returns { success, message, data: {...} }
-    const product = result.data || result
-    console.log('✅ Product created:', product.id)
-    return NextResponse.json(product, { status: response.status })
+    const product = result && typeof result === 'object' && 'data' in result
+      ? (result as any).data
+      : result
+
+    console.log('✅ Product created:', product && typeof product === 'object' ? (product as any).id : 'unknown-id')
+    return NextResponse.json(
+      product ?? { success: true, message: 'Product created successfully' },
+      { status: response.status }
+    )
   } catch (error: any) {
     console.error('❌ Create Product Error:', error.message)
     return NextResponse.json(

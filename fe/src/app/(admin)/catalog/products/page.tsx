@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
 import { InventoryAPIService, InventoryItem } from '@/services/inventory-api.service'
+import { useAuthStore } from '@/store/auth.store'
 import { Button } from '@/shared/ui/Button'
 import { Input } from '@/shared/ui/Input'
 import DataTable from '@/shared/ui/DataTable'
@@ -54,6 +55,7 @@ export default function ProductsPage() {
   const [costPrice, setCostPrice] = useState<number>(0)
   const [weight, setWeight] = useState<number>(0)
   const [mainImage, setMainImage] = useState<File | null>(null)
+  const [additionalImages, setAdditionalImages] = useState<File[]>([])
   const [slug, setSlug] = useState('')
   const [metaTitle, setMetaTitle] = useState('')
   const [metaDescription, setMetaDescription] = useState('')
@@ -153,6 +155,7 @@ export default function ProductsPage() {
     setCostPrice(0)
     setWeight(0)
     setMainImage(null)
+    setAdditionalImages([])
     setSlug('')
     setMetaTitle('')
     setMetaDescription('')
@@ -194,45 +197,54 @@ export default function ProductsPage() {
 
     try {
       if (mode === 'create') {
-        // Convert image to base64 if provided
-        let mainImageBase64: string | undefined = undefined
-        if (mainImage) {
-          try {
-            mainImageBase64 = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader()
-              reader.onloadend = () => resolve(reader.result as string)
-              reader.onerror = reject
-              reader.readAsDataURL(mainImage)
-            })
-          } catch (err) {
-            console.error('Error reading image:', err)
-            alert('Không thể đọc file ảnh. Vui lòng thử lại.')
-            return
-          }
+        // Swagger requires MainImage (multipart/form-data)
+        if (!mainImage) {
+          alert('Vui lòng chọn ảnh chính (Main Image).')
+          return
         }
 
-        await ProductAPIService.createProduct({
-          sku,
-          name,
-          categoryId: category || '00000000-0000-0000-0000-000000000001',
-          price,
-          unit,
-          barcode: barcode || undefined,
-          description: description || undefined,
-          brand: brand || undefined,
-          origin: origin || undefined,
-          originalPrice: originalPrice || undefined,
-          costPrice: costPrice || undefined,
-          weight: weight || undefined,
-          isAvailable: status === 'ACTIVE',
-          isFeatured: false,
-          isNew: true,
-          slug: slug || undefined,
-          metaTitle: metaTitle || undefined,
-          metaDescription: metaDescription || undefined,
-          maxKeywords: metaKeywords || undefined,
-          maxImage: mainImageBase64,
+        const formData = new FormData()
+        const appendIfDefined = (key: string, value: unknown) => {
+          if (value === undefined || value === null || value === '') return
+          formData.append(key, String(value))
+        }
+
+        appendIfDefined('Sku', sku)
+        appendIfDefined('Name', name)
+        appendIfDefined('CategoryId', category || '00000000-0000-0000-0000-000000000001')
+        appendIfDefined('Price', price)
+        appendIfDefined('Unit', unit)
+        appendIfDefined('Barcode', barcode)
+        appendIfDefined('Description', description)
+        appendIfDefined('Brand', brand)
+        appendIfDefined('Origin', origin)
+        appendIfDefined('OriginalPrice', originalPrice)
+        appendIfDefined('CostPrice', costPrice)
+        appendIfDefined('Weight', weight)
+        appendIfDefined('IsAvailable', status === 'ACTIVE')
+        appendIfDefined('IsFeatured', false)
+        appendIfDefined('IsNew', true)
+        appendIfDefined('Slug', slug)
+        appendIfDefined('MetaTitle', metaTitle)
+        appendIfDefined('MetaDescription', metaDescription)
+        appendIfDefined('MetaKeywords', metaKeywords)
+        formData.append('MainImage', mainImage)
+        additionalImages.forEach((file) => {
+          formData.append('AdditionalImages', file)
         })
+
+        const token = useAuthStore.getState().token
+        const response = await fetch('/api/products', {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          body: formData,
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => '')
+          throw new Error(errorText || `Create product failed (${response.status})`)
+        }
+
         alert('Tạo sản phẩm thành công!')
       } else if (mode === 'edit' && editingId) {
         await ProductAPIService.updateProduct(editingId, {
@@ -563,6 +575,27 @@ export default function ProductsPage() {
                 file:bg-primary-50 file:text-primary-700
                 hover:file:bg-primary-100"
             />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">
+              Additional Images
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => setAdditionalImages(Array.from(e.target.files || []))}
+              className="mt-1 block w-full text-sm text-gray-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-md file:border-0
+                file:text-sm file:font-semibold
+                file:bg-primary-50 file:text-primary-700
+                hover:file:bg-primary-100"
+            />
+            {additionalImages.length > 0 && (
+              <p className="text-xs text-gray-500">Da chon {additionalImages.length} anh phu</p>
+            )}
           </div>
           
           <Input
