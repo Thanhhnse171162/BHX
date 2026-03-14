@@ -1,255 +1,259 @@
 'use client'
 
-import { useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
-  Package, 
-  CheckCircle, 
-  AlertTriangle, 
-  XCircle, 
-  TruckIcon,
+  ArrowDownToLine,
   ArrowRightLeft,
-  TrendingUp,
-  Store
+  AlertTriangle, 
+  ClipboardList,
+  Plus,
+  SquareArrowOutUpRight,
+  Truck,
+  Warehouse,
+  Boxes,
+  PackageSearch,
+  Zap
 } from 'lucide-react'
-import { Button } from '@/shared/ui/Button'
 
 export default function StoreWarehouseDashboard() {
   const router = useRouter()
 
-  // Mock statistics for store warehouse
-  const stats = useMemo(() => {
-    return {
-      totalProducts: 450,
-      inStorage: 280,
-      onShelf: 170,
-      lowStock: 35,
-      outOfStock: 8,
-      pendingFromCentral: 12, // Hàng chờ nhận từ kho tổng
-      waitingForShelf: 25, // Hàng đang chờ xuất ra quầy
-    }
-  }, [])
+  const summaryCards = [
+    {
+      title: 'Yêu cầu châm hàng',
+      value: '24',
+      status: '+4 mới',
+      icon: <ArrowRightLeft className="h-5 w-5" />,
+      iconWrap: 'bg-blue-100 text-blue-600',
+      statusWrap: 'bg-blue-100 text-blue-600',
+    },
+    {
+      title: 'Hàng đang về',
+      value: '12',
+      status: 'Đang vận chuyển',
+      icon: <Truck className="h-5 w-5" />,
+      iconWrap: 'bg-emerald-100 text-emerald-600',
+      statusWrap: 'bg-emerald-100 text-emerald-600',
+    },
+    {
+      title: 'Chuyển kho',
+      value: '15',
+      status: '8 đang chờ',
+      icon: <ClipboardList className="h-5 w-5" />,
+      iconWrap: 'bg-amber-100 text-amber-600',
+      statusWrap: 'bg-amber-100 text-amber-700',
+    },
+    {
+      title: 'Cảnh báo tồn thấp',
+      value: '07',
+      status: 'Khẩn cấp',
+      icon: <AlertTriangle className="h-5 w-5" />,
+      iconWrap: 'bg-red-100 text-red-600',
+      statusWrap: 'bg-red-100 text-red-600',
+      cardClass: 'border-red-200',
+    },
+  ]
+
+  const inboundRows = [
+    { po: 'PO-8821', supplier: 'Global Logistics Ltd', eta: '10:30 AM', status: 'Đúng giờ', statusClass: 'bg-emerald-100 text-emerald-700' },
+    { po: 'PO-8824', supplier: 'Industrial Supplies Inc', eta: '02:15 PM', status: 'Trễ hẹn', statusClass: 'bg-amber-100 text-amber-700' },
+    { po: 'PO-8829', supplier: 'Eco Packaging Co', eta: '04:45 PM', status: 'Đang về', statusClass: 'bg-blue-100 text-blue-700' },
+  ]
+
+  const outboundRows = [
+    { requestId: 'REQ-0941', store: 'Downtown Outlet', quantity: '124 đơn vị', priority: 'KHẨN CẤP', priorityClass: 'bg-red-100 text-red-700' },
+    { requestId: 'REQ-0955', store: 'Northside Hub', quantity: '58 đơn vị', priority: 'THÔNG THƯỜNG', priorityClass: 'bg-slate-200 text-slate-600' },
+    { requestId: 'REQ-0958', store: 'West Plaza', quantity: '210 đơn vị', priority: 'CAO', priorityClass: 'bg-emerald-100 text-emerald-700' },
+  ]
+
+  const lowStockProducts = [
+    { name: 'Dây đồng 50m', sku: 'WR-0021', remain: 12, level: 'NGUY CẤP', levelClass: 'bg-red-100 text-red-600' },
+    { name: 'Giá đỡ thép L', sku: 'SB-8832', remain: 45, level: 'CẢNH BÁO', levelClass: 'bg-amber-100 text-amber-700' },
+    { name: 'Ống nhựa PVC 32mm', sku: 'PV-4491', remain: 5, level: 'NGUY CẤP', levelClass: 'bg-red-100 text-red-600' },
+    { name: 'Bulong M8 (Gói 100)', sku: 'BT-2201', remain: 82, level: 'CẢNH BÁO', levelClass: 'bg-amber-100 text-amber-700' },
+    { name: 'Hộp dụng cụ Classic', sku: 'TB-1100', remain: 2, level: 'NGUY CẤP', levelClass: 'bg-red-100 text-red-600' },
+  ]
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 rounded-2xl bg-slate-100 p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Store Warehouse Dashboard</h1>
-          <p className="text-gray-600 mt-1">Tổng quan kho cửa hàng</p>
+          <h1 className="text-[38px] leading-tight font-extrabold tracking-tight text-slate-800">Tổng quan kho</h1>
+          <p className="mt-1 text-[20px] text-slate-500">Quản lý lịch trình nhập và xuất kho hàng ngày của bạn.</p>
         </div>
-        <div className="flex items-center gap-2 text-gray-600">
-          <Store className="w-5 h-5" />
-          <span className="font-medium">Store #001</span>
-        </div>
-      </div>
-
-      {/* Main Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Total Products at Store */}
-        <div className="bg-gradient-to-br from-[#2d6e3e] to-green-700 rounded-xl shadow-lg p-6 text-white">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-green-100 text-sm font-medium">Tổng sản phẩm</p>
-              <h3 className="text-3xl font-bold mt-2">{stats.totalProducts}</h3>
-              <p className="text-green-100 text-xs mt-1">Tại cửa hàng</p>
-            </div>
-            <div className="bg-white/20 p-3 rounded-lg">
-              <Package className="w-6 h-6" />
-            </div>
-          </div>
-        </div>
-
-        {/* In Storage */}
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-green-100 text-sm font-medium">Hàng trong kho</p>
-              <h3 className="text-3xl font-bold mt-2">{stats.inStorage}</h3>
-              <p className="text-green-100 text-xs mt-1">Còn trong kho sau cửa hàng</p>
-            </div>
-            <div className="bg-white/20 p-3 rounded-lg">
-              <CheckCircle className="w-6 h-6" />
-            </div>
-          </div>
-        </div>
-
-        {/* On Shelf */}
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-purple-100 text-sm font-medium">Hàng trên quầy</p>
-              <h3 className="text-3xl font-bold mt-2">{stats.onShelf}</h3>
-              <p className="text-purple-100 text-xs mt-1">Đang bán tại quầy</p>
-            </div>
-            <div className="bg-white/20 p-3 rounded-lg">
-              <Store className="w-6 h-6" />
-            </div>
-          </div>
-        </div>
-
-        {/* Low Stock */}
-        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg p-6 text-white">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-orange-100 text-sm font-medium">Sắp hết hàng</p>
-              <h3 className="text-3xl font-bold mt-2">{stats.lowStock}</h3>
-              <p className="text-orange-100 text-xs mt-1">Cần nhập thêm</p>
-            </div>
-            <div className="bg-white/20 p-3 rounded-lg">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-          </div>
+        <div className="flex items-center gap-3">
+          <button className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+            <ArrowDownToLine className="h-4 w-4" />
+            Xuất báo cáo
+          </button>
+          <button className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600">
+            <Plus className="h-4 w-4" />
+            Tạo mới
+          </button>
         </div>
       </div>
 
-      {/* Store-Specific Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Out of Stock */}
-        <div className="bg-white rounded-xl shadow p-6 border border-gray-200">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <p className="text-gray-600 text-sm font-medium">Hết hàng</p>
-              <h3 className="text-2xl font-bold text-red-600 mt-2">{stats.outOfStock}</h3>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4 text-red-600 border-red-600 hover:bg-red-50"
-                onClick={() => router.push('/warehouse-store/out-of-stock')}
-              >
-                Xem chi tiết
-              </Button>
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-4">
+        {summaryCards.map((card) => (
+          <article key={card.title} className={`rounded-2xl border border-slate-200 bg-white px-5 py-4 ${card.cardClass ?? ''}`}>
+            <div className="flex items-start justify-between">
+              <div className={`inline-flex rounded-lg px-2 py-1 text-xs font-bold ${card.statusWrap}`}>{card.status}</div>
+              <div className={`rounded-lg p-2 ${card.iconWrap}`}>{card.icon}</div>
             </div>
-            <div className="bg-red-100 p-3 rounded-lg">
-              <XCircle className="w-6 h-6 text-red-600" />
-            </div>
-          </div>
-        </div>
+            <p className="mt-5 text-[17px] text-slate-500">{card.title}</p>
+            <p className="mt-1 text-[44px] leading-none font-extrabold tracking-tight text-slate-800">{card.value}</p>
+          </article>
+        ))}
+      </section>
 
-        {/* Pending from Central */}
-        <div className="bg-white rounded-xl shadow p-6 border border-gray-200">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <p className="text-gray-600 text-sm font-medium">Chờ nhận từ kho tổng</p>
-              <h3 className="text-2xl font-bold text-green-600 mt-2">{stats.pendingFromCentral}</h3>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4 text-green-600 border-green-600 hover:bg-green-50"
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.9fr_1fr]">
+        <div className="space-y-4">
+          <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <h2 className="flex items-center gap-2 text-[24px] font-bold text-slate-800">
+                <span className="rounded-md bg-emerald-100 p-1.5 text-emerald-600">
+                  <Truck className="h-4 w-4" />
+                </span>
+                Hàng nhập hôm nay
+              </h2>
+              <button
+                className="text-sm font-semibold text-emerald-600 hover:text-emerald-700"
                 onClick={() => router.push('/warehouse-store/receive-goods')}
               >
-                Xem phiếu chuyển
-              </Button>
+                Xem tất cả
+              </button>
             </div>
-            <div className="bg-green-100 p-3 rounded-lg">
-              <TruckIcon className="w-6 h-6 text-green-600" />
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500">
+                  <tr>
+                    <th className="px-5 py-3 font-semibold">Mã PO</th>
+                    <th className="px-5 py-3 font-semibold">Nhà cung cấp</th>
+                    <th className="px-5 py-3 font-semibold">Dự kiến (ETA)</th>
+                    <th className="px-5 py-3 font-semibold">Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inboundRows.map((row) => (
+                    <tr key={row.po} className="border-t border-slate-100">
+                      <td className="px-5 py-3 font-medium text-slate-700">{row.po}</td>
+                      <td className="px-5 py-3 text-slate-600">{row.supplier}</td>
+                      <td className="px-5 py-3 text-slate-600">{row.eta}</td>
+                      <td className="px-5 py-3">
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${row.statusClass}`}>{row.status}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
-        </div>
+          </article>
 
-        {/* Waiting for Shelf */}
-        <div className="bg-white rounded-xl shadow p-6 border border-gray-200">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <p className="text-gray-600 text-sm font-medium">Chờ xuất ra quầy</p>
-              <h3 className="text-2xl font-bold text-purple-600 mt-2">{stats.waitingForShelf}</h3>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4 text-purple-600 border-purple-600 hover:bg-purple-50"
+          <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <h2 className="flex items-center gap-2 text-[24px] font-bold text-slate-800">
+                <span className="rounded-md bg-emerald-100 p-1.5 text-emerald-600">
+                  <ArrowRightLeft className="h-4 w-4" />
+                </span>
+                Đang chờ xuất
+              </h2>
+              <button
+                className="text-sm font-semibold text-emerald-600 hover:text-emerald-700"
                 onClick={() => router.push('/warehouse-store/transfer-to-shelf')}
               >
-                Xuất hàng
-              </Button>
+                Quản lý xuất kho
+              </button>
             </div>
-            <div className="bg-purple-100 p-3 rounded-lg">
-              <ArrowRightLeft className="w-6 h-6 text-purple-600" />
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500">
+                  <tr>
+                    <th className="px-5 py-3 font-semibold">Mã yêu cầu</th>
+                    <th className="px-5 py-3 font-semibold">Cửa hàng</th>
+                    <th className="px-5 py-3 font-semibold">Số lượng</th>
+                    <th className="px-5 py-3 font-semibold">Ưu tiên</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {outboundRows.map((row) => (
+                    <tr key={row.requestId} className="border-t border-slate-100">
+                      <td className="px-5 py-3 font-medium text-slate-700">{row.requestId}</td>
+                      <td className="px-5 py-3 text-slate-600">{row.store}</td>
+                      <td className="px-5 py-3 text-slate-600">{row.quantity}</td>
+                      <td className="px-5 py-3">
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${row.priorityClass}`}>{row.priority}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
+          </article>
         </div>
-      </div>
 
-      {/* Quick Actions */}
-      <div className="bg-white rounded-xl shadow p-6 border border-gray-200">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Thao tác nhanh</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Button
-            variant="outline"
-            className="justify-start h-auto py-4"
-            onClick={() => router.push('/warehouse-store/receive-goods')}
-          >
-            <TruckIcon className="w-5 h-5 mr-2" />
-            <span>Nhận hàng từ kho tổng</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="justify-start h-auto py-4"
-            onClick={() => router.push('/warehouse-store/transfer-to-shelf')}
-          >
-            <ArrowRightLeft className="w-5 h-5 mr-2" />
-            <span>Xuất hàng ra quầy</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="justify-start h-auto py-4"
-            onClick={() => router.push('/warehouse-store/restock-request')}
-          >
-            <TrendingUp className="w-5 h-5 mr-2" />
-            <span>Yêu cầu nhập hàng</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="justify-start h-auto py-4"
-            onClick={() => router.push('/warehouse-store/inventory-check')}
-          >
-            <CheckCircle className="w-5 h-5 mr-2" />
-            <span>Kiểm kê kho</span>
-          </Button>
-        </div>
-      </div>
+        <article className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white">
+          <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4">
+            <AlertTriangle className="h-5 w-5 text-red-500" />
+            <h2 className="text-[24px] font-bold text-slate-800">Sản phẩm sắp hết hàng</h2>
+          </div>
+          <div className="flex-1 space-y-4 p-4">
+            {lowStockProducts.map((product) => (
+              <div key={product.sku} className="flex items-start gap-3 rounded-xl px-2 py-1 hover:bg-slate-50">
+                <div className="rounded-lg bg-slate-100 p-2 text-slate-500">
+                  <PackageSearch className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[16px] font-semibold text-slate-800">{product.name}</p>
+                  <p className="text-xs text-slate-400">SKU: {product.sku}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-bold text-red-500">Còn {product.remain}</p>
+                  <span className={`inline-flex rounded px-1.5 py-0.5 text-[10px] font-extrabold ${product.levelClass}`}>{product.level}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="p-4 pt-0">
+            <button
+              onClick={() => router.push('/warehouse-store/low-stock')}
+              className="w-full rounded-lg border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-200"
+            >
+              Bắt đầu nhập tất cả
+            </button>
+          </div>
+        </article>
+      </section>
 
-      {/* Recent Activities (Optional) */}
-      <div className="bg-white rounded-xl shadow p-6 border border-gray-200">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Hoạt động gần đây</h2>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between py-3 border-b border-gray-100">
-            <div className="flex items-center gap-3">
-              <div className="bg-green-100 p-2 rounded-lg">
-                <TruckIcon className="w-4 h-4 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-900">Nhận hàng từ kho tổng</p>
-                <p className="text-xs text-gray-500">Phiếu #WH-2026-001 - 50 sản phẩm</p>
-              </div>
-            </div>
-            <span className="text-xs text-gray-400">2 giờ trước</span>
-          </div>
-          <div className="flex items-center justify-between py-3 border-b border-gray-100">
-            <div className="flex items-center gap-3">
-              <div className="bg-purple-100 p-2 rounded-lg">
-                <ArrowRightLeft className="w-4 h-4 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-900">Xuất hàng ra quầy</p>
-                <p className="text-xs text-gray-500">30 sản phẩm từ kho ra quầy bán</p>
-              </div>
-            </div>
-            <span className="text-xs text-gray-400">4 giờ trước</span>
-          </div>
-          <div className="flex items-center justify-between py-3">
-            <div className="flex items-center gap-3">
-              <div className="bg-green-100 p-2 rounded-lg">
-                <CheckCircle className="w-4 h-4 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-900">Kiểm kê định kỳ</p>
-                <p className="text-xs text-gray-500">Hoàn thành kiểm kê 120 sản phẩm</p>
-              </div>
-            </div>
-            <span className="text-xs text-gray-400">Hôm qua</span>
-          </div>
-        </div>
-      </div>
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <button
+          onClick={() => router.push('/warehouse-store/restock-request')}
+          className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:border-emerald-300 hover:text-emerald-600"
+        >
+          <Zap className="h-4 w-4" />
+          Tạo yêu cầu châm hàng
+        </button>
+        <button
+          onClick={() => router.push('/warehouse-store/inventory')}
+          className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:border-emerald-300 hover:text-emerald-600"
+        >
+          <Warehouse className="h-4 w-4" />
+          Kiểm tra kho hàng
+        </button>
+        <button
+          onClick={() => router.push('/warehouse-store/receive-goods')}
+          className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:border-emerald-300 hover:text-emerald-600"
+        >
+          <Truck className="h-4 w-4" />
+          Theo dõi nhập hàng
+        </button>
+        <button
+          onClick={() => router.push('/warehouse-store/damaged-expired')}
+          className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:border-emerald-300 hover:text-emerald-600"
+        >
+          <SquareArrowOutUpRight className="h-4 w-4" />
+          Xử lý hàng lỗi/hết hạn
+        </button>
+      </section>
     </div>
   )
 }

@@ -21,8 +21,8 @@ export default function StoreWarehouseLayout({
         return
       }
       
-      // Kiểm tra role_id phải là 5 (Warehouse Staff) và email có @company.com
-      if (user && (user.roleId !== 5 || !user.email?.endsWith('@company.com'))) {
+      // Role 5 = Warehouse Staff portal
+      if (user && user.roleId !== 5) {
         router.push('/')
         return
       }
@@ -37,7 +37,7 @@ export default function StoreWarehouseLayout({
     )
   }
 
-  if (!isAuthenticated || !user || user.roleId !== 5 || !user.email?.endsWith('@company.com')) {
+  if (!isAuthenticated || !user || user.roleId !== 5) {
     return null
   }
 

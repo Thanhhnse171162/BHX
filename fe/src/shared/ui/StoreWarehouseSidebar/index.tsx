@@ -4,14 +4,12 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { 
   LayoutDashboard, 
-  TruckIcon, 
-  ArrowRightLeft, 
-  List, 
-  AlertTriangle, 
-  TrendingUp,
-  ClipboardCheck,
-  AlertOctagon,
-  Store
+  Package,
+  ClipboardList,
+  ArrowLeftRight,
+  Warehouse,
+  BarChart3,
+  Boxes
 } from 'lucide-react'
 
 interface SidebarItem {
@@ -22,44 +20,34 @@ interface SidebarItem {
 
 const sidebarItems: SidebarItem[] = [
   {
-    label: 'Dashboard',
+    label: 'Bảng điều khiển',
     href: '/warehouse-store',
     icon: <LayoutDashboard size={20} />
   },
   {
-    label: 'Receive Goods',
+    label: 'Nhập hàng',
     href: '/warehouse-store/receive-goods',
-    icon: <TruckIcon size={20} />
+    icon: <Package size={20} />
   },
   {
-    label: 'Transfer to Shelf',
-    href: '/warehouse-store/transfer-to-shelf',
-    icon: <ArrowRightLeft size={20} />
-  },
-  {
-    label: 'Inventory List',
-    href: '/warehouse-store/inventory',
-    icon: <List size={20} />
-  },
-  {
-    label: 'Low Stock Alerts',
-    href: '/warehouse-store/low-stock',
-    icon: <AlertTriangle size={20} />
-  },
-  {
-    label: 'Restock Request',
+    label: 'Yêu cầu châm hàng',
     href: '/warehouse-store/restock-request',
-    icon: <TrendingUp size={20} />
+    icon: <ClipboardList size={20} />
   },
   {
-    label: 'Inventory Check',
+    label: 'Chuyển kho',
+    href: '/warehouse-store/transfer-to-shelf',
+    icon: <ArrowLeftRight size={20} />
+  },
+  {
+    label: 'Kho hàng',
+    href: '/warehouse-store/inventory',
+    icon: <Warehouse size={20} />
+  },
+  {
+    label: 'Lịch sử biến động',
     href: '/warehouse-store/inventory-check',
-    icon: <ClipboardCheck size={20} />
-  },
-  {
-    label: 'Damaged / Expired',
-    href: '/warehouse-store/damaged-expired',
-    icon: <AlertOctagon size={20} />
+    icon: <BarChart3 size={20} />
   }
 ]
 
@@ -67,38 +55,36 @@ export function StoreWarehouseSidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="w-64 bg-[#2d6e3e] text-white flex-shrink-0 shadow-xl">
-      {/* Logo/Brand */}
-      <div className="p-6 border-b border-white/10">
+    <aside className="relative flex h-screen w-[250px] flex-shrink-0 flex-col border-r border-slate-200 bg-white">
+      <div className="px-5 pt-6 pb-4 border-b border-slate-100">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center">
-            <Store className="text-[#2d6e3e]" size={24} />
+          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-emerald-50 text-emerald-600">
+            <Boxes size={18} />
           </div>
           <div>
-            <h1 className="text-white font-bold text-lg">Store Warehouse</h1>
-            <p className="text-xs text-green-200">Kho cửa hàng</p>
+            <h1 className="text-[24px] leading-none font-extrabold text-slate-800">Hệ thống</h1>
+            <p className="mt-1 text-[12px] font-semibold uppercase tracking-wide text-slate-500">Quản lý kho hàng</p>
           </div>
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="p-4">
-        <ul className="space-y-1">
+      <nav className="flex-1 px-3 py-5">
+        <ul className="space-y-1.5">
           {sidebarItems.map((item) => {
-            const isActive = pathname === item.href
+            const isActive = pathname === item.href || (item.href !== '/warehouse-store' && pathname.startsWith(item.href))
             return (
               <li key={item.href}>
                 <Link
                   href={item.href}
                   className={`
-                    flex items-center gap-3 px-4 py-3 rounded-lg transition-colors
+                    flex items-center gap-3 rounded-xl px-3 py-2.5 text-[16px] font-medium transition-all
                     ${isActive 
-                      ? 'bg-white/20 text-white font-medium' 
-                      : 'text-white/80 hover:bg-white/10 hover:text-white'
+                      ? 'bg-emerald-100 text-emerald-600' 
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
                     }
                   `}
                 >
-                  {item.icon}
+                  <span className={isActive ? 'text-emerald-600' : 'text-slate-500'}>{item.icon}</span>
                   <span>{item.label}</span>
                 </Link>
               </li>
@@ -107,11 +93,15 @@ export function StoreWarehouseSidebar() {
         </ul>
       </nav>
 
-      {/* Footer Info */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10">
-        <div className="text-xs text-green-200">
-          <p className="font-medium">Store #001</p>
-          <p className="text-green-300">Chi nhánh Quận 1</p>
+      <div className="mx-3 mb-3 rounded-xl bg-slate-100 px-3 py-2.5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-200 text-emerald-700 text-sm font-bold">
+            JD
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-[15px] font-semibold text-slate-800">John Doe</p>
+            <p className="truncate text-[12px] text-slate-500">Nhân viên kho cao cấp</p>
+          </div>
         </div>
       </div>
     </aside>

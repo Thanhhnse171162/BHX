@@ -30,7 +30,11 @@ const TRENDING_SEARCHES = [
   '🔥 Rau củ tươi', '🔥 Thịt heo', '🎁 Khuyến mãi', '🥗 Trái cây', '🍖 Thịt bò'
 ]
 
-export function Header() {
+interface HeaderProps {
+  hideDeliveryAndCart?: boolean
+}
+
+export function Header({ hideDeliveryAndCart = false }: HeaderProps) {
   const router = useRouter()
   const { user, isAuthenticated, logout } = useAuth()
   const { items: cartItems, removeItem, getTotalItems, getTotalPrice } = useCartStore()
@@ -342,102 +346,106 @@ export function Header() {
             {/* Right section */}
             <div className="flex items-center gap-[30px] ml-auto">
 
-              {/* Delivery Location Selector */}
-              <DeliveryLocationSelector />
+              {!hideDeliveryAndCart && (
+                <>
+                  {/* Delivery Location Selector */}
+                  <DeliveryLocationSelector />
 
-              {/* Cart - Giỏ hàng */}
-              <div ref={cartRef} className="relative">
-                <button
-                  onClick={() => setShowCartPreview(!showCartPreview)}
-                  className="flex items-center gap-2 h-[40px] px-4 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
-                  aria-label="Giỏ hàng"
-                >
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                  <span className="hidden lg:inline text-white font-semibold text-[13px]">Giỏ hàng ({cartCount})</span>
-                  {cartCount > 0 && (
-                    <span className="md:hidden absolute -top-1 -right-1 min-w-[20px] h-5 bg-yellow-400 text-green-600 text-[11px] rounded-full flex items-center justify-center font-extrabold px-1.5">
-                      {cartCount}
-                    </span>
-                  )}
-                </button>
-
-                {/* Cart preview dropdown */}
-                {showCartPreview && (
-                  <div className="absolute right-0 top-full mt-2 w-80 md:w-96 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-green-50 to-emerald-50">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-bold text-gray-900 text-[15px]">Giỏ hàng của bạn</h3>
-                        <span className="px-2.5 py-0.5 bg-green-100 text-green-700 text-[11px] font-extrabold rounded-full">
-                          {cartCount} sản phẩm
+                  {/* Cart - Giỏ hàng */}
+                  <div ref={cartRef} className="relative">
+                    <button
+                      onClick={() => setShowCartPreview(!showCartPreview)}
+                      className="flex items-center gap-2 h-[40px] px-4 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+                      aria-label="Giỏ hàng"
+                    >
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      <span className="hidden lg:inline text-white font-semibold text-[13px]">Giỏ hàng ({cartCount})</span>
+                      {cartCount > 0 && (
+                        <span className="md:hidden absolute -top-1 -right-1 min-w-[20px] h-5 bg-yellow-400 text-green-600 text-[11px] rounded-full flex items-center justify-center font-extrabold px-1.5">
+                          {cartCount}
                         </span>
-                      </div>
-                    </div>
-                    <div className="max-h-96 overflow-y-auto">
-                      {cartItems.length > 0 ? (
-                        <>
-                          {cartItems.map((item) => (
-                            <div key={item.id} className="p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors">
-                              <div className="flex items-center gap-3">
-                                <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center text-3xl border border-gray-200">
-                                  {item.image}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-semibold text-gray-900 text-[13px] line-clamp-2">{item.name}</p>
-                                  <div className="flex items-center justify-between mt-1">
-                                    <span className="text-[13px] text-gray-600">SL: {item.quantity}</span>
-                                    <span className="font-bold text-emerald-600 text-[13px]">{formatPrice(item.price * item.quantity)}</span>
+                      )}
+                    </button>
+
+                    {/* Cart preview dropdown */}
+                    {showCartPreview && (
+                      <div className="absolute right-0 top-full mt-2 w-80 md:w-96 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-green-50 to-emerald-50">
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-bold text-gray-900 text-[15px]">Giỏ hàng của bạn</h3>
+                            <span className="px-2.5 py-0.5 bg-green-100 text-green-700 text-[11px] font-extrabold rounded-full">
+                              {cartCount} sản phẩm
+                            </span>
+                          </div>
+                        </div>
+                        <div className="max-h-96 overflow-y-auto">
+                          {cartItems.length > 0 ? (
+                            <>
+                              {cartItems.map((item) => (
+                                <div key={item.id} className="p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center text-3xl border border-gray-200">
+                                      {item.image}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-semibold text-gray-900 text-[13px] line-clamp-2">{item.name}</p>
+                                      <div className="flex items-center justify-between mt-1">
+                                        <span className="text-[13px] text-gray-600">SL: {item.quantity}</span>
+                                        <span className="font-bold text-emerald-600 text-[13px]">{formatPrice(item.price * item.quantity)}</span>
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() => removeItem(item.id)}
+                                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                      aria-label="Xóa"
+                                    >
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                    </button>
                                   </div>
                                 </div>
-                                <button
-                                  onClick={() => removeItem(item.id)}
-                                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                  aria-label="Xóa"
+                              ))}
+                              <div className="p-4 bg-gray-50 border-t border-gray-200">
+                                <div className="flex items-center justify-between mb-3">
+                                  <span className="font-semibold text-gray-700 text-[14px]">Tổng cộng:</span>
+                                  <span className="font-extrabold text-green-600 text-[17px]">{formatPrice(cartTotal)}</span>
+                                </div>
+                                <Link
+                                  href="/customer/cart"
+                                  onClick={() => setShowCartPreview(false)}
+                                  className="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl font-bold text-[14px] transition-all duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg active:scale-98"
                                 >
+                                  <span>Xem giỏ hàng</span>
                                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                                   </svg>
-                                </button>
+                                </Link>
                               </div>
-                            </div>
-                          ))}
-                          <div className="p-4 bg-gray-50 border-t border-gray-200">
-                            <div className="flex items-center justify-between mb-3">
-                              <span className="font-semibold text-gray-700 text-[14px]">Tổng cộng:</span>
-                              <span className="font-extrabold text-green-600 text-[17px]">{formatPrice(cartTotal)}</span>
-                            </div>
-                            <Link
-                              href="/customer/cart"
-                              onClick={() => setShowCartPreview(false)}
-                              className="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl font-bold text-[14px] transition-all duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg active:scale-98"
-                            >
-                              <span>Xem giỏ hàng</span>
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                            </>
+                          ) : (
+                            <div className="p-8 text-center">
+                              <svg className="w-16 h-16 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                               </svg>
-                            </Link>
-                          </div>
-                        </>
-                      ) : (
-                        <div className="p-8 text-center">
-                          <svg className="w-16 h-16 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                          </svg>
-                          <p className="text-gray-500 font-semibold">Giỏ hàng trống</p>
-                          <Link
-                            href="/customer"
-                            onClick={() => setShowCartPreview(false)}
-                            className="inline-block mt-3 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-[13px] font-semibold transition-colors"
-                          >
-                            Tiếp tục mua sắm
-                          </Link>
+                              <p className="text-gray-500 font-semibold">Giỏ hàng trống</p>
+                              <Link
+                                href="/customer"
+                                onClick={() => setShowCartPreview(false)}
+                                className="inline-block mt-3 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-[13px] font-semibold transition-colors"
+                              >
+                                Tiếp tục mua sắm
+                              </Link>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </>
+              )}
 
               {/* User menu - Hội viên */}
               {user && isAuthenticated ? (

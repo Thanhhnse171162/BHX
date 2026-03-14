@@ -2,8 +2,7 @@
 
 import { useAuth } from '@/shared/hooks/useAuth'
 import { useRouter } from 'next/navigation'
-import { Bell, LogOut, User, Store } from 'lucide-react'
-import { Button } from '@/shared/ui/Button'
+import { Bell, LogOut, Search, Settings } from 'lucide-react'
 
 export function StoreWarehouseHeader() {
   const { user, logout } = useAuth()
@@ -15,45 +14,36 @@ export function StoreWarehouseHeader() {
   }
 
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
-      <div className="flex items-center justify-between">
-        {/* Left side - Store info */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-gray-700">
-            <Store className="w-5 h-5 text-green-600" />
-            <span className="font-semibold">Kho cửa hàng - Store #001</span>
-          </div>
+    <header className="border-b border-slate-200 bg-white px-6 py-3">
+      <div className="flex items-center gap-4">
+        <div className="relative max-w-[440px] flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Tìm đơn hàng, SKU, hoặc nhân viên..."
+            className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:outline-none"
+          />
         </div>
 
-        {/* Right side - User actions */}
-        <div className="flex items-center gap-4">
-          {/* Notifications */}
-          <button className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-            <Bell size={20} />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+        <div className="ml-auto flex items-center gap-3">
+          <button className="relative p-2 text-slate-500 transition-colors hover:text-slate-700" aria-label="Thông báo">
+            <Bell size={18} />
+            <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-red-500" />
           </button>
-
-          {/* User info */}
-          <div className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg">
-            <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
-              <User size={16} className="text-white" />
-            </div>
-            <div className="text-left">
-              <p className="text-sm font-medium text-gray-900">{user?.name || 'User'}</p>
-              <p className="text-xs text-gray-500">Warehouse Staff</p>
-            </div>
-          </div>
-
-          {/* Logout */}
-          <Button
-            variant="outline"
-            size="sm"
+          <button className="p-2 text-slate-500 transition-colors hover:text-slate-700" aria-label="Cài đặt">
+            <Settings size={18} />
+          </button>
+          <div className="h-8 w-px bg-slate-200" />
+          <button
             onClick={handleLogout}
-            className="flex items-center gap-2"
+            className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100"
           >
-            <LogOut size={16} />
-            <span>Logout</span>
-          </Button>
+            <LogOut size={14} />
+            Đăng xuất
+          </button>
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-700 text-xs font-bold text-white">
+            {(user?.name?.[0] || 'U').toUpperCase()}
+          </div>
         </div>
       </div>
     </header>
