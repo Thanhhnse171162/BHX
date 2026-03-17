@@ -9,6 +9,7 @@ import { SystemAlertsPanel } from '@/features/reporting/components/admin/SystemA
 import { QuickActions } from '@/features/reporting/components/admin/QuickActions'
 import { ModuleShortcuts } from '@/features/reporting/components/admin/ModuleShortcuts'
 
+export default function AdminDashboard() {
   const user = useAuthStore((state) => state.user)
   // roleId 5 = WAREHOUSE_STAFF
   const showReport = user?.role !== ROLE_ID_MAP[5]
