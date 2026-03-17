@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   Search,
   PackagePlus,
@@ -15,6 +15,11 @@ import {
   X,
   PackageCheck,
 } from 'lucide-react'
+import CreateRestockRequestForm from './create-form'
+import { useAuthStore } from '@/store/auth.store'
+import { RestockAPIService, RestockRequestFromAPI } from '@/services/restock-api.service'
+import { ProductAPIService } from '@/services/product-api.service'
+import { UserAPIService } from '@/services/user-api.service'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type RequestStatus = 'Đã duyệt' | 'Chờ duyệt' | 'Từ chối' | 'Đã hoàn thành'
@@ -23,7 +28,6 @@ interface PurchaseRequest {
   id: string
   product: string
   sku: string
-  category: string
   quantity: number
   unit: string
   reason: string
@@ -33,21 +37,50 @@ interface PurchaseRequest {
   note?: string
 }
 
-// ─── Mock data ─────────────────────────────────────────────────────────────────
-const ALL_REQUESTS: PurchaseRequest[] = [
-  { id: 'YC-0021', product: 'Mì Hảo Hảo tôm chua cay',      sku: 'HH-MG-TCC',    category: 'Mì & Cháo',   quantity: 10, unit: 'Thùng', reason: 'Hết hàng',   requestedBy: 'Minh Tuấn', date: '12/03/2026', status: 'Chờ duyệt' },
-  { id: 'YC-0020', product: 'Nước mắm Phú Quốc 750ml',       sku: 'PQ-NMM-750',   category: 'Gia vị',      quantity: 5,  unit: 'Thùng', reason: 'Sắp hết',    requestedBy: 'Thu Hà',    date: '12/03/2026', status: 'Đã duyệt', note: 'Đã liên hệ nhà cung cấp' },
-  { id: 'YC-0019', product: 'Cá ngừ đóng hộp Bình Đà',       sku: 'BD-CN-HP',     category: 'Đồ hộp',      quantity: 8,  unit: 'Thùng', reason: 'Hết hàng',   requestedBy: 'Quang Huy', date: '11/03/2026', status: 'Đã duyệt' },
-  { id: 'YC-0018', product: 'Bánh mì sandwich Hải Hà',        sku: 'HH-BM-SW',     category: 'Bánh & Kẹo',  quantity: 3,  unit: 'Thùng', reason: 'Sắp hết',    requestedBy: 'Minh Tuấn', date: '11/03/2026', status: 'Đã duyệt' },
-  { id: 'YC-0017', product: 'Nước ngọt Pepsi lon 330ml',      sku: 'PEP-LON-330',  category: 'Nước uống',   quantity: 15, unit: 'Thùng', reason: 'Hết hàng',   requestedBy: 'Thu Hà',    date: '10/03/2026', status: 'Từ chối',  note: 'Chờ thanh lý lô cũ' },
-  { id: 'YC-0016', product: 'Dầu ăn Neptune 1L',              sku: 'NTP-DA-1L',    category: 'Dầu ăn',      quantity: 6,  unit: 'Thùng', reason: 'Sắp hết',    requestedBy: 'Quang Huy', date: '10/03/2026', status: 'Đã duyệt' },
-  { id: 'YC-0015', product: 'Snack khoai tây Pringles',        sku: 'PRG-SNK-KT',   category: 'Bánh & Kẹo',  quantity: 5,  unit: 'Thùng', reason: 'Sắp hết',    requestedBy: 'Minh Tuấn', date: '10/03/2026', status: 'Chờ duyệt' },
-  { id: 'YC-0014', product: 'Bột ngọt Ajinomoto 200g',        sku: 'AJN-BN-200G',  category: 'Gia vị',      quantity: 10, unit: 'Thùng', reason: 'Sắp hết',    requestedBy: 'Thu Hà',    date: '09/03/2026', status: 'Đã duyệt' },
-  { id: 'YC-0013', product: 'Sữa tươi Vinamilk 1L',           sku: 'VNM-STT-1L',   category: 'Sữa & Trứng', quantity: 20, unit: 'Thùng', reason: 'Sắp hết',    requestedBy: 'Quang Huy', date: '09/03/2026', status: 'Đã duyệt' },
-  { id: 'YC-0012', product: 'Trứng gà ta (vỉ 10)',            sku: 'TG-TA-10',     category: 'Sữa & Trứng', quantity: 50, unit: 'Vỉ',    reason: 'Bổ sung',    requestedBy: 'Minh Tuấn', date: '08/03/2026', status: 'Từ chối',  note: 'Vượt định mức đặt hàng' },
-  { id: 'YC-0011', product: 'Gạo ST25 túi 5kg',               sku: 'ST25-G-5KG',   category: 'Gạo & Nông sản', quantity: 30, unit: 'Túi', reason: 'Bổ sung',    requestedBy: 'Thu Hà',    date: '08/03/2026', status: 'Đã duyệt' },
-  { id: 'YC-0010', product: 'Kem đánh răng Colgate 230g',      sku: 'CLG-KDR-230',  category: 'Vệ sinh',     quantity: 4,  unit: 'Thùng', reason: 'Bổ sung',    requestedBy: 'Quang Huy', date: '07/03/2026', status: 'Chờ duyệt' },
-]
+function mapStatus(status: string): RequestStatus {
+  if (status === 'APPROVED') return 'Đã duyệt'
+  if (status === 'REJECTED') return 'Từ chối'
+  if (status === 'COMPLETED') return 'Đã hoàn thành'
+  return 'Chờ duyệt'
+}
+
+function mapToRows(req: RestockRequestFromAPI, productMap: Record<string, string>, userMap: Record<string, string>): PurchaseRequest[] {
+  // If no items, create one row with request-level info
+  if (!req.items || req.items.length === 0) {
+    const userName = userMap[req.requestedBy] || req.requestedBy || '--'
+    return [{
+      id: req.requestNumber || req.id,
+      product: 'Không có sản phẩm',
+      sku: '--',
+      quantity: 0,
+      unit: '',
+      reason: '--',
+      requestedBy: userName,
+      date: req.requestedDate ? new Date(req.requestedDate).toLocaleDateString('vi-VN') : '--/--/----',
+      status: mapStatus(req.status),
+      note: req.notes || undefined,
+    }]
+  }
+
+  // Create one row per item, each with the request number but different product details
+  return req.items.map((item, idx) => {
+    const productName = item.productName || productMap[item.productId] || '--'
+    const userName = userMap[req.requestedBy] || req.requestedBy || '--'
+    
+    return {
+      id: req.requestNumber || req.id,
+      product: productName,
+      sku: item.productId || '--',
+      quantity: item.requestedQuantity || 0,
+      unit: item.unit || '',
+      reason: item.reason || '--',
+      requestedBy: userName,
+      date: req.requestedDate ? new Date(req.requestedDate).toLocaleDateString('vi-VN') : '--/--/----',
+      status: mapStatus(req.status),
+      note: idx === 0 && req.notes ? req.notes : undefined,
+    }
+  })
+}
 
 const STATUS_OPTS: RequestStatus[] = ['Đã duyệt', 'Chờ duyệt', 'Từ chối', 'Đã hoàn thành']
 
@@ -76,7 +109,6 @@ function DetailModal({ req, onClose }: { req: PurchaseRequest; onClose: () => vo
           <Row label="Mã yêu cầu"   value={<span className="font-mono font-semibold text-gray-800">{req.id}</span>} />
           <Row label="Sản phẩm"     value={req.product} />
           <Row label="SKU"          value={<span className="font-mono text-gray-600">{req.sku}</span>} />
-          <Row label="Danh mục"     value={req.category} />
           <Row label="Số lượng"     value={`${req.quantity} ${req.unit}`} />
           <Row label="Lý do"        value={req.reason} />
           <Row label="Người yêu cầu" value={req.requestedBy} />
@@ -115,19 +147,88 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function PurchaseRequestsPage() {
-  const [requests, setRequests]       = useState<PurchaseRequest[]>(ALL_REQUESTS)
+  const user = useAuthStore((s) => s.user)
+  const [requests, setRequests]       = useState<PurchaseRequest[]>([])
   const [search, setSearch]           = useState('')
   const [statusFilter, setStatus]     = useState<string>('Tất cả')
   const [page, setPage]               = useState(1)
   const [selected, setSelected]       = useState<PurchaseRequest | null>(null)
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [loading, setLoading]         = useState(false)
+  const [loadError, setLoadError]     = useState<string | null>(null)
 
   const todayStr = new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
-  function handleConfirmDelivery(id: string) {
-    setRequests((prev) =>
-      prev.map((r) => r.id === id ? { ...r, status: 'Đã hoàn thành' as RequestStatus } : r)
-    )
-  }
+  const loadRequests = useCallback(async () => {
+    try {
+      setLoading(true)
+      setLoadError(null)
+
+      // Load products to map productId → name
+      let productMap: Record<string, string> = {}
+      try {
+        const products = await ProductAPIService.getAllProducts()
+        for (const p of products) {
+          productMap[p.id] = p.name
+        }
+      } catch {
+        // If products can't be loaded, continue without mapping
+      }
+
+      // Load users to map userId → userName
+      let userMap: Record<string, string> = {}
+      try {
+        const users = await UserAPIService.getAll()
+        for (const u of users) {
+          const userName = u.full_name || u.fullName || u.name || u.email || u.id
+          userMap[u.id] = userName
+        }
+      } catch {
+        // If users can't be loaded, continue without mapping
+      }
+
+      const warehouseId = user?.workplaceId ?? user?.storeId ?? user?.warehouseId ?? ''
+      if (!warehouseId) {
+        setRequests([])
+        setLoadError('Không xác định được warehouseId của tài khoản để tải dữ liệu.')
+        return
+      }
+
+      // Match BE behavior exactly: GET /api/restock-requests/by-warehouse/{warehouseId}
+      const byWarehouse = await RestockAPIService.getByWarehouse(warehouseId)
+
+      // Safety merge: some environments return fewer items from one endpoint.
+      // If getAll is allowed, merge same-warehouse rows and de-duplicate by id.
+      let merged = byWarehouse
+      try {
+        const all = await RestockAPIService.getAll()
+        const wid = warehouseId.toLowerCase()
+        const sameWarehouse = all.filter((r) => {
+          const toVal = (r.toWarehouseId || '').toLowerCase()
+          const fromVal = (r.fromWarehouseId || '').toLowerCase()
+          return toVal === wid || fromVal === wid
+        })
+        const byId = new Map<string, RestockRequestFromAPI>()
+        for (const r of byWarehouse) byId.set(r.id, r)
+        for (const r of sameWarehouse) byId.set(r.id, r)
+        merged = Array.from(byId.values())
+      } catch {
+        // Ignore if getAll is forbidden for current role.
+      }
+
+      setRequests(merged.flatMap((req) => mapToRows(req, productMap, userMap)))
+      setPage(1)
+    } catch (error: any) {
+      setRequests([])
+      setLoadError(error?.response?.data?.message || 'Không tải được danh sách yêu cầu nhập hàng')
+    } finally {
+      setLoading(false)
+    }
+  }, [user?.warehouseId, user?.workplaceId, user?.storeId])
+
+  useEffect(() => {
+    loadRequests()
+  }, [loadRequests])
 
   const filtered = useMemo(() => {
     let list = requests
@@ -139,7 +240,7 @@ export default function PurchaseRequestsPage() {
       )
     }
     return list
-  }, [search, statusFilter])
+  }, [requests, search, statusFilter])
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paged      = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -163,7 +264,10 @@ export default function PurchaseRequestsPage() {
           </h1>
           <p className="text-[13px] text-gray-500 mt-0.5">Theo dõi và quản lý các yêu cầu bổ sung hàng hóa</p>
         </div>
-        <button className="flex items-center gap-2 text-[13px] font-medium text-white bg-emerald-600 px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors shadow-sm">
+        <button
+          onClick={() => setShowCreateForm(true)}
+          className="flex items-center gap-2 text-[13px] font-medium text-white bg-emerald-600 px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors shadow-sm"
+        >
           <Plus size={15} />
           Tạo yêu cầu mới
         </button>
@@ -220,11 +324,16 @@ export default function PurchaseRequestsPage() {
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        {loadError && (
+          <div className="px-4 py-3 text-[12px] text-red-600 bg-red-50 border-b border-red-100">
+            {loadError}
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-[13px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                {['Mã YC', 'Sản phẩm', 'Danh mục', 'Số lượng', 'Lý do', 'Người YC', 'Ngày tạo', 'Trạng thái', ''].map((h) => (
+                {['Mã YC', 'Sản phẩm', 'Số lượng', 'Lý do', 'Người YC', 'Ngày tạo', 'Trạng thái', ''].map((h) => (
                   <th key={h} className="text-left py-3 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
                     {h}
                   </th>
@@ -232,7 +341,13 @@ export default function PurchaseRequestsPage() {
               </tr>
             </thead>
             <tbody>
-              {paged.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={9} className="py-12 text-center text-gray-400 text-[13px]">
+                    Đang tải dữ liệu...
+                  </td>
+                </tr>
+              ) : paged.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-12 text-center text-gray-400 text-[13px]">
                     Không tìm thấy yêu cầu nào
@@ -251,11 +366,6 @@ export default function PurchaseRequestsPage() {
                         <div className="font-medium text-gray-800">{req.product}</div>
                         <div className="text-[11px] text-gray-400">{req.sku}</div>
                       </td>
-                      <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 text-[11px] font-medium whitespace-nowrap">
-                          {req.category}
-                        </span>
-                      </td>
                       <td className="py-3 px-4 font-semibold text-gray-700">{req.quantity} <span className="font-normal text-gray-400 text-[11px]">{req.unit}</span></td>
                       <td className="py-3 px-4 text-gray-500">{req.reason}</td>
                       <td className="py-3 px-4 text-gray-600">{req.requestedBy}</td>
@@ -266,24 +376,13 @@ export default function PurchaseRequestsPage() {
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        {req.status === 'Đã duyệt' ? (
-                          <button
-                            onClick={() => handleConfirmDelivery(req.id)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[12px] font-medium transition-colors whitespace-nowrap"
-                            title="Xác nhận đã giao hàng"
-                          >
-                            <PackageCheck size={13} />
-                            Xác nhận đã giao
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => setSelected(req)}
-                            className="p-1.5 rounded-lg hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 transition-colors"
-                            title="Xem chi tiết"
-                          >
-                            <Eye size={15} />
-                          </button>
-                        )}
+                        <button
+                          onClick={() => setSelected(req)}
+                          className="p-1.5 rounded-lg hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 transition-colors"
+                          title="Xem chi tiết"
+                        >
+                          <Eye size={15} />
+                        </button>
                       </td>
                     </tr>
                   )
@@ -329,6 +428,16 @@ export default function PurchaseRequestsPage() {
       </div>
 
       {selected && <DetailModal req={selected} onClose={() => setSelected(null)} />}
+
+      {showCreateForm && (
+        <CreateRestockRequestForm
+          onClose={() => setShowCreateForm(false)}
+          onCreated={() => {
+            setShowCreateForm(false)
+            loadRequests()
+          }}
+        />
+      )}
     </div>
   )
 }

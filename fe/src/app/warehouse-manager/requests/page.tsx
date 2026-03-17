@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import {
   CirclePlus,
   Download,
@@ -11,6 +11,10 @@ import {
   AlertTriangle,
   X,
 } from 'lucide-react'
+import { useAuthStore } from '@/store/auth.store'
+import { RestockAPIService, RestockRequestFromAPI } from '@/services/restock-api.service'
+import { ProductAPIService } from '@/services/product-api.service'
+import { UserAPIService } from '@/services/user-api.service'
 
 type RequestPriority = 'CAO' | 'TRUNG BÌNH' | 'THẤP'
 type RequestStatus = 'Chờ duyệt' | 'Đang xử lý' | 'Đã giao' | 'Đã duyệt'
@@ -18,6 +22,7 @@ type RequestType = 'store' | 'warehouse'
 
 interface RequestItem {
   id: string
+  uniqueId: string  // For React key (must be unique)
   source: string
   sourceCode: string
   productSummary: string
@@ -28,68 +33,11 @@ interface RequestItem {
   type: RequestType
 }
 
-const REQUESTS: RequestItem[] = [
-  {
-    id: 'RQ-8821',
-    source: 'BHX Q.12 - Tô Ký',
-    sourceCode: 'ST-042',
-    productSummary: 'Gạo ST25, Sữa tươi (12 mặt hàng)',
-    priority: 'CAO',
-    status: 'Chờ duyệt',
-    createdAt: '14:20 - 24/10',
-    actionLabel: 'Duyệt',
-    type: 'store',
-  },
-  {
-    id: 'RQ-8819',
-    source: 'BHX Thủ Đức - Kha Vạn Cân',
-    sourceCode: 'ST-115',
-    productSummary: 'Rau củ quả sạch (5 mặt hàng)',
-    priority: 'TRUNG BÌNH',
-    status: 'Đang xử lý',
-    createdAt: '13:05 - 24/10',
-    actionLabel: 'Đã duyệt',
-    type: 'store',
-  },
-  {
-    id: 'RQ-8815',
-    source: 'BHX Gò Vấp - Quang Trung',
-    sourceCode: 'ST-089',
-    productSummary: 'Dầu ăn, Nước mắm (8 mặt hàng)',
-    priority: 'THẤP',
-    status: 'Đã giao',
-    createdAt: '10:45 - 24/10',
-    actionLabel: 'Đã giao',
-    type: 'store',
-  },
-  {
-    id: 'RQ-8810',
-    source: 'BHX Tân Bình - Lý Thường Kiệt',
-    sourceCode: 'ST-201',
-    productSummary: 'Trứng, Thịt tươi sống (15 mặt hàng)',
-    priority: 'CAO',
-    status: 'Đã duyệt',
-    createdAt: '09:15 - 24/10',
-    actionLabel: 'Đã duyệt',
-    type: 'store',
-  },
-  {
-    id: 'RQ-8806',
-    source: 'Kho Tổng Miền Nam',
-    sourceCode: 'WH-001',
-    productSummary: 'Điều phối kho dự phòng (20 mặt hàng)',
-    priority: 'TRUNG BÌNH',
-    status: 'Đang xử lý',
-    createdAt: '08:35 - 24/10',
-    actionLabel: 'Xử lý',
-    type: 'warehouse',
-  },
-]
-
 const PAGE_SIZE = 4
 
 export default function WarehouseManagerRequestsPage() {
-  const [requests, setRequests] = useState<RequestItem[]>(REQUESTS)
+  const user = useAuthStore((s) => s.user)
+  const [requests, setRequests] = useState<RequestItem[]>([])
   const [activeTab, setActiveTab] = useState<RequestType>('store')
   const [page, setPage] = useState(1)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -100,8 +48,112 @@ export default function WarehouseManagerRequestsPage() {
     priority: 'TRUNG BÌNH' as RequestPriority,
   })
 
+  // Load requests from API
+  const loadRequests = useCallback(async () => {
+    try {
+      // Get warehouse ID - try multiple sources
+      const warehouseId = user?.warehouseId ?? user?.storeId ?? user?.workplaceId ?? ''
+      if (!warehouseId) {
+        setRequests([])
+        return
+      }
+
+      // Load product and user maps
+      let productMap: Record<string, string> = {}
+      try {
+        const products = await ProductAPIService.getAllProducts()
+        for (const p of products) {
+          productMap[p.id] = p.name
+        }
+      } catch {
+        // Continue without product mapping
+      }
+
+      let userMap: Record<string, string> = {}
+      try {
+        const users = await UserAPIService.getAll()
+        for (const u of users) {
+          const userName = u.full_name || u.fullName || u.name || u.email || u.id
+          userMap[u.id] = userName
+        }
+      } catch {
+        // Continue without user mapping
+      }
+
+      // Load all restock requests
+      let allRequests: RestockRequestFromAPI[] = []
+      try {
+        allRequests = await RestockAPIService.getAll()
+        console.log('📦 warehouse-manager: All requests loaded:', allRequests.length)
+      } catch {
+        console.log('📦 warehouse-manager: Failed to load all requests')
+        allRequests = []
+      }
+
+      // Filter requests where fromWarehouseId = current warehouseId 
+      // (because old data was created with: fromWarehouseId = Warehouse parent, toWarehouseId = Store)
+      console.log('📦 warehouse-manager: Filtering by fromWarehouseId =', warehouseId.toLowerCase())
+      const filtered = allRequests.filter(
+        (r) => {
+          const fromVal = (r.fromWarehouseId || '').toLowerCase()
+          const toVal = (r.toWarehouseId || '').toLowerCase()
+          const wid = warehouseId.toLowerCase()
+          const matchFrom = fromVal === wid
+          const matchTo = toVal === wid
+          console.log(`  - request ${r.id}:`, {fromWarehouseId: r.fromWarehouseId, toWarehouseId: r.toWarehouseId, matchFrom, matchTo})
+          return matchFrom || matchTo  // Try both
+        }
+      )
+      console.log('📦 warehouse-manager: Filtered requests:', filtered.length)
+
+      // Convert to RequestItem format
+      const converted: RequestItem[] = filtered.map((req) => {
+        const productNames = req.items?.map((item) => item.productName || productMap[item.productId] || '--').join(', ') || '--'
+        const userName = userMap[req.requestedBy] || req.requestedBy || '--'
+        const createdAtDate = req.requestedDate ? new Date(req.requestedDate).toLocaleDateString('vi-VN') : '--/--/----'
+
+        return {
+          uniqueId: req.id,  // Use backend ID for unique key
+          id: req.requestNumber || req.id,  // Display ID
+          source: userName,
+          sourceCode: req.toWarehouseId || '--',  // Show store ID (destination)
+          productSummary: productNames,
+          priority: req.priority === 'URGENT' ? 'CAO' : req.priority === 'HIGH' ? 'TRUNG BÌNH' : 'THẤP',
+          status: mapStatus(req.status),
+          createdAt: createdAtDate,
+          actionLabel: req.status === 'APPROVED' ? 'Đã duyệt' : 'Duyệt',
+          type: 'store',
+        }
+      })
+
+      setRequests(converted)
+      setPage(1)
+    } catch {
+      setRequests([])
+    }
+  }, [user?.warehouseId, user?.storeId, user?.workplaceId])
+
+  useEffect(() => {
+    loadRequests()
+  }, [loadRequests])
+
+  function mapStatus(status: string): RequestStatus {
+    if (status === 'APPROVED') return 'Đã duyệt'
+    if (status === 'COMPLETED') return 'Đã giao'
+    if (status === 'PROCESSING') return 'Đang xử lý'
+    return 'Chờ duyệt'
+  }
+
+  const onChangeTab = (tab: RequestType) => {
+    setActiveTab(tab)
+    if (tab !== 'warehouse') {
+      setIsCreateOpen(false)
+    }
+    setPage(1)
+  }
+
   const filtered = useMemo(
-    () => requests.filter((item) => item.type === activeTab),
+    () => requests.filter((item) => item.type === activeTab && item.status !== 'Đã giao'),
     [activeTab, requests],
   )
 
@@ -111,17 +163,9 @@ export default function WarehouseManagerRequestsPage() {
     [filtered, page],
   )
 
-  const waitingCount = requests.filter((r) => r.status === 'Chờ duyệt').length
-  const urgentCount = requests.filter((r) => r.priority === 'CAO').length
-  const approvedToday = requests.filter((r) => r.status === 'Đã duyệt').length
-
-  const onChangeTab = (tab: RequestType) => {
-    setActiveTab(tab)
-    if (tab !== 'warehouse') {
-      setIsCreateOpen(false)
-    }
-    setPage(1)
-  }
+  const waitingCount = filtered.filter((r) => r.status === 'Chờ duyệt').length
+  const urgentCount = filtered.filter((r) => r.priority === 'CAO').length
+  const approvedToday = filtered.filter((r) => r.status === 'Đã duyệt').length
 
   const createRequest = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -135,18 +179,15 @@ export default function WarehouseManagerRequestsPage() {
       return Number.isNaN(numeric) ? max : Math.max(max, numeric)
     }, 0)
 
-    const now = new Date()
-    const time = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-    const date = now.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
-
     const newItem: RequestItem = {
+      uniqueId: `${Date.now()}`,  // Unique ID for React key
       id: `RQ-${maxId + 1}`,
       source: newRequest.source.trim(),
       sourceCode: newRequest.sourceCode.trim(),
       productSummary: newRequest.productSummary.trim(),
       priority: newRequest.priority,
       status: 'Chờ duyệt',
-      createdAt: `${time} - ${date}`,
+      createdAt: new Date().toLocaleDateString('vi-VN'),
       actionLabel: 'Duyệt',
       type: 'warehouse',
     }
@@ -275,7 +316,7 @@ export default function WarehouseManagerRequestsPage() {
                 </tr>
               ) : (
                 paged.map((row) => (
-                  <tr key={row.id} className="border-t border-gray-100 hover:bg-gray-50/70 transition-colors">
+                  <tr key={row.uniqueId} className="border-t border-gray-100 hover:bg-gray-50/70 transition-colors">
                     <td className="px-5 py-4 font-bold text-[#ea580c]">#{row.id}</td>
                     <td className="px-5 py-4">
                       <p className="font-semibold text-gray-800">{row.source}</p>
