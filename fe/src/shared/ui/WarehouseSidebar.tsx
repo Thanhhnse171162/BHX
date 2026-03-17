@@ -104,69 +104,6 @@ function getNavigationItems(userRole?: string): NavItem[] {
   }
   return items
 }
-  {
-    label: 'Tổng quan',
-    href: '/warehouse',
-    icon: LayoutDashboard
-  },
-  {
-    label: 'Tồn kho',
-    href: '/warehouse/inventory',
-    icon: Package,
-    subItems: [
-      {
-        label: 'Tồn kho',
-        href: '/warehouse/inventory',
-        icon: Package
-      },
-      {
-        label: 'Tồn kho theo lô',
-        href: '/warehouse/inventory/batch-movements',
-        icon: Warehouse
-      },
-      {
-        label: 'Kiểm kê tồn kho',
-        href: '/warehouse/checks',
-        icon: ClipboardCheck
-      }
-    ]
-  },
-  {
-    label: 'Yêu cầu kho',
-    href: '/warehouse/requests',
-    icon: FileText
-  },
-  {
-    label: 'Di chuyển hàng',
-    href: '/warehouse/stock-movement',
-    icon: ArrowLeftRight
-  },
-  {
-    label: 'Bổ sung hàng',
-    href: '/warehouse/replenishment',
-    icon: RefreshCw
-  },
-  {
-    label: 'Quản lý NCC',
-    href: '/warehouse/suppliers',
-    icon: Truck
-  },
-  {
-    label: 'Quản lý kho',
-    href: '/warehouse/management',
-    icon: Building2
-  },
-  {
-    label: 'Quản lý sản phẩm',
-    href: '/warehouse/products',
-    icon: BoxIcon
-  },
-  {
-    label: 'Báo cáo',
-    href: '/warehouse/reports',
-    icon: BarChart3
-  }
-]
 
 export function WarehouseSidebar() {
   const pathname = usePathname()

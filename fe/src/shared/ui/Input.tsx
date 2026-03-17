@@ -27,6 +27,11 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             transition-colors
             ${error ? 'border-red-500' : 'border-gray-300'}
             disabled:bg-gray-100 disabled:cursor-not-allowed
+            [&::-webkit-outer-spin-button]:appearance-none
+            [&::-webkit-outer-spin-button]:m-0
+            [&::-webkit-inner-spin-button]:appearance-none
+            [&::-webkit-inner-spin-button]:m-0
+            [&[type=number]]:appearance-textfield
             ${className}
           `}
           {...props}
