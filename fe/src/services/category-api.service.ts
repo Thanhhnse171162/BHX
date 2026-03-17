@@ -63,21 +63,41 @@ export interface CreateCategoryResponse {
 export class CategoryAPIService {
   private static baseURL = '/categories'
 
+  private static extractCategoryArray(payload: unknown): CategoryFromAPI[] {
+    if (Array.isArray(payload)) {
+      return payload as CategoryFromAPI[]
+    }
+
+    if (!payload || typeof payload !== 'object') {
+      return []
+    }
+
+    const obj = payload as Record<string, unknown>
+    const candidates = [obj.data, obj.items, obj.results, obj.categories]
+
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate)) {
+        return candidate as CategoryFromAPI[]
+      }
+
+      if (candidate && typeof candidate === 'object') {
+        const nested = candidate as Record<string, unknown>
+        if (Array.isArray(nested.items)) return nested.items as CategoryFromAPI[]
+        if (Array.isArray(nested.results)) return nested.results as CategoryFromAPI[]
+        if (Array.isArray(nested.categories)) return nested.categories as CategoryFromAPI[]
+      }
+    }
+
+    return []
+  }
+
   /**
    * Lấy tất cả categories
    */
   static async getAllCategories(): Promise<CategoryFromAPI[]> {
     try {
       const response = await localApiClient.get<CategoryFromAPI[]>(this.baseURL)
-      const payload = response.data as unknown
-      if (Array.isArray(payload)) {
-        return payload as CategoryFromAPI[]
-      }
-      if (payload && typeof payload === 'object' && 'data' in (payload as any)) {
-        const nested = (payload as any).data
-        return Array.isArray(nested) ? (nested as CategoryFromAPI[]) : []
-      }
-      return []
+      return this.extractCategoryArray(response.data as unknown)
     } catch (error) {
       console.error('Error fetching categories:', error)
       throw error

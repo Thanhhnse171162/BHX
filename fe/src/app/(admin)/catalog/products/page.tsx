@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
 import { InventoryAPIService, InventoryItem } from '@/services/inventory-api.service'
+import { CategoryAPIService, CategoryFromAPI } from '@/services/category-api.service'
 import { useAuthStore } from '@/store/auth.store'
 import { Button } from '@/shared/ui/Button'
 import { Input } from '@/shared/ui/Input'
@@ -33,6 +34,8 @@ interface ProductRow {
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<ProductRow[]>([])
+  const [categories, setCategories] = useState<CategoryFromAPI[]>([])
+  const [categoryIdByName, setCategoryIdByName] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -61,10 +64,70 @@ export default function ProductsPage() {
   const [metaDescription, setMetaDescription] = useState('')
   const [metaKeywords, setMetaKeywords] = useState('')
 
+  const getCategoryId = (category: CategoryFromAPI): string => {
+    const candidates: Array<unknown> = [
+      category.id,
+      (category as { ID?: string }).ID,
+      category.Id,
+      category.categoryId,
+      category.CategoryId,
+      category.categoryID,
+      category.CategoryID,
+      category.category_id,
+      category.Category_Id,
+      category._id,
+    ]
+
+    for (const candidate of candidates) {
+      if (candidate === undefined || candidate === null) continue
+      const normalized = String(candidate).trim()
+      if (normalized) {
+        return normalized
+      }
+    }
+
+    return ''
+  }
+
+  const normalizeCategoryName = (value: string | null | undefined): string =>
+    String(value || '').trim().toLowerCase()
+
+  const availableCategories = categories
+    .map((cat) => ({
+      ...cat,
+      resolvedId: getCategoryId(cat) || categoryIdByName[normalizeCategoryName(cat.name)] || '',
+    }))
+    .filter((cat) => !!cat.resolvedId)
+
   // Fetch products từ API backend
   useEffect(() => {
     fetchProducts()
+    fetchCategories()
   }, [])
+
+  const fetchCategories = async () => {
+    try {
+      const data = await CategoryAPIService.getAllCategories()
+      const activeCategories = data.filter((c) => {
+        const normalizedStatus = String(c.status || '').trim().toUpperCase()
+        const isDeletedRaw = (c as CategoryFromAPI & { isDeleted?: unknown }).isDeleted ?? c.is_deleted
+
+        const isDeleted =
+          isDeletedRaw === 1 ||
+          isDeletedRaw === '1' ||
+          isDeletedRaw === true ||
+          String(isDeletedRaw || '').toLowerCase() === 'true'
+
+        // Accept empty status to avoid hiding all categories when BE response is inconsistent.
+        const isActive = !normalizedStatus || normalizedStatus === 'ACTIVE'
+
+        return isActive && !isDeleted
+      })
+      setCategories(activeCategories)
+    } catch (err) {
+      console.error('Error loading categories:', err)
+    }
+  }
 
   const fetchProducts = async () => {
     try {
@@ -128,6 +191,16 @@ export default function ProductsPage() {
           reorderLevel: inventory?.minStockLevel ?? 0,
         }
       })
+
+      const derivedCategoryIdByName: Record<string, string> = {}
+      productsData.forEach((p) => {
+        const normalizedName = normalizeCategoryName(p.categoryName)
+        if (normalizedName && p.categoryId) {
+          derivedCategoryIdByName[normalizedName] = p.categoryId
+        }
+      })
+
+      setCategoryIdByName(derivedCategoryIdByName)
       
       setProducts(rows)
     } catch (err) {
@@ -143,7 +216,7 @@ export default function ProductsPage() {
     setEditingId(null)
     setSku('')
     setName('')
-    setCategory('')
+    setCategory(availableCategories.length > 0 ? availableCategories[0].resolvedId : '')
     setPrice(0)
     setUnit('kg')
     setStatus('ACTIVE')
@@ -163,12 +236,20 @@ export default function ProductsPage() {
     setIsModalOpen(true)
   }
 
+  // Helper function to parse number and remove leading zeros
+  const parseNumberInput = (value: string): number => {
+    if (!value || value === '') return 0
+    const num = parseFloat(value)
+    return isNaN(num) ? 0 : num
+  }
+
   const handleEdit = (row: ProductRow) => {
     setMode('edit')
     setEditingId(row.id)
     setSku(row.sku)
     setName(row.name)
-    setCategory(row.category)
+    const matchedCategory = availableCategories.find((c) => c.name === row.category)
+    setCategory(matchedCategory ? matchedCategory.resolvedId : '')
     setPrice(row.price)
     setUnit(row.unit)
     setStatus(row.status)
@@ -192,14 +273,93 @@ export default function ProductsPage() {
     setIsModalOpen(false)
   }
 
+  const parseApiErrorMessage = (payload: unknown): string => {
+    if (payload === null || payload === undefined) return ''
+
+    if (typeof payload === 'string') {
+      const trimmed = payload.trim()
+      if (!trimmed) return ''
+      try {
+        const parsed = JSON.parse(trimmed) as unknown
+        const parsedMessage = parseApiErrorMessage(parsed)
+        return parsedMessage || trimmed
+      } catch {
+        return trimmed
+      }
+    }
+
+    if (typeof payload !== 'object') {
+      return String(payload)
+    }
+
+    const data = payload as {
+      message?: unknown
+      error?: unknown
+      title?: unknown
+      errors?: Record<string, unknown>
+    }
+
+    const lines: string[] = []
+
+    if (typeof data.message === 'string' && data.message.trim()) {
+      lines.push(data.message.trim())
+    }
+
+    if (typeof data.error === 'string' && data.error.trim()) {
+      lines.push(data.error.trim())
+    }
+
+    if (typeof data.title === 'string' && data.title.trim()) {
+      lines.push(data.title.trim())
+    }
+
+    if (data.errors && typeof data.errors === 'object') {
+      Object.entries(data.errors).forEach(([field, value]) => {
+        if (Array.isArray(value)) {
+          const fieldErrors = value
+            .map((item) => String(item).trim())
+            .filter(Boolean)
+            .join(', ')
+
+          if (fieldErrors) {
+            lines.push(`${field}: ${fieldErrors}`)
+          }
+        } else if (value !== null && value !== undefined) {
+          const singleError = String(value).trim()
+          if (singleError) {
+            lines.push(`${field}: ${singleError}`)
+          }
+        }
+      })
+    }
+
+    return Array.from(new Set(lines)).join('\n').trim()
+  }
+
+  const getReadableErrorMessage = (error: unknown): string => {
+    if (error && typeof error === 'object') {
+      const axiosLikeResponseData = (error as { response?: { data?: unknown } }).response?.data
+      const fromAxiosData = parseApiErrorMessage(axiosLikeResponseData)
+      if (fromAxiosData) return fromAxiosData
+    }
+
+    if (error instanceof Error) {
+      const parsed = parseApiErrorMessage(error.message)
+      if (parsed) return parsed
+      return error.message
+    }
+
+    const fallback = parseApiErrorMessage(error)
+    return fallback || 'Đã có lỗi không xác định từ server.'
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     try {
       if (mode === 'create') {
-        // Swagger requires MainImage (multipart/form-data)
-        if (!mainImage) {
-          alert('Vui lòng chọn ảnh chính (Main Image).')
+        if (!category) {
+          alert('Vui lòng chọn category hợp lệ.')
           return
         }
 
@@ -211,7 +371,7 @@ export default function ProductsPage() {
 
         appendIfDefined('Sku', sku)
         appendIfDefined('Name', name)
-        appendIfDefined('CategoryId', category || '00000000-0000-0000-0000-000000000001')
+        appendIfDefined('CategoryId', category)
         appendIfDefined('Price', price)
         appendIfDefined('Unit', unit)
         appendIfDefined('Barcode', barcode)
@@ -228,7 +388,9 @@ export default function ProductsPage() {
         appendIfDefined('MetaTitle', metaTitle)
         appendIfDefined('MetaDescription', metaDescription)
         appendIfDefined('MetaKeywords', metaKeywords)
-        formData.append('MainImage', mainImage)
+        if (mainImage) {
+          formData.append('MainImage', mainImage)
+        }
         additionalImages.forEach((file) => {
           formData.append('AdditionalImages', file)
         })
@@ -241,8 +403,17 @@ export default function ProductsPage() {
         })
 
         if (!response.ok) {
-          const errorText = await response.text().catch(() => '')
-          throw new Error(errorText || `Create product failed (${response.status})`)
+          const responseContentType = response.headers.get('content-type') || ''
+          const errorPayload = responseContentType.includes('application/json')
+            ? await response.json().catch(() => null)
+            : await response.text().catch(() => '')
+
+          const detailedMessage =
+            parseApiErrorMessage(errorPayload) ||
+            (typeof errorPayload === 'string' ? errorPayload : '') ||
+            `Create product failed (${response.status})`
+
+          throw new Error(detailedMessage)
         }
 
         alert('Tạo sản phẩm thành công!')
@@ -261,7 +432,8 @@ export default function ProductsPage() {
       await fetchProducts() // Reload lại danh sách
     } catch (err) {
       console.error('Error saving product:', err)
-      alert('Không thể lưu sản phẩm. Vui lòng thử lại.')
+      const detailedError = getReadableErrorMessage(err)
+      alert(`Không thể lưu sản phẩm:\n${detailedError}`)
     }
   }
 
@@ -479,18 +651,34 @@ export default function ProductsPage() {
             placeholder="Gạo thơm ST25"
             required
           />
-          <Input
-            label="Category"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            placeholder="Gạo, mì"
-            required
-          />
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">
+              Category *
+            </label>
+            <select
+              className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              required
+            >
+              <option value="" disabled>
+                {availableCategories.length > 0 ? 'Select category' : 'No category available'}
+              </option>
+              {availableCategories.map((cat) => {
+                const categoryId = cat.resolvedId
+                return (
+                  <option key={categoryId} value={categoryId}>
+                    {cat.name}
+                  </option>
+                )
+              })}
+            </select>
+          </div>
           <Input
             label="Price"
             type="number"
-            value={price}
-            onChange={(e) => setPrice(Number(e.target.value))}
+            value={price || ''}
+            onChange={(e) => setPrice(parseNumberInput(e.target.value))}
             required
           />
           <Input
@@ -539,15 +727,15 @@ export default function ProductsPage() {
             <Input
               label="Original Price"
               type="number"
-              value={originalPrice}
-              onChange={(e) => setOriginalPrice(Number(e.target.value))}
+              value={originalPrice || ''}
+              onChange={(e) => setOriginalPrice(parseNumberInput(e.target.value))}
               placeholder="0"
             />
             <Input
               label="Cost Price"
               type="number"
-              value={costPrice}
-              onChange={(e) => setCostPrice(Number(e.target.value))}
+              value={costPrice || ''}
+              onChange={(e) => setCostPrice(parseNumberInput(e.target.value))}
               placeholder="0"
             />
           </div>
@@ -555,8 +743,8 @@ export default function ProductsPage() {
           <Input
             label="Weight (kg)"
             type="number"
-            value={weight}
-            onChange={(e) => setWeight(Number(e.target.value))}
+            value={weight || ''}
+            onChange={(e) => setWeight(parseNumberInput(e.target.value))}
             placeholder="0"
           />
           
@@ -575,6 +763,7 @@ export default function ProductsPage() {
                 file:bg-primary-50 file:text-primary-700
                 hover:file:bg-primary-100"
             />
+            <p className="text-xs text-gray-500">Co the bo trong neu backend khong bat buoc anh chinh.</p>
           </div>
 
           <div className="flex flex-col gap-1">

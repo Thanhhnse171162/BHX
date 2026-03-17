@@ -87,12 +87,17 @@ export async function POST(request: NextRequest) {
     const incomingContentType = request.headers.get('content-type')
     const incomingContentLength = request.headers.get('content-length')
     const headers: HeadersInit = {}
-    if (authHeader) {
-      headers['Authorization'] = authHeader
-    }
-
+    
     console.log('📦 Incoming create product content-type:', incomingContentType)
     console.log('📏 Incoming create product content-length:', incomingContentLength)
+    console.log('🔐 Authorization header:', authHeader ? `present (${authHeader.substring(0, 30)}...)` : '❌ MISSING')
+    
+    if (authHeader) {
+      headers['Authorization'] = authHeader
+      console.log('✅ Authorization attached to backend request')
+    } else {
+      console.log('⚠️ No authorization header found in request')
+    }
 
     if (incomingContentType) {
       headers['Content-Type'] = incomingContentType
