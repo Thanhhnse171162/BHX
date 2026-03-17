@@ -2,12 +2,16 @@
 
 import { PageHeader } from '@/shared/ui/PageHeader'
 import { DashboardKpis } from '@/features/reporting/components/admin/DashboardKpis'
+import { useAuthStore } from '@/store/auth.store'
+import { ROLE_ID_MAP } from '@/shared/types'
 import { RecentActivityPanel } from '@/features/reporting/components/admin/RecentActivityPanel'
 import { SystemAlertsPanel } from '@/features/reporting/components/admin/SystemAlertsPanel'
 import { QuickActions } from '@/features/reporting/components/admin/QuickActions'
 import { ModuleShortcuts } from '@/features/reporting/components/admin/ModuleShortcuts'
 
-export default function AdminDashboard() {
+  const user = useAuthStore((state) => state.user)
+  // roleId 5 = WAREHOUSE_STAFF
+  const showReport = user?.role !== ROLE_ID_MAP[5]
   return (
     <div className="px-6 py-8 min-h-full">
       {/* Professional Page Header */}
@@ -26,9 +30,11 @@ export default function AdminDashboard() {
 
       <div className="max-w-7xl mx-auto space-y-6">
         {/* KPI cards with enhanced styling */}
-        <div className="transform transition-all duration-300 hover:scale-[1.01]">
-          <DashboardKpis />
-        </div>
+        {showReport && (
+          <div className="transform transition-all duration-300 hover:scale-[1.01]">
+            <DashboardKpis />
+          </div>
+        )}
 
         {/* Two-column panels with card styling */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

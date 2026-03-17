@@ -32,7 +32,78 @@ interface NavItem {
   subItems?: NavItem[]
 }
 
-const navigationItems: NavItem[] = [
+import { ROLE_ID_MAP } from '@/shared/types'
+
+function getNavigationItems(userRole?: string): NavItem[] {
+  const items: NavItem[] = [
+    {
+      label: 'Tổng quan',
+      href: '/warehouse',
+      icon: LayoutDashboard
+    },
+    {
+      label: 'Tồn kho',
+      href: '/warehouse/inventory',
+      icon: Package,
+      subItems: [
+        {
+          label: 'Tồn kho',
+          href: '/warehouse/inventory',
+          icon: Package
+        },
+        {
+          label: 'Tồn kho theo lô',
+          href: '/warehouse/inventory/batch-movements',
+          icon: Warehouse
+        },
+        {
+          label: 'Kiểm kê tồn kho',
+          href: '/warehouse/checks',
+          icon: ClipboardCheck
+        }
+      ]
+    },
+    {
+      label: 'Yêu cầu kho',
+      href: '/warehouse/requests',
+      icon: FileText
+    },
+    {
+      label: 'Di chuyển hàng',
+      href: '/warehouse/stock-movement',
+      icon: ArrowLeftRight
+    },
+    {
+      label: 'Bổ sung hàng',
+      href: '/warehouse/replenishment',
+      icon: RefreshCw
+    },
+    {
+      label: 'Quản lý NCC',
+      href: '/warehouse/suppliers',
+      icon: Truck
+    },
+    {
+      label: 'Quản lý kho',
+      href: '/warehouse/management',
+      icon: Building2
+    },
+    {
+      label: 'Quản lý sản phẩm',
+      href: '/warehouse/products',
+      icon: BoxIcon
+    }
+  ]
+  // Only show 'Báo cáo' if not WAREHOUSE_STAFF (role id 5)
+  if (userRole !== ROLE_ID_MAP[5]) {
+    items.push({
+      label: 'Báo cáo',
+      href: '/warehouse/reports',
+      icon: BarChart3
+    })
+  }
+  return items
+}
   {
     label: 'Tổng quan',
     href: '/warehouse',
@@ -104,6 +175,7 @@ export function WarehouseSidebar() {
   const { user } = useAuth()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [expandedItems, setExpandedItems] = useState<string[]>(['Inventory'])
+  const navigationItems = getNavigationItems(user?.role)
 
   // Warehouse mapping dựa trên workplace_id từ database (chữ thường)
   const warehouseNames: { [key: string]: string } = {
