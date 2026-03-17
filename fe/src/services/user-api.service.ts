@@ -17,6 +17,14 @@ export interface UserInfoFromAPI {
 }
 
 export class UserAPIService {
+  static async getAll(): Promise<UserInfoFromAPI[]> {
+    const res = await localApiClient.get('/users')
+    const payload = res.data
+    if (Array.isArray(payload)) return payload
+    if (payload?.data && Array.isArray(payload.data)) return payload.data
+    return []
+  }
+
   static async getById(id: string): Promise<UserInfoFromAPI | null> {
     if (!id) return null
     const res = await localApiClient.get(`/users/${id}`)

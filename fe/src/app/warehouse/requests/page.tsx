@@ -158,6 +158,10 @@ export default function WarehouseRequestsPage() {
     { id: 1, productId: '', product: '', unit: '', currentQty: 0, requestQty: 0, reason: '' },
   ])
 
+  const normalizedRole = String(user?.role ?? '').toUpperCase().replace(/\s+/g, '_')
+  const isWarehouseAdmin = normalizedRole === 'WAREHOUSE_ADMIN' || user?.roleId === 7
+  const workplaceId = user?.warehouseId || user?.workplaceId || ''
+
   //  Fetch data 
   const fetchRequests = async () => {
     try {
@@ -168,17 +172,16 @@ export default function WarehouseRequestsPage() {
       let data: RestockRequestFromAPI[] = []
 
       // Ưu tiên dùng API theo kho / kho cha để BE filter đúng quyền
-      if (user?.warehouseId) {
-        // Nếu user là Warehouse Admin (quản lý kho tổng) → xem các yêu cầu của toàn bộ kho con
-        if (user.role === 'WAREHOUSE_ADMIN') {
-          data = await RestockAPIService.getByParentWarehouse(user.warehouseId)
+      if (workplaceId) {
+        // Warehouse Admin (roleId=7) xem toàn bộ yêu cầu của kho con theo kho tổng
+        if (isWarehouseAdmin) {
+          data = await RestockAPIService.getByParentWarehouse(workplaceId)
         } else {
-          // Warehouse staff / Store manager → chỉ xem yêu cầu gắn với kho/cửa hàng của mình
-          data = await RestockAPIService.getByWarehouse(user.warehouseId)
+          // Warehouse staff / Store manager xem yêu cầu gắn với kho/cửa hàng của mình
+          data = await RestockAPIService.getByWarehouse(workplaceId)
         }
       } else {
-        // Fallback: không có warehouseId → gọi getAll (ADMIN, roles đặc biệt)
-        data = await RestockAPIService.getAll()
+        data = []
       }
 
       setRequests(data)
@@ -224,7 +227,7 @@ export default function WarehouseRequestsPage() {
 
     fetchProducts()
     fetchWarehouses()
-  }, [token, user?.warehouseId])
+  }, [token, workplaceId, isWarehouseAdmin])
 
   useEffect(() => {
     if (!token || requests.length === 0) return
@@ -323,8 +326,11 @@ export default function WarehouseRequestsPage() {
     })
   }, [requests, search, statusFilter, priorityFilter])
 
+  // Dropdown shows only APPROVED and PROCESSING requests (can be transferred)
   const transferRequestOptions = useMemo(
-    () => requests.map(r => ({ id: r.id, requestNumber: r.requestNumber })),
+    () => requests
+      .filter(r => r.status === 'APPROVED' || r.status === 'PROCESSING')
+      .map(r => ({ id: r.id, requestNumber: r.requestNumber, status: r.status })),
     [requests]
   )
 
