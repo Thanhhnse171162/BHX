@@ -11,7 +11,8 @@ import {
   X,
   FileText,
   Upload,
-  Download
+  Download,
+  ArrowDownUp
 } from 'lucide-react'
 import { Button } from '@/shared/ui/Button'
 import { Input } from '@/shared/ui/Input'
