@@ -4,11 +4,11 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { 
   LayoutDashboard, 
-  Package,
-  ClipboardList,
-  ArrowLeftRight,
   Warehouse,
+  PlusSquare,
+  ArrowLeftRight,
   BarChart3,
+  Archive,
   Boxes
 } from 'lucide-react'
 
@@ -20,24 +20,9 @@ interface SidebarItem {
 
 const sidebarItems: SidebarItem[] = [
   {
-    label: 'Bảng điều khiển',
+    label: 'Tổng quan',
     href: '/warehouse-store',
     icon: <LayoutDashboard size={20} />
-  },
-  {
-    label: 'Nhập hàng',
-    href: '/warehouse-store/receive-goods',
-    icon: <Package size={20} />
-  },
-  {
-    label: 'Yêu cầu châm hàng',
-    href: '/warehouse-store/restock-request',
-    icon: <ClipboardList size={20} />
-  },
-  {
-    label: 'Chuyển kho',
-    href: '/warehouse-store/transfer-to-shelf',
-    icon: <ArrowLeftRight size={20} />
   },
   {
     label: 'Kho hàng',
@@ -45,8 +30,18 @@ const sidebarItems: SidebarItem[] = [
     icon: <Warehouse size={20} />
   },
   {
-    label: 'Lịch sử biến động',
-    href: '/warehouse-store/inventory-check',
+    label: 'Nhập hàng',
+    href: '/warehouse-store/receive-goods',
+    icon: <PlusSquare size={20} />
+  },
+  {
+    label: 'Xuất hàng',
+    href: '/warehouse-store/dispatch-goods',
+    icon: <Archive size={20} />
+  },
+  {
+    label: 'Báo cáo',
+    href: '/warehouse-store/reports',
     icon: <BarChart3 size={20} />
   }
 ]
@@ -72,6 +67,8 @@ export function StoreWarehouseSidebar() {
         <ul className="space-y-1.5">
           {sidebarItems.map((item) => {
             const isActive = pathname === item.href || (item.href !== '/warehouse-store' && pathname.startsWith(item.href))
+            // Highlight đặc biệt cho Nhập hàng
+            const isNhapHang = item.label === 'Nhập hàng'
             return (
               <li key={item.href}>
                 <Link
@@ -79,12 +76,14 @@ export function StoreWarehouseSidebar() {
                   className={`
                     flex items-center gap-3 rounded-xl px-3 py-2.5 text-[16px] font-medium transition-all
                     ${isActive 
-                      ? 'bg-emerald-100 text-emerald-600' 
+                      ? isNhapHang 
+                        ? 'bg-emerald-100 text-green-700' // Đậm hơn cho Nhập hàng
+                        : 'bg-emerald-100 text-emerald-600' 
                       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
                     }
                   `}
                 >
-                  <span className={isActive ? 'text-emerald-600' : 'text-slate-500'}>{item.icon}</span>
+                  <span className={isActive ? (isNhapHang ? 'text-green-700' : 'text-emerald-600') : 'text-slate-500'}>{item.icon}</span>
                   <span>{item.label}</span>
                 </Link>
               </li>

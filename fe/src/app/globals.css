@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -8,6 +10,8 @@
   --color-bhx-light: #22c55e;
   --color-bhx-lighter: #86efac;
   --color-bhx-bg: #f0fdf4;
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
 }
 
 * {
@@ -18,88 +22,159 @@
 
 html {
   scroll-behavior: smooth;
+  font-family: var(--font-sans);
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.65;
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
   background-color: #f9fafb;
   color: #1f2937;
 }
 
-@layer components {
-  .btn-primary {
-    @apply px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm hover:shadow-md;
-  }
+/* Typography Hierarchy */
 
-  .btn-secondary {
-    @apply px-6 py-3 bg-gray-200 text-gray-900 rounded-lg hover:bg-gray-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium;
-  }
-
-  .btn-bhx {
-    @apply px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-bold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5;
-  }
-
-  .input-base {
-    @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all;
-  }
-
-  .card {
-    @apply bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow;
-  }
-
-  .card-bhx {
-    @apply bg-white rounded-2xl shadow-md p-6 border-2 border-emerald-100 hover:shadow-xl hover:border-emerald-300 transition-all;
-  }
-
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
-
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  .gradient-bhx {
-    @apply bg-gradient-to-br from-emerald-400 via-green-500 to-teal-600;
-  }
-
-  .text-bhx {
-    @apply text-emerald-600;
-  }
-
-  .bg-bhx {
-    @apply bg-emerald-600;
-  }
-
-  .border-bhx {
-    @apply border-emerald-600;
-  }
+/* Page Title */
+.page-title {
+  @apply text-2xl font-semibold text-slate-900 tracking-tight;
 }
 
-@layer utilities {
-  .animate-float {
-    animation: float 3s ease-in-out infinite;
-  }
+.page-subtitle {
+  @apply text-sm font-normal text-slate-500 mt-2;
+}
 
-  @keyframes float {
-    0%, 100% {
-      transform: translateY(0px);
-    }
-    50% {
-      transform: translateY(-10px);
-    }
-  }
+/* Section Title */
+.section-title {
+  @apply text-lg font-semibold text-slate-900 tracking-tight;
+}
 
-  .text-shadow {
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
+.section-subtitle {
+  @apply text-sm font-normal text-slate-500 mt-1;
+}
 
-  .text-shadow-lg {
-    text-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  }
+/* Table Header */
+.table-header {
+  @apply text-xs font-medium text-slate-500 uppercase tracking-wider;
+}
+
+/* Table Content */
+.table-content {
+  @apply text-sm font-normal text-slate-800;
+}
+
+.table-secondary {
+  @apply text-xs font-normal text-slate-500;
+}
+
+/* Heading Styles - Only for main content, not tables */
+
+h1 {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+h2 {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+h3 {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+h4 {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+h5 {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+h6 {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+/* Text Styles */
+
+p {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.65;
+  color: #374151;
+}
+
+/* Table specific - override heading styles */
+table h1, table h2, table h3, table h4, table h5, table h6 {
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+}
+
+table p {
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+
+small {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* Button Styles */
+
+button, a {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+/* Input Styles */
+
+input, textarea, select {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+/* Label Styles */
+
+label {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: #4b5563;
 }
