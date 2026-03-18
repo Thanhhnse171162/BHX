@@ -101,6 +101,7 @@ export default function CashierLayout({ children }: CashierLayoutProps) {
       (user.roleId !== undefined && allowedRoleIds.includes(user.roleId))
 
     if (!isAllowed) {
+<<<<<<< HEAD
       if (user.role === 'ADMIN') router.push('/admin/dashboard')
       else if (user.role === 'CUSTOMER') router.push('/customer')
       else if (user.role === 'STORE_MANAGER') router.push('/store-manager')
@@ -108,6 +109,23 @@ export default function CashierLayout({ children }: CashierLayoutProps) {
       else if (user.role === 'WAREHOUSE_ADMIN' || user.roleId === 7) router.push('/warehouse')
       else if (user.roleId === 5) router.push('/warehouse-store')
       else router.push('/login')
+=======
+      if (user.role === 'ADMIN') {
+        router.push('/admin/dashboard')
+      } else if (user.role === 'CUSTOMER') {
+        router.push('/customer')
+      } else if (user.role === 'STORE_MANAGER') {
+        router.push('/store-manager')
+      } else if (user.role === 'WAREHOUSE_MANAGER' || user.roleId === 3) {
+        router.push('/warehouse-manager')
+      } else if (user.role === 'WAREHOUSE_ADMIN' || user.roleId === 7) {
+        router.push('/warehouse')
+      } else if (user.roleId === 5) {
+        router.push('/warehouse-store')
+      } else {
+        router.push('/login')
+      }
+>>>>>>> ecf7800fe0981d264f4bbefedf75e631aa6dc159
     }
   }, [isAuthenticated, user, router, hydrated])
 
