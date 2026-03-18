@@ -26,7 +26,7 @@ const nextConfig = {
   },
   // Proxy API calls to backend services to avoid CORS issues
   async rewrites() {
-    const IAM_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://localhost:5000'
+    const IAM_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://localhost:5003'
     return [
       {
         source: '/iam/:path*',

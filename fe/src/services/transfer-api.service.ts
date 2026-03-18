@@ -1,4 +1,4 @@
-import axiosInstance from '@/shared/api/http'
+import { localApiClient } from '@/shared/api/http'
 
 export interface CreateTransferItemDTO {
   productId: string
@@ -50,16 +50,16 @@ export interface TransferFromAPI {
 }
 
 export class TransferAPIService {
-  private static readonly base = '/api/Transfer/transfer'
+  private static readonly base = '/transfer/transfer'
 
   static async create(dto: CreateTransferDTO): Promise<TransferFromAPI> {
-    const response = await axiosInstance.post(this.base, dto)
+    const response = await localApiClient.post(this.base, dto)
     const payload = response.data
     return payload?.data ?? payload
   }
 
   static async getTransfers(): Promise<TransferFromAPI[]> {
-    const response = await axiosInstance.get('/api/Transfer/transfers')
+    const response = await localApiClient.get('/transfer/transfers')
     return response.data?.data ?? response.data ?? []
   }
 }

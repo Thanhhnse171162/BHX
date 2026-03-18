@@ -1,0 +1,46 @@
+import { NextRequest, NextResponse } from 'next/server'
+import axios from 'axios'
+
+const INVENTORY_SERVICE_URL =
+  process.env.INVENTORY_URL ||
+  process.env.NEXT_PUBLIC_INVENTORY_URL ||
+  'http://localhost:5003'
+
+/**
+ * GET /api/transfer/transfers
+ * Proxy to backend: GET /api/Transfer/transfers
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const queryString = searchParams.toString()
+    const url = `${INVENTORY_SERVICE_URL}/api/Transfer/transfers${queryString ? `?${queryString}` : ''}`
+
+    const authHeader = request.headers.get('authorization')
+    const cookieToken = request.cookies.get('auth_token')?.value
+    const authorization = authHeader || (cookieToken ? `Bearer ${cookieToken}` : '')
+
+    const response = await axios.get(url, {
+      headers: {
+        Authorization: authorization,
+        Accept: '*/*',
+      },
+    })
+
+    return NextResponse.json(response.data, { status: response.status })
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: error.response?.data?.message || 'Error fetching transfers',
+          error: error.response?.data?.error || undefined,
+        },
+        { status: error.response?.status || 500 }
+      )
+    }
+
+    return NextResponse.json({ success: false, message: 'Internal server error' }, { status: 500 })
+  }
+}
+

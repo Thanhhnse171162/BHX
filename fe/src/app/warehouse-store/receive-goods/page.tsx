@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { TransferAPIService, TransferFromAPI, TransferItemFromAPI } from '@/services/transfer-api.service'
 import { useAuthStore } from '@/store/auth.store'
+import { localApiClient } from '@/shared/api/http'
 
 // ─── Status mapping ───────────────────────────────────────────────────────────
 type StatusType = 'done' | 'pending' | 'error'
@@ -105,6 +106,9 @@ export default function ReceiveGoodsPage() {
   const destinationLocationId = String(user?.workplaceId ?? '')
   const normalizedDestinationId = destinationLocationId.trim().toLowerCase()
 
+  // Warehouses/stores lookup for showing names instead of IDs
+  const [locations, setLocations] = useState<Array<{ id: string; name?: string }>>([])
+
   // List state
   const [transfers, setTransfers] = useState<TransferFromAPI[]>([])
   const [loading, setLoading] = useState(false)
@@ -141,6 +145,32 @@ export default function ReceiveGoodsPage() {
   useEffect(() => {
     fetchTransfers()
   }, [fetchTransfers])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await localApiClient.get('/warehouses?status=ACTIVE&is_deleted=0')
+        const payload = res.data
+        const list =
+          Array.isArray(payload?.data) ? payload.data :
+          Array.isArray(payload) ? payload :
+          []
+        if (!cancelled) setLocations(list)
+      } catch {
+        if (!cancelled) setLocations([])
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  const normalizeId = (v?: string | null) => String(v ?? '').trim().toLowerCase()
+  const getLocationLabel = (id?: string | null) => {
+    const key = normalizeId(id)
+    if (!key) return '—'
+    const name = locations.find(l => normalizeId(l.id) === key)?.name
+    return name || String(id).slice(-8)
+  }
 
   // ─── Derived list ─────────────────────────────────────────────────────────
   const destinationTransfers = transfers.filter(
@@ -344,10 +374,10 @@ export default function ReceiveGoodsPage() {
                     {transfer.transferNumber}
                   </td>
                   <td className="px-4 py-3.5 text-slate-700 text-xs">
-                    {transfer.fromLocationId}
+                    {getLocationLabel(transfer.fromLocationId)}
                   </td>
                   <td className="px-4 py-3.5 text-slate-700 text-xs">
-                    {transfer.toLocationId}
+                    {getLocationLabel(transfer.toLocationId)}
                   </td>
                   <td className="px-4 py-3.5 text-slate-500 text-xs">
                     {transfer.transferDate}
@@ -444,14 +474,14 @@ export default function ReceiveGoodsPage() {
                       {
                         icon: MapPin,
                         label: 'Kho nguồn',
-                        value: `${inspectingOrder.fromLocationType} · ${inspectingOrder.fromLocationId}`,
+                        value: `${inspectingOrder.fromLocationType} · ${getLocationLabel(inspectingOrder.fromLocationId)}`,
                         ring: 'ring-blue-200',
                         iconCls: 'text-blue-500 bg-blue-50',
                       },
                       {
                         icon: MapPin,
                         label: 'Kho đích',
-                        value: `${inspectingOrder.toLocationType} · ${inspectingOrder.toLocationId}`,
+                        value: `${inspectingOrder.toLocationType} · ${getLocationLabel(inspectingOrder.toLocationId)}`,
                         ring: 'ring-violet-200',
                         iconCls: 'text-violet-500 bg-violet-50',
                       },
