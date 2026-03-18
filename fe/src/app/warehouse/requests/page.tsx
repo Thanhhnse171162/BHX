@@ -551,7 +551,11 @@ export default function WarehouseRequestsPage() {
   }
   const getWarehouseLabel = (id: string) => {
     if (!id) return '—'
-    return warehouseNameMap[id] || warehouses.find(w => w.id === id)?.name || id.slice(-8)
+    const key = normalizeId(id)
+    const direct = warehouseNameMap[id]
+    if (direct) return direct
+    const fromList = warehouses.find(w => normalizeId(w.id) === key)?.name
+    return fromList || warehouseNameMap[key] || id.slice(-8)
   }
   const getUserLabel = (id: string | null) => {
     if (!id) return '—'
@@ -1327,8 +1331,8 @@ export default function WarehouseRequestsPage() {
                     {/* NOTE: map restockRequestId from TransferFromAPI when field confirmed */}
                     {(t as any).restockRequestId ? String((t as any).restockRequestId).slice(0, 8) + '...' : '—'}
                   </td>
-                  <td className="px-5 py-3.5 text-gray-600 text-xs">{t.fromLocationId || '—'}</td>
-                  <td className="px-5 py-3.5 text-gray-600 text-xs">{t.toLocationId || '—'}</td>
+                  <td className="px-5 py-3.5 text-gray-600 text-xs">{t.fromLocationId ? getWarehouseLabel(t.fromLocationId) : '—'}</td>
+                  <td className="px-5 py-3.5 text-gray-600 text-xs">{t.toLocationId ? getWarehouseLabel(t.toLocationId) : '—'}</td>
                   <td className="px-5 py-3.5"><StatusBadge status={t.status} /></td>
                   <td className="px-5 py-3.5 text-gray-500 text-xs whitespace-nowrap">{fmtDate(t.transferDate)}</td>
                   <td className="px-5 py-3.5 text-gray-500 text-xs whitespace-nowrap">
