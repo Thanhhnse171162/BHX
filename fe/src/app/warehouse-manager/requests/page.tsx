@@ -10,9 +10,15 @@ import {
   CheckCircle2,
   AlertTriangle,
   X,
+  Search,
+  Package,
+  Trash2,
+  Loader2,
+  ChevronDown,
+  Warehouse,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
-import { RestockAPIService, RestockRequestFromAPI } from '@/services/restock-api.service'
+import { RestockAPIService, RestockRequestFromAPI, CreateRestockRequestDTO } from '@/services/restock-api.service'
 import { ProductAPIService } from '@/services/product-api.service'
 import { UserAPIService } from '@/services/user-api.service'
 
@@ -33,6 +39,36 @@ interface RequestItem {
   type: RequestType
 }
 
+interface WarehouseOption {
+  id: string
+  name: string
+  parentId?: string | null
+  parent_id?: string | null
+}
+
+interface ProductOption {
+  id: string
+  sku: string
+  name: string
+  unit: string
+}
+
+interface FormItem {
+  productId: string
+  productName: string
+  productSku: string
+  productUnit: string
+  requestedQuantity: number
+  currentQuantity: number
+  reason: string
+}
+
+const ITEM_REASONS = ['Hết hàng', 'Sắp hết', 'Điều phối', 'Khác']
+
+function normalizeId(value?: string | null): string {
+  return String(value ?? '').trim().toLowerCase()
+}
+
 const PAGE_SIZE = 4
 
 export default function WarehouseManagerRequestsPage() {
@@ -42,11 +78,17 @@ export default function WarehouseManagerRequestsPage() {
   const [page, setPage] = useState(1)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [newRequest, setNewRequest] = useState({
-    source: '',
-    sourceCode: '',
-    productSummary: '',
+    toWarehouseId: '',
+    notes: '',
     priority: 'TRUNG BÌNH' as RequestPriority,
   })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [locations, setLocations] = useState<WarehouseOption[]>([])
+  const [productsForItems, setProductsForItems] = useState<ProductOption[]>([])
+  const [items, setItems] = useState<FormItem[]>([])
+  const [loadingLocations, setLoadingLocations] = useState(false)
+  const [loadingProducts, setLoadingProducts] = useState(false)
 
   // Load requests from API
   const loadRequests = useCallback(async () => {
@@ -106,8 +148,21 @@ export default function WarehouseManagerRequestsPage() {
       )
       console.log('📦 warehouse-manager: Filtered requests:', filtered.length)
 
+      // Load warehouse manager requests by parent warehouse (BE endpoint)
+      const parentWarehouseId = user?.warehouseId ?? user?.workplaceId ?? user?.storeId ?? ''
+      let byParentWarehouse: RestockRequestFromAPI[] = []
+      if (parentWarehouseId) {
+        try {
+          byParentWarehouse = await RestockAPIService.getByParentWarehouse(parentWarehouseId)
+          console.log('📦 warehouse-manager: by-parent-warehouse loaded:', byParentWarehouse.length)
+        } catch {
+          console.log('📦 warehouse-manager: Failed to load by-parent-warehouse')
+          byParentWarehouse = []
+        }
+      }
+
       // Convert to RequestItem format
-      const converted: RequestItem[] = filtered.map((req) => {
+      const storeItems: RequestItem[] = filtered.map((req) => {
         const productNames = req.items?.map((item) => item.productName || productMap[item.productId] || '--').join(', ') || '--'
         const userName = userMap[req.requestedBy] || req.requestedBy || '--'
         const createdAtDate = req.requestedDate ? new Date(req.requestedDate).toLocaleDateString('vi-VN') : '--/--/----'
@@ -126,7 +181,26 @@ export default function WarehouseManagerRequestsPage() {
         }
       })
 
-      setRequests(converted)
+      const warehouseItems: RequestItem[] = byParentWarehouse.map((req) => {
+        const productNames = req.items?.map((item) => item.productName || productMap[item.productId] || '--').join(', ') || '--'
+        const userName = userMap[req.requestedBy] || req.requestedBy || '--'
+        const createdAtDate = req.requestedDate ? new Date(req.requestedDate).toLocaleDateString('vi-VN') : '--/--/----'
+
+        return {
+          uniqueId: `wh-${req.id}`,
+          id: req.requestNumber || req.id,
+          source: userName,
+          sourceCode: req.toWarehouseId || '--',
+          productSummary: productNames,
+          priority: req.priority === 'URGENT' ? 'CAO' : req.priority === 'HIGH' ? 'TRUNG BÌNH' : 'THẤP',
+          status: mapStatus(req.status),
+          createdAt: createdAtDate,
+          actionLabel: req.status === 'APPROVED' ? 'Đã duyệt' : 'Duyệt',
+          type: 'warehouse',
+        }
+      })
+
+      setRequests([...storeItems, ...warehouseItems])
       setPage(1)
     } catch {
       setRequests([])
@@ -136,6 +210,50 @@ export default function WarehouseManagerRequestsPage() {
   useEffect(() => {
     loadRequests()
   }, [loadRequests])
+
+  // Load warehouses (for toWarehouseId suggestions)
+  useEffect(() => {
+    setLoadingLocations(true)
+    fetch('/api/warehouses', {
+      headers: { Authorization: `Bearer ${useAuthStore.getState().token ?? ''}` },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        const raw = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : []
+        setLocations(
+          raw.map((w: any) => ({
+            id: w.id,
+            name: w.name ?? w.code ?? w.id,
+            parentId: w.parentId ?? w.parent_id ?? null,
+            parent_id: w.parent_id ?? w.parentId ?? null,
+          })),
+        )
+      })
+      .catch(() => setLocations([]))
+      .finally(() => setLoadingLocations(false))
+  }, [])
+
+  // Load products (for items[])
+  useEffect(() => {
+    setLoadingProducts(true)
+    fetch('/api/products', {
+      headers: { Authorization: `Bearer ${useAuthStore.getState().token ?? ''}` },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        const raw = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : []
+        setProductsForItems(
+          raw.map((p: any) => ({
+            id: p.id,
+            sku: p.sku,
+            name: p.name,
+            unit: p.unit ?? 'cái',
+          })),
+        )
+      })
+      .catch(() => setProductsForItems([]))
+      .finally(() => setLoadingProducts(false))
+  }, [])
 
   function mapStatus(status: string): RequestStatus {
     if (status === 'APPROVED') return 'Đã duyệt'
@@ -153,7 +271,10 @@ export default function WarehouseManagerRequestsPage() {
   }
 
   const filtered = useMemo(
-    () => requests.filter((item) => item.type === activeTab && item.status !== 'Đã giao'),
+    () =>
+      requests.filter(
+        (item) => item.type === activeTab && (activeTab === 'warehouse' || item.status !== 'Đã giao')
+      ),
     [activeTab, requests],
   )
 
@@ -167,40 +288,134 @@ export default function WarehouseManagerRequestsPage() {
   const urgentCount = filtered.filter((r) => r.priority === 'CAO').length
   const approvedToday = filtered.filter((r) => r.status === 'Đã duyệt').length
 
-  const createRequest = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  const fromWarehouseIdForForm = user?.warehouseId ?? user?.workplaceId ?? ''
+  const normalizedFromId = normalizeId(fromWarehouseIdForForm)
 
-    if (!newRequest.source.trim() || !newRequest.sourceCode.trim() || !newRequest.productSummary.trim()) {
+  // Record của kho hiện tại (dùng để lấy tên hiển thị và parent)
+  const currentWarehouseRecord = locations.find(
+    (loc) => normalizeId(loc.id) === normalizedFromId,
+  )
+  const fromWarehouseDisplayName =
+    currentWarehouseRecord?.name ??
+    fromWarehouseIdForForm
+
+  // Các cửa hàng/kho con mà kho hiện tại đang quản lý
+  const managedChildren = locations.filter(
+    (loc) => normalizeId(loc.parentId ?? loc.parent_id) === normalizedFromId,
+  )
+  const parentWarehouse =
+    currentWarehouseRecord &&
+    locations.find(
+      (loc) => normalizeId(loc.id) === normalizeId(currentWarehouseRecord.parentId ?? currentWarehouseRecord.parent_id),
+    )
+
+  // Danh sách đích được phép chọn: kho cha (nếu có) + các kho/cửa hàng con
+  const selectableDestinations = [
+    ...(parentWarehouse ? [parentWarehouse] : []),
+    ...managedChildren,
+  ].filter((loc, index, self) => index === self.findIndex((x) => x.id === loc.id))
+
+  // Helpers cho items trong form
+  const addItemByProductId = (productId: string) => {
+    if (!productId) return
+    if (items.some((i) => i.productId === productId)) return
+    const p = productsForItems.find((x) => x.id === productId)
+    if (!p) return
+    setItems((prev) => [
+      ...prev,
+      {
+        productId: p.id,
+        productName: p.name,
+        productSku: p.sku,
+        productUnit: p.unit,
+        requestedQuantity: 1,
+        currentQuantity: 0,
+        reason: '',
+      },
+    ])
+  }
+
+  const removeItem = (index: number) => {
+    setItems((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const updateItem = <K extends keyof FormItem>(index: number, key: K, value: FormItem[K]) => {
+    setItems((prev) => prev.map((it, i) => (i === index ? { ...it, [key]: value } : it)))
+  }
+
+  const createRequest = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setSubmitError(null)
+
+    const fromWarehouseId = user?.warehouseId ?? user?.workplaceId ?? user?.storeId ?? ''
+    if (!fromWarehouseId) {
+      setSubmitError('Không xác định được kho nguồn từ tài khoản đăng nhập.')
       return
     }
 
-    const maxId = requests.reduce((max, item) => {
-      const numeric = Number.parseInt(item.id.replace('RQ-', ''), 10)
-      return Number.isNaN(numeric) ? max : Math.max(max, numeric)
-    }, 0)
-
-    const newItem: RequestItem = {
-      uniqueId: `${Date.now()}`,  // Unique ID for React key
-      id: `RQ-${maxId + 1}`,
-      source: newRequest.source.trim(),
-      sourceCode: newRequest.sourceCode.trim(),
-      productSummary: newRequest.productSummary.trim(),
-      priority: newRequest.priority,
-      status: 'Chờ duyệt',
-      createdAt: new Date().toLocaleDateString('vi-VN'),
-      actionLabel: 'Duyệt',
-      type: 'warehouse',
+    if (!newRequest.toWarehouseId.trim()) {
+      setSubmitError('Vui lòng nhập Mã nguồn (kho/điểm nhận yêu cầu).')
+      return
     }
 
-    setRequests((prev) => [newItem, ...prev])
-    setPage(1)
-    setIsCreateOpen(false)
-    setNewRequest({
-      source: '',
-      sourceCode: '',
-      productSummary: '',
-      priority: 'TRUNG BÌNH',
-    })
+    // notes: BE cho phép rỗng, không bắt buộc validate
+
+    if (items.length === 0) {
+      setSubmitError('Vui lòng thêm ít nhất 1 sản phẩm vào danh sách items.')
+      return
+    }
+
+    for (const it of items) {
+      if (it.requestedQuantity <= 0) {
+        setSubmitError(`Số lượng yêu cầu của "${it.productName}" phải lớn hơn 0.`)
+        return
+      }
+    }
+
+    const priorityMap: Record<RequestPriority, 'NORMAL' | 'HIGH' | 'URGENT'> = {
+      'THẤP': 'NORMAL',
+      'TRUNG BÌNH': 'HIGH',
+      'CAO': 'URGENT',
+    }
+
+    const dto: CreateRestockRequestDTO = {
+      fromWarehouseId,
+      fromLocationType: 'WAREHOUSE',
+      toWarehouseId: newRequest.toWarehouseId.trim(),
+      toLocationType: 'WAREHOUSE',
+      priority: priorityMap[newRequest.priority],
+      notes: newRequest.notes.trim() || undefined,
+      items: items.map((it) => ({
+        productId: it.productId,
+        requestedQuantity: it.requestedQuantity,
+        currentQuantity: it.currentQuantity,
+        reason: it.reason.trim() || undefined,
+      })),
+    }
+
+    try {
+      setIsSubmitting(true)
+      await RestockAPIService.create(dto)
+
+      await loadRequests()
+      setPage(1)
+      setIsCreateOpen(false)
+      setNewRequest({
+        toWarehouseId: '',
+        notes: '',
+        priority: 'TRUNG BÌNH',
+      })
+      setItems([])
+    } catch (error: any) {
+      const msg =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        'Tạo yêu cầu thất bại. Vui lòng thử lại.'
+      setSubmitError(msg)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -387,53 +602,190 @@ export default function WarehouseManagerRequestsPage() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <form onSubmit={createRequest} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <label className="text-sm text-gray-600">
-                Nguồn yêu cầu
-                <input
-                  value={newRequest.source}
-                  onChange={(e) => setNewRequest((prev) => ({ ...prev, source: e.target.value }))}
-                  placeholder="Ví dụ: Kho Tổng Miền Nam"
-                  className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-200"
-                  required
-                />
-              </label>
-              <label className="text-sm text-gray-600">
-                Mã nguồn
-                <input
-                  value={newRequest.sourceCode}
-                  onChange={(e) => setNewRequest((prev) => ({ ...prev, sourceCode: e.target.value }))}
-                  placeholder="Ví dụ: WH-010"
-                  className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-200"
-                  required
-                />
-              </label>
-              <label className="text-sm text-gray-600 md:col-span-2">
-                Sản phẩm / nội dung yêu cầu
-                <textarea
-                  value={newRequest.productSummary}
-                  onChange={(e) => setNewRequest((prev) => ({ ...prev, productSummary: e.target.value }))}
-                  placeholder="Ví dụ: Điều phối rau củ (10 mặt hàng)"
-                  rows={4}
-                  className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-200 resize-y"
-                  required
-                />
-              </label>
-              <label className="text-sm text-gray-600">
-                Độ ưu tiên
-                <select
-                  value={newRequest.priority}
-                  onChange={(e) =>
-                    setNewRequest((prev) => ({ ...prev, priority: e.target.value as RequestPriority }))
-                  }
-                  className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-200"
-                >
-                  <option value="CAO">CAO</option>
-                  <option value="TRUNG BÌNH">TRUNG BÌNH</option>
-                  <option value="THẤP">THẤP</option>
-                </select>
-              </label>
-              <div className="md:col-span-2 flex justify-end gap-2">
+            <form onSubmit={createRequest} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="text-sm text-gray-600">
+                  fromWarehouseId
+                  <div className="relative mt-1">
+                    <Warehouse className="w-3 h-3 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      value={fromWarehouseDisplayName}
+                      readOnly
+                      placeholder="Tự động theo kho đăng nhập"
+                      className="w-full pl-8 pr-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-gray-700 text-sm"
+                    />
+                  </div>
+                </label>
+                <label className="text-sm text-gray-600">
+                  toWarehouseId
+                  <div className="relative mt-1">
+                    <Search className="w-3 h-3 absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500" />
+                    <select
+                      value={newRequest.toWarehouseId}
+                      onChange={(e) =>
+                        setNewRequest((prev) => ({ ...prev, toWarehouseId: e.target.value }))
+                      }
+                      className="w-full pl-8 pr-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-200 text-sm"
+                    >
+                      <option value="">-- Chọn kho / cửa hàng nhận --</option>
+                      {selectableDestinations.map((loc) => (
+                        <option key={loc.id} value={loc.id}>
+                          {loc.name} ({loc.id})
+                        </option>
+                      ))}
+                    </select>
+                    {loadingLocations && (
+                      <Loader2 className="w-3 h-3 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" />
+                    )}
+                  </div>
+                </label>
+                <input type="hidden" value="WAREHOUSE" />
+                <input type="hidden" value="WAREHOUSE" />
+                <label className="text-sm text-gray-600">
+                  priority
+                  <select
+                    value={newRequest.priority}
+                    onChange={(e) =>
+                      setNewRequest((prev) => ({ ...prev, priority: e.target.value as RequestPriority }))
+                    }
+                    className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-200 text-sm"
+                  >
+                    <option value="THẤP">NORMAL</option>
+                    <option value="TRUNG BÌNH">HIGH</option>
+                    <option value="CAO">URGENT</option>
+                  </select>
+                </label>
+                <label className="text-sm text-gray-600">
+                  notes
+                  <textarea
+                    value={newRequest.notes}
+                    onChange={(e) => setNewRequest((prev) => ({ ...prev, notes: e.target.value }))}
+                    rows={3}
+                    placeholder="Ghi chú thêm cho đơn yêu cầu..."
+                    className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-200 resize-y text-sm"
+                  />
+                </label>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <Package className="w-4 h-4 text-emerald-500" />
+                  Items (sản phẩm yêu cầu) <span className="text-red-500">*</span>
+                </p>
+                <div className="relative">
+                  <Search className="w-3 h-3 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <select
+                    onChange={(e) => {
+                      addItemByProductId(e.target.value)
+                      e.target.value = ''
+                    }}
+                    className="w-full pl-8 pr-3 py-2 rounded-lg border border-gray-300 text-sm"
+                  >
+                    <option value="">+ Thêm sản phẩm vào items...</option>
+                    {productsForItems.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.sku})
+                      </option>
+                    ))}
+                  </select>
+                  {loadingProducts && (
+                    <Loader2 className="w-3 h-3 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" />
+                  )}
+                </div>
+
+                {items.length === 0 ? (
+                  <div className="mt-3 border-2 border-dashed border-gray-200 rounded-xl py-6 text-center text-gray-400 text-sm">
+                    Chưa có sản phẩm nào. Hãy chọn ở danh sách phía trên để thêm.
+                  </div>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    {items.map((item, idx) => (
+                      <div
+                        key={item.productId}
+                        className="border border-gray-200 rounded-xl p-3 bg-gray-50/60 space-y-3"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-800">{item.productName}</p>
+                            <p className="text-xs text-gray-500">
+                              {item.productSku} · {item.productUnit}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeItem(idx)}
+                            className="p-1 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-[11px] text-gray-600 mb-1">
+                              requestedQuantity *
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              value={item.requestedQuantity}
+                              onChange={(e) =>
+                                updateItem(
+                                  idx,
+                                  'requestedQuantity',
+                                  Math.max(1, Number(e.target.value) || 1),
+                                )
+                              }
+                              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg text-center"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] text-gray-600 mb-1">
+                              currentQuantity
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={item.currentQuantity}
+                              onChange={(e) =>
+                                updateItem(
+                                  idx,
+                                  'currentQuantity',
+                                  Math.max(0, Number(e.target.value) || 0),
+                                )
+                              }
+                              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg text-center"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] text-gray-600 mb-1">reason</label>
+                            <div className="relative">
+                              <select
+                                value={item.reason}
+                                onChange={(e) => updateItem(idx, 'reason', e.target.value)}
+                                className="w-full px-2 pr-6 py-1.5 text-xs border border-gray-300 rounded-lg"
+                              >
+                                <option value="">-- chọn --</option>
+                                {ITEM_REASONS.map((r) => (
+                                  <option key={r} value={r}>
+                                    {r}
+                                  </option>
+                                ))}
+                              </select>
+                              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {submitError && (
+                <p className="text-sm text-red-600">{submitError}</p>
+              )}
+
+              <div className="flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsCreateOpen(false)}
@@ -443,9 +795,10 @@ export default function WarehouseManagerRequestsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-[#f97316] text-white font-semibold hover:bg-[#ea580c]"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 rounded-lg bg-[#f97316] text-white font-semibold hover:bg-[#ea580c] disabled:opacity-60"
                 >
-                  Lưu yêu cầu
+                  {isSubmitting ? 'Đang lưu...' : 'Lưu yêu cầu'}
                 </button>
               </div>
             </form>
