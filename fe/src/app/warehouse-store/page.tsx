@@ -133,7 +133,7 @@ export default function StoreWarehouseDashboard() {
             </h2>
             <button
               className="text-xs font-semibold text-emerald-600 hover:text-emerald-700"
-              onClick={() => router.push('/warehouse-staff/receive-goods')}
+              onClick={() => router.push('/warehouse-store/receive-goods')}
             >
               Xem tất cả phiếu nhập →
             </button>
@@ -180,7 +180,7 @@ export default function StoreWarehouseDashboard() {
             </h2>
             <button
               className="text-xs font-semibold text-emerald-600 hover:text-emerald-700"
-              onClick={() => router.push('/warehouse-staff/dispatch-goods')}
+              onClick={() => router.push('/warehouse-store/dispatch-goods')}
             >
               Xem tất cả phiếu xuất →
             </button>
@@ -221,11 +221,11 @@ export default function StoreWarehouseDashboard() {
       {/* Quick Actions */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {[
-          { label: 'Tạo yêu cầu châm hàng', icon: <Zap className="h-4 w-4" />, path: '/warehouse-staff/restock-request' },
-          { label: 'Kiểm tra kho hàng', icon: <Warehouse className="h-4 w-4" />, path: '/warehouse-staff/inventory' },
-          { label: 'Theo dõi nhập hàng', icon: <Truck className="h-4 w-4" />, path: '/warehouse-staff/receive-goods' },
-          { label: 'Xuất hàng', icon: <SquareArrowOutUpRight className="h-4 w-4" />, path: '/warehouse-staff/dispatch-goods' },
-          { label: 'Xử lý hàng lỗi/hết hạn', icon: <AlertTriangle className="h-4 w-4" />, path: '/warehouse-staff/damaged-expired' },
+          { label: 'Tạo yêu cầu châm hàng', icon: <Zap className="h-4 w-4" />, path: '/warehouse-store/restock-request' },
+          { label: 'Kiểm tra kho hàng', icon: <Warehouse className="h-4 w-4" />, path: '/warehouse-store/inventory' },
+          { label: 'Theo dõi nhập hàng', icon: <Truck className="h-4 w-4" />, path: '/warehouse-store/receive-goods' },
+          { label: 'Xuất hàng', icon: <SquareArrowOutUpRight className="h-4 w-4" />, path: '/warehouse-store/dispatch-goods' },
+          { label: 'Xử lý hàng lỗi/hết hạn', icon: <AlertTriangle className="h-4 w-4" />, path: '/warehouse-store/damaged-expired' },
         ].map(({ label, icon, path }) => (
           <button
             key={label}

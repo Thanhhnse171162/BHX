@@ -70,7 +70,7 @@ export default function LowStockAlertsPage() {
   }
 
   const handleRequestRestock = (item: LowStockItem) => {
-    router.push(`/warehouse-staff/restock-request?sku=${item.sku}`)
+    router.push(`/warehouse-store/restock-request?sku=${item.sku}`)
   }
 
   return (

@@ -516,7 +516,7 @@ export function Header({ hideDeliveryAndCart = false }: HeaderProps) {
                               user.role === 'STORE_MANAGER' ? '/store-manager' :
                               user.role === 'ADMIN' ? '/admin/dashboard' :
                               user.role === 'WAREHOUSE_MANAGER' ? '/warehouse' :
-                              user.role === 'WAREHOUSE_STAFF' ? '/warehouse-staff' :
+                              user.role === 'WAREHOUSE_STAFF' ? '/warehouse-store' :
                               user.role === 'STAFF' ? '/cashier' : '/'
                             }
                             className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-gray-700 hover:text-green-600"
