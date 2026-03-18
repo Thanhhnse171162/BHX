@@ -30,7 +30,7 @@ export function RouteGuard({ children, allowedRoles, fallback }: RouteGuardProps
         STORE_MANAGER: '/store-manager',
         WAREHOUSE_MANAGER: '/warehouse-manager',
         WAREHOUSE_ADMIN: '/warehouse',
-        WAREHOUSE_STAFF: '/warehouse-store',
+        WAREHOUSE_STAFF: '/warehouse-staff',
         STAFF: '/cashier',
         CUSTOMER: '/customer',
       }

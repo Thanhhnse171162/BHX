@@ -39,14 +39,14 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
     const isStaff = user.role === 'STAFF' || user.roleId === 5
     const hasCompanyEmail = user.email.toLowerCase().endsWith('@company.com')
 
-    if (!isStaff || !hasCompanyEmail) {
-      // Redirect to appropriate page based on role
-      if (user.role === 'ADMIN') router.push('/admin/dashboard')
-      else if (user.role === 'CUSTOMER') router.push('/customer')
-      else if (user.role === 'STORE_MANAGER') router.push('/store-manager')
-      else if (user.role === 'WAREHOUSE_MANAGER' || user.roleId === 3) router.push('/warehouse-manager')
-      else if (user.role === 'WAREHOUSE_ADMIN' || user.roleId === 7) router.push('/warehouse')
-      else if (user.roleId === 5) router.push('/warehouse-store')
+      if (!isStaff || !hasCompanyEmail) {
+        // Redirect to appropriate page based on role
+        if (user.role === 'ADMIN') router.push('/admin/dashboard')
+        else if (user.role === 'CUSTOMER') router.push('/customer')
+        else if (user.role === 'STORE_MANAGER') router.push('/store-manager')
+        else if (user.role === 'WAREHOUSE_MANAGER' || user.roleId === 3) router.push('/warehouse-manager')
+        else if (user.role === 'WAREHOUSE_ADMIN' || user.roleId === 7) router.push('/warehouse')
+        else if (user.roleId === 5) router.push('/warehouse-staff')
       else router.push('/ops')
       return
     }

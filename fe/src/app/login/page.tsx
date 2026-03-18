@@ -154,7 +154,7 @@ export default function LoginPage() {
       } else if (userRole === 'STAFF') {
         router.replace('/cashier')
       } else if (userRole === 'WAREHOUSE_STAFF') {
-        router.replace('/warehouse-store')
+          router.replace('/warehouse-staff')
       } else {
         router.replace('/customer')
       }

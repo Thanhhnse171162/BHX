@@ -48,7 +48,7 @@ export default function OutOfStockPage() {
   ]
 
   const handleRequestRestock = (item: OutOfStockItem) => {
-    router.push(`/warehouse-store/restock-request?sku=${item.sku}&qty=${item.suggestedReorder}`)
+    router.push(`/warehouse-staff/restock-request?sku=${item.sku}&qty=${item.suggestedReorder}`)
   }
 
   const getUrgencyLevel = (days: number) => {

@@ -107,6 +107,7 @@ export default function CashierLayout({ children }: CashierLayoutProps) {
       else if (user.role === 'WAREHOUSE_MANAGER' || user.roleId === 3) router.push('/warehouse-manager')
       else if (user.role === 'WAREHOUSE_ADMIN' || user.roleId === 7) router.push('/warehouse')
       else if (user.roleId === 5) router.push('/warehouse-store')
+        else router.push('/warehouse-staff')
       else router.push('/login')
     }
   }, [isAuthenticated, user, router, hydrated])

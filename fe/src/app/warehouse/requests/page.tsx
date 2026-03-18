@@ -1,22 +1,14 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
-  Search,
-  ChevronDown,
-  SlidersHorizontal,
-  Plus,
-  X,
-  AlertTriangle,
-  Package,
-  Trash2,
-  RefreshCw,
-  CheckCircle,
-  XCircle,
-  Loader2,
+  Search, ChevronDown, Plus, X, AlertTriangle,
+  Package, Trash2, RefreshCw, CheckCircle, XCircle, Loader2,
+  ArrowRight, Truck, MapPin, User, FileText,
+  ChevronLeft, ChevronRight, Inbox,
 } from 'lucide-react'
 import { RestockAPIService, RestockRequestFromAPI, RestockRequestItem } from '@/services/restock-api.service'
-import { TransferAPIService } from '@/services/transfer-api.service'
+import { TransferAPIService, TransferFromAPI } from '@/services/transfer-api.service'
 import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
 import { UserAPIService } from '@/services/user-api.service'
 import { WarehouseLookupAPIService } from '@/services/warehouse-lookup-api.service'
@@ -25,116 +17,264 @@ import { localApiClient } from '@/shared/api/http'
 import type { AdminWarehouse } from '@/shared/types/warehouse.types'
 import { useAuthStore } from '@/store/auth.store'
 
-// â”€â”€â”€ Types 
+// ─── Types ────────────────────────────────────────────────────────────────────
 
+// requestQty is string to allow free typing without leading-zero issues
 interface ProductRow {
   id: number
   productId: string
   product: string
   unit: string
   currentQty: number
-  requestQty: number
+  requestQty: string   // ← string, converted to number only at submit
   reason: string
 }
 
+// requestedQuantity and receivedQuantity are strings for the same reason
 interface TransferItemRow {
   id: number
   productId: string
   batchId: string
-  requestedQuantity: number
-  receivedQuantity: number
+  requestedQuantity: string  // ← string
+  receivedQuantity: string   // ← string
   notes: string
 }
 
-// â”€â”€â”€ Helper components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+let _nextProductRowId = 10
+let _nextTransferItemRowId = 100
+
+function normalizeId(value?: string | null): string {
+  return String(value ?? '').trim().toLowerCase()
+}
+function isWarehouseId(id: string): boolean {
+  return normalizeId(id).startsWith('a')
+}
+
+// ─── Small UI helpers (all in-file) ──────────────────────────────────────────
 
 function PriorityBadge({ priority }: { priority: string }) {
   const map: Record<string, { label: string; cls: string }> = {
-    URGENT: { label: 'Khẩn cấp', cls: 'text-red-500 font-semibold' },
-    HIGH:   { label: 'Cao',   cls: 'text-orange-500 font-semibold' },
-    NORMAL: { label: 'Bình thường',   cls: 'text-gray-400 font-medium' },
+    URGENT: { label: 'Khẩn cấp', cls: 'text-red-600 bg-red-50 border border-red-200' },
+    HIGH:   { label: 'Cao',      cls: 'text-orange-600 bg-orange-50 border border-orange-200' },
+    NORMAL: { label: 'Bình thường', cls: 'text-gray-500 bg-gray-50 border border-gray-200' },
   }
-  const s = map[priority] ?? { label: priority, cls: 'text-gray-500' }
-  return <span className={s.cls}>{s.label}</span>
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { dot: string; bg: string; text: string; label: string }> = {
-    PENDING:    { dot: 'bg-yellow-400', bg: 'bg-yellow-50 border border-yellow-200', text: 'text-yellow-700', label: 'Chờ xử lý' },
-    APPROVED:   { dot: 'bg-green-500',  bg: 'bg-green-50 border border-green-200',   text: 'text-green-700',  label: 'Đã duyệt' },
-    PROCESSING: { dot: 'bg-blue-500',   bg: 'bg-blue-50 border border-blue-200',     text: 'text-blue-700',   label: 'Đang xử lý' },
-    COMPLETED:  { dot: 'bg-teal-500',   bg: 'bg-teal-50 border border-teal-200',     text: 'text-teal-700',   label: 'Hoàn thành' },
-    REJECTED:   { dot: 'bg-red-500',    bg: 'bg-red-50 border border-red-200',       text: 'text-red-700',    label: 'Từ chối' },
-  }
-  const s = map[status] ?? { dot: 'bg-gray-400', bg: 'bg-gray-50 border border-gray-200', text: 'text-gray-700', label: status }
+  const s = map[priority] ?? { label: priority, cls: 'text-gray-500 bg-gray-50 border border-gray-200' }
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${s.bg} ${s.text}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${s.cls}`}>
+      {priority === 'URGENT' && <AlertTriangle size={10} className="mr-1" />}
       {s.label}
     </span>
   )
 }
 
-function SelectField({ label, options, value, onChange, required }: {
-  label: string
-  options: { value: string; label: string }[]
-  value: string
-  onChange: (v: string) => void
-  required?: boolean
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, { dot: string; bg: string; text: string; label: string }> = {
+    PENDING:    { dot: 'bg-amber-400',  bg: 'bg-amber-50 border border-amber-200',   text: 'text-amber-700',  label: 'Chờ xử lý' },
+    APPROVED:   { dot: 'bg-green-500',  bg: 'bg-green-50 border border-green-200',   text: 'text-green-700',  label: 'Đã duyệt' },
+    PROCESSING: { dot: 'bg-blue-500',   bg: 'bg-blue-50 border border-blue-200',     text: 'text-blue-700',   label: 'Đang xử lý' },
+    COMPLETED:  { dot: 'bg-teal-500',   bg: 'bg-teal-50 border border-teal-200',     text: 'text-teal-700',   label: 'Hoàn thành' },
+    REJECTED:   { dot: 'bg-red-500',    bg: 'bg-red-50 border border-red-200',       text: 'text-red-700',    label: 'Từ chối' },
+    IN_TRANSIT: { dot: 'bg-indigo-500', bg: 'bg-indigo-50 border border-indigo-200', text: 'text-indigo-700', label: 'Đang vận chuyển' },
+    CANCELLED:  { dot: 'bg-gray-400',   bg: 'bg-gray-50 border border-gray-200',     text: 'text-gray-600',   label: 'Đã hủy' },
+  }
+  const s = map[status] ?? { dot: 'bg-gray-400', bg: 'bg-gray-50 border border-gray-200', text: 'text-gray-600', label: status }
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${s.bg} ${s.text}`}>
+      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.dot}`} />
+      {s.label}
+    </span>
+  )
+}
+
+function SelectField({ label, options, value, onChange, required, colSpan }: {
+  label: string; options: { value: string; label: string }[]
+  value: string; onChange: (v: string) => void
+  required?: boolean; colSpan?: string
 }) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className={`flex flex-col gap-1.5 ${colSpan ?? ''}`}>
       <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-        {label}{required && ' *'}
+        {label}{required && <span className="text-red-400 ml-0.5">*</span>}
       </label>
       <div className="relative">
         <select
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          required={required}
-          className="w-full appearance-none border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 pr-8"
+          value={value} onChange={e => onChange(e.target.value)} required={required}
+          className="w-full appearance-none border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-400 pr-8 transition"
         >
-          {options.map(o => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
+          {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
-        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={14} />
       </div>
     </div>
   )
 }
 
-
-
-let _nextProductRowId = 10
-let _nextTransferItemRowId = 100
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-function normalizeId(value?: string | null): string {
-  return String(value ?? '').trim().toLowerCase()
+function InfoField({ label, value, icon: Icon, highlight }: {
+  label: string; value?: string | null; icon?: React.ElementType; highlight?: boolean
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1">
+        {Icon && <Icon size={10} />}{label}
+      </p>
+      <p className={`text-sm font-medium break-all ${highlight ? 'text-blue-600' : 'text-gray-800'}`}>
+        {value || '—'}
+      </p>
+    </div>
+  )
 }
 
-function isWarehouseId(id: string): boolean {
-  return normalizeId(id).startsWith('a')
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 mb-3">
+      <div className="h-px flex-1 bg-gray-100" />
+      <span className="text-xs font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">{children}</span>
+      <div className="h-px flex-1 bg-gray-100" />
+    </div>
+  )
 }
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <tr>
+      <td colSpan={99} className="py-14 text-center">
+        <div className="flex flex-col items-center gap-2 text-gray-300">
+          <Inbox size={32} />
+          <p className="text-sm">{text}</p>
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+function SkeletonRow({ cols }: { cols: number }) {
+  return (
+    <tr>
+      {Array.from({ length: cols }).map((_, i) => (
+        <td key={i} className="px-5 py-3.5">
+          <div className="h-3.5 bg-gray-100 rounded animate-pulse w-3/4" />
+        </td>
+      ))}
+    </tr>
+  )
+}
+
+// ─── Number input helper ──────────────────────────────────────────────────────
+// Strips leading zeros while typing, allows empty string, never coerces to 0
+function sanitizeNumericInput(raw: string): string {
+  if (raw === '' || raw === '-') return raw
+  // Remove non-digit characters except leading minus
+  const digits = raw.replace(/[^\d]/g, '')
+  if (digits === '') return ''
+  // Strip leading zeros (e.g. "0444" → "444"), but keep "0" alone
+  return String(Number(digits))
+}
+
+// ─── Pagination helper ────────────────────────────────────────────────────────
+
+function usePagination<T>(items: T[], pageSize = 10) {
+  const [page, setPage] = useState(1)
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize))
+  const safePage = Math.min(page, totalPages)
+
+  const paginated = useMemo(() => {
+    const start = (safePage - 1) * pageSize
+    return items.slice(start, start + pageSize)
+  }, [items, safePage, pageSize])
+
+  const reset = useCallback(() => setPage(1), [])
+
+  return { page: safePage, setPage, totalPages, paginated, total: items.length, pageSize, reset }
+}
+
+function PaginationBar({
+  page, totalPages, total, pageSize, setPage,
+}: {
+  page: number; totalPages: number; total: number; pageSize: number
+  setPage: (p: number) => void
+}) {
+  const from = total === 0 ? 0 : (page - 1) * pageSize + 1
+  const to = Math.min(page * pageSize, total)
+
+  const pageNumbers: (number | '…')[] = []
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++) pageNumbers.push(i)
+  } else {
+    pageNumbers.push(1)
+    if (page > 3) pageNumbers.push('…')
+    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) pageNumbers.push(i)
+    if (page < totalPages - 2) pageNumbers.push('…')
+    pageNumbers.push(totalPages)
+  }
+
+  return (
+    <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 bg-gray-50/50">
+      <span className="text-xs text-gray-500">
+        Hiển thị <span className="font-semibold text-gray-700">{from}–{to}</span> trên{' '}
+        <span className="font-semibold text-gray-700">{total}</span> kết quả
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => setPage(page - 1)} disabled={page === 1}
+          className="flex items-center gap-1 px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-gray-600 transition"
+        >
+          <ChevronLeft size={13} /> Trước
+        </button>
+        {pageNumbers.map((p, i) =>
+          p === '…' ? (
+            <span key={`ellipsis-${i}`} className="px-1 text-gray-400 text-xs">…</span>
+          ) : (
+            <button
+              key={p}
+              onClick={() => setPage(p as number)}
+              className={`w-7 h-7 rounded-lg text-xs font-semibold transition ${
+                page === p ? 'bg-green-600 text-white' : 'border border-gray-200 text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {p}
+            </button>
+          )
+        )}
+        <button
+          onClick={() => setPage(page + 1)} disabled={page === totalPages}
+          className="flex items-center gap-1 px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-gray-600 transition"
+        >
+          Sau <ChevronRight size={13} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function WarehouseRequestsPage() {
   const { user, token } = useAuthStore()
 
+  // ── Restock request state ──────────────────────────────────────────────────
   const [requests, setRequests] = useState<RestockRequestFromAPI[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [priorityFilter, setPriorityFilter] = useState('ALL')
+  const [selectedRequest, setSelectedRequest] = useState<RestockRequestFromAPI | null>(null)
 
+  // ── Transfer history state ─────────────────────────────────────────────────
+  const [transfers, setTransfers] = useState<TransferFromAPI[]>([])
+  const [isLoadingTransfers, setIsLoadingTransfers] = useState(false)
+  const [transferError, setTransferError] = useState<string | null>(null)
+  const [transferSearch, setTransferSearch] = useState('')
+  const [transferStatusFilter, setTransferStatusFilter] = useState('ALL')
+
+  // ── Modal state ────────────────────────────────────────────────────────────
   const [showModal, setShowModal] = useState(false)
   const [showTransferModal, setShowTransferModal] = useState(false)
-  const [selectedRequest, setSelectedRequest] = useState<RestockRequestFromAPI | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmittingTransfer, setIsSubmittingTransfer] = useState(false)
 
+  // ── Transfer form state ────────────────────────────────────────────────────
   const [transferFromLocationType, setTransferFromLocationType] = useState('WAREHOUSE')
   const [transferFromLocationId, setTransferFromLocationId] = useState('')
   const [transferToLocationType, setTransferToLocationType] = useState('STORE')
@@ -146,6 +286,7 @@ export default function WarehouseRequestsPage() {
   const [transferItems, setTransferItems] = useState<TransferItemRow[]>([])
   const [transferSourceRequest, setTransferSourceRequest] = useState<RestockRequestFromAPI | null>(null)
 
+  // ── Supporting data ────────────────────────────────────────────────────────
   const [products, setProducts] = useState<ProductFromAPI[]>([])
   const [isLoadingProducts, setIsLoadingProducts] = useState(false)
   const [batches, setBatches] = useState<ProductBatchFromAPI[]>([])
@@ -155,7 +296,7 @@ export default function WarehouseRequestsPage() {
   const [userNameMap, setUserNameMap] = useState<Record<string, string>>({})
   const [warehouseNameMap, setWarehouseNameMap] = useState<Record<string, string>>({})
 
-  //  Create form state 
+  // ── Create request form state ──────────────────────────────────────────────
   const [fromWarehouseId, setFromWarehouseId] = useState('')
   const [fromLocType, setFromLocType] = useState('WAREHOUSE')
   const [toWarehouseId, setToWarehouseId] = useState('')
@@ -163,18 +304,17 @@ export default function WarehouseRequestsPage() {
   const [priority, setPriority] = useState('NORMAL')
   const [notes, setNotes] = useState('')
   const [productRows, setProductRows] = useState<ProductRow[]>([
-    { id: 1, productId: '', product: '', unit: '', currentQty: 0, requestQty: 0, reason: '' },
+    { id: 1, productId: '', product: '', unit: '', currentQty: 0, requestQty: '', reason: '' },
   ])
 
+  // ── Derived user/workplace info ────────────────────────────────────────────
   const normalizedRole = String(user?.role ?? '').toUpperCase().replace(/\s+/g, '_')
   const isWarehouseAdmin = normalizedRole === 'WAREHOUSE_ADMIN' || user?.roleId === 7
   const workplaceId = user?.warehouseId || user?.workplaceId || ''
 
-  // Kho/cửa hàng thuộc quyền kiểm soát của kho tổng (descendants theo parentId)
   const managedLocationIds = useMemo(() => {
     const root = normalizeId(workplaceId)
     if (!root || warehouses.length === 0) return new Set<string>()
-
     const byParent = new Map<string, string[]>()
     for (const w of warehouses as any[]) {
       const pid = normalizeId(w.parentId ?? w.parent_id)
@@ -183,746 +323,562 @@ export default function WarehouseRequestsPage() {
       if (!byParent.has(pid)) byParent.set(pid, [])
       byParent.get(pid)!.push(id)
     }
-
     const visited = new Set<string>()
-    const queue: string[] = [root]
+    const queue = [root]
     while (queue.length) {
       const cur = queue.shift()!
       if (visited.has(cur)) continue
       visited.add(cur)
-      const children = byParent.get(cur) ?? []
-      for (const c of children) queue.push(c)
+      for (const c of byParent.get(cur) ?? []) queue.push(c)
     }
     return visited
   }, [workplaceId, warehouses])
 
-  const warehouseSourceOptions = useMemo(() => {
-    const allWarehouses = warehouses.filter((w) => isWarehouseId(w.id))
-    // Chỉ hiện các kho thuộc quyền kho tổng đang quản lý (descendants theo parentId)
-    return allWarehouses.filter((w) => managedLocationIds.has(normalizeId(w.id)))
-  }, [warehouses, managedLocationIds])
+  const warehouseSourceOptions = useMemo(() =>
+    warehouses.filter(w => isWarehouseId(w.id) && managedLocationIds.has(normalizeId(w.id))),
+    [warehouses, managedLocationIds]
+  )
+  const storeOptions = useMemo(() =>
+    warehouses.filter(w => !isWarehouseId(w.id) && managedLocationIds.has(normalizeId(w.id))),
+    [warehouses, managedLocationIds]
+  )
 
-  const storeOptions = useMemo(() => {
-    // store ids thường bắt đầu bằng 'b' trong seed data
-    const stores = warehouses.filter((w) => !isWarehouseId(w.id))
-    // Chỉ show store/kho con thuộc quyền kiểm soát của kho tổng
-    return stores.filter((w) => managedLocationIds.has(normalizeId(w.id)))
-  }, [warehouses, managedLocationIds])
-
-  //  Fetch data 
-  const fetchRequests = async () => {
+  // ── Fetch restock requests ─────────────────────────────────────────────────
+  const fetchRequests = useCallback(async () => {
+    if (!token) return
+    setIsLoading(true)
+    setError(null)
     try {
-      if (!token) return
-      setIsLoading(true)
-      setError(null)
-
       let data: RestockRequestFromAPI[] = []
-
-      // Ưu tiên dùng API theo kho / kho cha để BE filter đúng quyền
       if (workplaceId) {
-        // Warehouse Admin (roleId=7) xem toàn bộ yêu cầu của kho con theo kho tổng
-        if (isWarehouseAdmin) {
-          data = await RestockAPIService.getByParentWarehouse(workplaceId)
-        } else {
-          // Warehouse staff / Store manager xem yêu cầu gắn với kho/cửa hàng của mình
-          data = await RestockAPIService.getByWarehouse(workplaceId)
-        }
-
-        // BE endpoint đôi khi chỉ filter theo fromWarehouseId.
-        // Đảm bảo kho hiện tại (đặc biệt kho tổng) nhìn thấy các đơn gửi ĐẾN mình theo toWarehouseId.
+        data = isWarehouseAdmin
+          ? await RestockAPIService.getByParentWarehouse(workplaceId)
+          : await RestockAPIService.getByWarehouse(workplaceId)
         try {
           const all = await RestockAPIService.getAll()
           const wid = workplaceId.toLowerCase()
-          const incoming = all.filter((r) => (r.toWarehouseId || '').toLowerCase() === wid)
+          const incoming = all.filter(r => (r.toWarehouseId || '').toLowerCase() === wid)
           const merged = [...data, ...incoming]
-          const deduped = merged.filter((r, idx, self) => idx === self.findIndex((x) => x.id === r.id))
-          data = deduped
-        } catch {
-          // ignore: fallback to data from scoped endpoint
-        }
-      } else {
-        data = []
+          data = merged.filter((r, idx, self) => idx === self.findIndex(x => x.id === r.id))
+        } catch { /* ignore */ }
       }
-
       setRequests(data)
-      if (data.length > 0) setSelectedRequest(data[0])
-    } catch (err) {
-      console.error('Error loading restock requests:', err)
+      if (data.length > 0 && !selectedRequest) setSelectedRequest(data[0])
+    } catch {
       setError('Không thể tải danh sách yêu cầu. Vui lòng thử lại.')
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [token, workplaceId, isWarehouseAdmin])
+
+  // ── Fetch transfer history ─────────────────────────────────────────────────
+  const fetchTransfers = useCallback(async () => {
+    if (!token || !workplaceId) return
+    setIsLoadingTransfers(true)
+    setTransferError(null)
+    try {
+      // NOTE: map to TransferAPIService.getTransfers(workplaceId) when available
+      const data = await TransferAPIService.getTransfers()
+      setTransfers(data)
+    } catch {
+      setTransferError('Không thể tải lịch sử đơn vận chuyển.')
+    } finally {
+      setIsLoadingTransfers(false)
+    }
+  }, [token, workplaceId])
 
   useEffect(() => {
     if (!token) return
-
     fetchRequests()
+    fetchTransfers()
 
     const fetchProducts = async () => {
-      try {
-        setIsLoadingProducts(true)
-        const data = await ProductAPIService.getAllProducts()
-        setProducts(data)
-      } catch (err) {
-        console.error('Error loading products for restock form:', err)
-      } finally {
-        setIsLoadingProducts(false)
-      }
+      setIsLoadingProducts(true)
+      try { setProducts(await ProductAPIService.getAllProducts()) }
+      catch { /* ignore */ }
+      finally { setIsLoadingProducts(false) }
     }
-
     const fetchWarehouses = async () => {
+      setIsLoadingWarehouses(true)
       try {
-        setIsLoadingWarehouses(true)
         const response = await localApiClient.get('/warehouses?status=ACTIVE&is_deleted=0')
         const json = response.data
         const data: AdminWarehouse[] = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : []
         setWarehouses(data)
-      } catch (err) {
-        console.error('Error loading warehouses for restock form:', err)
-      } finally {
-        setIsLoadingWarehouses(false)
-      }
+      } catch { /* ignore */ }
+      finally { setIsLoadingWarehouses(false) }
     }
-
     fetchProducts()
     fetchWarehouses()
   }, [token, workplaceId, isWarehouseAdmin])
 
+  // ── Resolve user names ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!token || requests.length === 0) return
-
-    const unresolvedIds = Array.from(
-      new Set(
-        requests.flatMap(r => [r.requestedBy, r.approvedBy].filter((id): id is string => Boolean(id)))
-      )
-    ).filter(id => id !== user?.id && !userNameMap[id])
-
-    if (unresolvedIds.length === 0) return
-
+    const unresolvedIds = Array.from(new Set(
+      requests.flatMap(r => [r.requestedBy, r.approvedBy].filter((id): id is string => Boolean(id)))
+    )).filter(id => id !== user?.id && !userNameMap[id])
+    if (!unresolvedIds.length) return
     let cancelled = false
-
-    const fetchUserNames = async () => {
-      const entries = await Promise.all(
-        unresolvedIds.map(async (id) => {
-          try {
-            const info = await UserAPIService.getIamDetailsById(id)
-            const displayName = info?.fullName || info?.full_name || info?.name || info?.email || ''
-            return [id, displayName] as const
-          } catch {
-            return [id, ''] as const
-          }
-        })
-      )
-
+    ;(async () => {
+      const entries = await Promise.all(unresolvedIds.map(async id => {
+        try {
+          const info = await UserAPIService.getIamDetailsById(id)
+          return [id, info?.fullName || info?.full_name || info?.name || info?.email || ''] as const
+        } catch { return [id, ''] as const }
+      }))
       if (cancelled) return
-
       setUserNameMap(prev => {
         const next = { ...prev }
-        for (const [id, name] of entries) {
-          if (name) next[id] = name
-        }
+        for (const [id, name] of entries) if (name) next[id] = name
         return next
       })
-    }
+    })()
+    return () => { cancelled = true }
+  }, [token, requests, user?.id])
 
-    fetchUserNames()
-
-    return () => {
-      cancelled = true
-    }
-  }, [token, requests, user?.id, userNameMap])
-
+  // ── Resolve warehouse names ────────────────────────────────────────────────
   useEffect(() => {
     if (!token || requests.length === 0) return
-
-    const unresolvedWarehouseIds = Array.from(
-      new Set(requests.flatMap(r => [r.fromWarehouseId, r.toWarehouseId].filter(Boolean)))
-    ).filter(id => !warehouseNameMap[id])
-
-    if (unresolvedWarehouseIds.length === 0) return
-
+    const ids = Array.from(new Set(requests.flatMap(r => [r.fromWarehouseId, r.toWarehouseId].filter(Boolean))))
+      .filter(id => !warehouseNameMap[id])
+    if (!ids.length) return
     let cancelled = false
-
-    const fetchWarehouseNames = async () => {
-      const entries = await Promise.all(
-        unresolvedWarehouseIds.map(async (id) => {
-          try {
-            const info = await WarehouseLookupAPIService.getById(id)
-            return [id, info?.name || ''] as const
-          } catch {
-            return [id, ''] as const
-          }
-        })
-      )
-
+    ;(async () => {
+      const entries = await Promise.all(ids.map(async id => {
+        try {
+          const info = await WarehouseLookupAPIService.getById(id)
+          return [id, info?.name || ''] as const
+        } catch { return [id, ''] as const }
+      }))
       if (cancelled) return
-
       setWarehouseNameMap(prev => {
         const next = { ...prev }
-        for (const [id, name] of entries) {
-          if (name) next[id] = name
-        }
+        for (const [id, name] of entries) if (name) next[id] = name
         return next
       })
+    })()
+    return () => { cancelled = true }
+  }, [token, requests])
+
+  // ── Load batches for transfer modal ───────────────────────────────────────
+  useEffect(() => {
+    if (!showTransferModal || !transferFromLocationId || !token) { setBatches([]); return }
+    let cancelled = false
+    setIsLoadingBatches(true)
+    ProductBatchAPIService.getByWarehouse(transferFromLocationId)
+      .then(data => { if (!cancelled) setBatches(data) })
+      .catch(() => { if (!cancelled) setBatches([]) })
+      .finally(() => { if (!cancelled) setIsLoadingBatches(false) })
+    return () => { cancelled = true }
+  }, [transferFromLocationId, showTransferModal, token])
+
+  // ── Auto-fill transfer form from selected request ─────────────────────────
+  useEffect(() => {
+    if (!showTransferModal) return
+    const key = transferRestockRequestId.trim().toLowerCase()
+    if (!key) { setTransferSourceRequest(null); setTransferItems([]); return }
+    const matched = requests.find(r => r.id.toLowerCase() === key || r.requestNumber.toLowerCase() === key)
+    if (matched) {
+      setTransferSourceRequest(matched)
+      setTransferFromLocationType(matched.fromLocationType || 'WAREHOUSE')
+      setTransferFromLocationId(matched.fromWarehouseId || '')
+      setTransferToLocationType(matched.toLocationType || 'STORE')
+      setTransferToLocationId(matched.toWarehouseId || '')
+      setTransferExpectedDelivery(toDateTimeLocalValue(new Date(Date.now() + 86400000)))
+      setTransferShippedBy(user?.id || '')
+      setTransferNotes(matched.notes || '')
+      setTransferItems((matched.items || []).map((item, idx) => ({
+        id: idx + 1,
+        productId: item.productId,
+        batchId: '',
+        // Store as string, strip leading zeros
+        requestedQuantity: String(item.approvedQuantity ?? item.requestedQuantity ?? 0),
+        receivedQuantity: '0',
+        notes: item.reason || '',
+      })))
+    } else {
+      setTransferSourceRequest(null)
     }
+  }, [transferRestockRequestId, showTransferModal, requests])
 
-    fetchWarehouseNames()
-
-    return () => {
-      cancelled = true
-    }
-  }, [token, requests, warehouseNameMap])
-
-  //  Filters 
+  // ── Filters ────────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     return requests.filter(r => {
-      const matchSearch =
-        r.requestNumber.toLowerCase().includes(search.toLowerCase()) ||
-        (r.notes ?? '').toLowerCase().includes(search.toLowerCase())
+      const q = search.toLowerCase()
+      const matchSearch = r.requestNumber.toLowerCase().includes(q) || (r.notes ?? '').toLowerCase().includes(q)
       const matchStatus = statusFilter === 'ALL' || r.status === statusFilter
       const matchPriority = priorityFilter === 'ALL' || r.priority === priorityFilter
       return matchSearch && matchStatus && matchPriority
     })
   }, [requests, search, statusFilter, priorityFilter])
 
-  // Dropdown shows only APPROVED and PROCESSING requests (can be transferred)
+  const filteredTransfers = useMemo(() => {
+    const q = transferSearch.toLowerCase()
+    return transfers.filter(t => {
+      const matchSearch = t.transferNumber?.toLowerCase().includes(q) ||
+        (t.restockRequestId || '').toLowerCase().includes(q)
+      const matchStatus = transferStatusFilter === 'ALL' || t.status === transferStatusFilter
+      return matchSearch && matchStatus
+    })
+  }, [transfers, transferSearch, transferStatusFilter])
+
+  // ── Pagination ─────────────────────────────────────────────────────────────
+  const reqPagination = usePagination(filtered, 10)
+  const trPagination = usePagination(filteredTransfers, 10)
+
+  useEffect(() => { reqPagination.reset() }, [search, statusFilter, priorityFilter])
+  useEffect(() => { trPagination.reset() }, [transferSearch, transferStatusFilter])
+
+  useEffect(() => {
+    if (!selectedRequest) return
+    const isVisible = reqPagination.paginated.some(r => r.id === selectedRequest.id)
+    if (!isVisible && reqPagination.paginated.length > 0) {
+      setSelectedRequest(reqPagination.paginated[0])
+    }
+  }, [reqPagination.paginated])
+
+  // ── Transfer request options ───────────────────────────────────────────────
   const transferRequestOptions = useMemo(
-    () => requests
-      .filter(r => r.status === 'APPROVED' || r.status === 'PROCESSING')
-      .map(r => ({ id: r.id, requestNumber: r.requestNumber, status: r.status })),
+    () => requests.filter(r => r.status === 'APPROVED' || r.status === 'PROCESSING'),
     [requests]
   )
 
-  //  Product row helpers 
-  const addProductRow = () => {
-    _nextProductRowId++
-    setProductRows(rows => [
-      ...rows,
-      { id: _nextProductRowId, productId: '', product: '', unit: '', currentQty: 0, requestQty: 0, reason: '' },
-    ])
-  }
-
-  const removeProductRow = (id: number) => {
-    setProductRows(rows => rows.filter(r => r.id !== id))
-  }
-
-  const updateRow = <K extends keyof ProductRow>(id: number, field: K, value: ProductRow[K]) => {
-    setProductRows(rows =>
-      rows.map(r => {
-        if (r.id !== id) return r
-        if (field === 'productId') {
-          const found = products.find(p => p.id === String(value))
-          return {
-            ...r,
-            productId: String(value),
-            product: found?.name ?? '',
-            unit: found?.unit ?? '',
-            // TODO: khi có API tồn kho theo kho nguồn, map currentQty từ đó
-            currentQty: r.currentQty,
-          }
-        }
-        return { ...r, [field]: value }
-      })
-    )
-  }
-
-  //  Reset & close modal 
-  const closeModal = () => {
-    setShowModal(false)
-    setFromWarehouseId(user?.warehouseId ?? '')
-    setFromLocType('WAREHOUSE')
-    setToWarehouseId('')
-    setToLocType('STORE')
-    setPriority('NORMAL')
-    setNotes('')
-    setProductRows([{ id: 1, productId: '', product: '', unit: '', currentQty: 0, requestQty: 0, reason: '' }])
-  }
-
-  //  Submit create 
-  const handleSubmit = async () => {
-    if (!fromWarehouseId || !toWarehouseId) {
-      alert('Vui lòng chọn kho nguồn và kho đích.')
-      return
-    }
-    const validItems = productRows.filter(r => r.productId && r.requestQty > 0)
-    if (validItems.length === 0) {
-      alert('Vui lòng thêm ít nhất 1 sản phẩm với số lượng yêu cầu.')
-      return
-    }
-    try {
-      setIsSubmitting(true)
-      await RestockAPIService.create({
-        fromWarehouseId,
-        fromLocationType: fromLocType,
-        toWarehouseId,
-        toLocationType: toLocType,
-        priority,
-        notes,
-        items: validItems.map(r => ({
-          productId: r.productId,
-          requestedQuantity: r.requestQty,
-          reason: r.reason,
-        })),
-      })
-      alert('Tạo yêu cầu thành công!')
-      closeModal()
-      fetchRequests()
-    } catch (err) {
-      console.error(err)
-      alert('Không thể tạo yêu cầu. Vui lòng thử lại.')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  //  Approve / Reject
-  const handleUpdateStatus = async (id: string, status: 'APPROVED' | 'REJECTED') => {
-    const action = status === 'APPROVED' ? 'duyệt' : 'từ chối'
-    if (!confirm(`Bạn có chắc muốn ${action} yêu cầu này?`)) return
-    try {
-      await RestockAPIService.updateStatus(id, status, status === 'REJECTED' ? 'Rejected by approver' : undefined)
-      await fetchRequests()
-    } catch (err) {
-      console.error(err)
-      alert(`Không thể ${action} yêu cầu. Vui lòng thử lại.`)
-    }
-  }
-
-  // â”€â”€ Format date 
+  // ── Helpers ────────────────────────────────────────────────────────────────
   const fmtDate = (d: string | null) => {
     if (!d) return '—'
     return new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: 'short', year: 'numeric' })
   }
-
   const getWarehouseLabel = (id: string) => {
     if (!id) return '—'
-    if (warehouseNameMap[id]) return warehouseNameMap[id]
-    const found = warehouses.find(w => w.id === id)
-    if (found) return found.name
-    return id.slice(-8)
+    return warehouseNameMap[id] || warehouses.find(w => w.id === id)?.name || id.slice(-8)
   }
-
   const getUserLabel = (id: string | null) => {
     if (!id) return '—'
     if (id === user?.id) return user.name
-    if (userNameMap[id]) return userNameMap[id]
-    // Rút gọn GUID để dễ đọc hơn
-    return `${id.slice(0, 8)}...${id.slice(-4)}`
+    return userNameMap[id] || `${id.slice(0, 8)}...${id.slice(-4)}`
   }
-
   const toDateTimeLocalValue = (date: Date) => {
     const offset = date.getTimezoneOffset()
-    const local = new Date(date.getTime() - offset * 60_000)
-    return local.toISOString().slice(0, 16)
+    return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16)
   }
 
+  // ── Product row helpers ────────────────────────────────────────────────────
+  const addProductRow = () => {
+    _nextProductRowId++
+    setProductRows(rows => [...rows, {
+      id: _nextProductRowId, productId: '', product: '', unit: '',
+      currentQty: 0, requestQty: '', reason: '',
+    }])
+  }
+  const removeProductRow = (id: number) => setProductRows(rows => rows.filter(r => r.id !== id))
+  const updateRow = <K extends keyof ProductRow>(id: number, field: K, value: ProductRow[K]) => {
+    setProductRows(rows => rows.map(r => {
+      if (r.id !== id) return r
+      if (field === 'productId') {
+        const found = products.find(p => p.id === String(value))
+        return { ...r, productId: String(value), product: found?.name ?? '', unit: found?.unit ?? '' }
+      }
+      return { ...r, [field]: value }
+    }))
+  }
+
+  // ── Transfer item helpers ──────────────────────────────────────────────────
+  const addTransferItemRow = () => {
+    _nextTransferItemRowId++
+    setTransferItems(rows => [...rows, {
+      id: _nextTransferItemRowId, productId: '', batchId: '',
+      requestedQuantity: '', receivedQuantity: '', notes: '',
+    }])
+  }
+  const removeTransferItemRow = (id: number) => setTransferItems(rows => rows.filter(r => r.id !== id))
+  const updateTransferItemRow = <K extends keyof TransferItemRow>(id: number, field: K, value: TransferItemRow[K]) => {
+    setTransferItems(rows => rows.map(r => r.id === id ? { ...r, [field]: value } : r))
+  }
+
+  // ── Modal close / reset ────────────────────────────────────────────────────
+  const closeModal = () => {
+    setShowModal(false)
+    setFromWarehouseId(user?.warehouseId ?? '')
+    setFromLocType('WAREHOUSE'); setToWarehouseId(''); setToLocType('STORE')
+    setPriority('NORMAL'); setNotes('')
+    setProductRows([{ id: 1, productId: '', product: '', unit: '', currentQty: 0, requestQty: '', reason: '' }])
+  }
+  const closeTransferModal = () => {
+    setShowTransferModal(false)
+    setTransferItems([]); setTransferSourceRequest(null)
+  }
   const openTransferModal = () => {
-    setTransferFromLocationType('WAREHOUSE')
-    setTransferFromLocationId('')
-    setTransferToLocationType('STORE')
-    setTransferToLocationId('')
-    setTransferExpectedDelivery('')
-    setTransferShippedBy('')
-    setTransferRestockRequestId('')
-    setTransferNotes('')
-    setTransferItems([])
-    setTransferSourceRequest(null)
+    setTransferFromLocationType('WAREHOUSE'); setTransferFromLocationId('')
+    setTransferToLocationType('STORE'); setTransferToLocationId('')
+    setTransferExpectedDelivery(''); setTransferShippedBy('')
+    setTransferRestockRequestId(''); setTransferNotes('')
+    setTransferItems([]); setTransferSourceRequest(null)
     setShowTransferModal(true)
   }
 
-  const closeTransferModal = () => {
-    setShowTransferModal(false)
-    setTransferItems([])
-    setTransferSourceRequest(null)
+  // ── Submit handlers ────────────────────────────────────────────────────────
+  const handleSubmit = async () => {
+    if (!fromWarehouseId || !toWarehouseId) { alert('Vui lòng chọn kho nguồn và kho đích.'); return }
+    // Convert string → number only at submit time
+    const validItems = productRows.filter(r => r.productId && Number(r.requestQty || 0) > 0)
+    if (!validItems.length) { alert('Vui lòng thêm ít nhất 1 sản phẩm.'); return }
+    try {
+      setIsSubmitting(true)
+      await RestockAPIService.create({
+        fromWarehouseId, fromLocationType: fromLocType, toWarehouseId, toLocationType: toLocType,
+        priority, notes,
+        items: validItems.map(r => ({
+          productId: r.productId,
+          requestedQuantity: Number(r.requestQty || 0),
+          reason: r.reason,
+        })),
+      })
+      alert('Tạo yêu cầu thành công!')
+      closeModal(); fetchRequests()
+    } catch { alert('Không thể tạo yêu cầu. Vui lòng thử lại.') }
+    finally { setIsSubmitting(false) }
   }
 
-  const applyRequestToTransferForm = (req: RestockRequestFromAPI) => {
-    setTransferSourceRequest(req)
-    setTransferFromLocationType(req.fromLocationType || 'WAREHOUSE')
-    setTransferFromLocationId(req.fromWarehouseId || '')
-    setTransferToLocationType(req.toLocationType || 'STORE')
-    setTransferToLocationId(req.toWarehouseId || '')
-    setTransferExpectedDelivery(toDateTimeLocalValue(new Date(Date.now() + 24 * 60 * 60 * 1000)))
-    setTransferShippedBy(user?.id || '')
-    setTransferNotes(req.notes || '')
-
-    const sourceItems = req.items || []
-    setTransferItems(
-      sourceItems.map((item, idx) => ({
-        id: idx + 1,
-        productId: item.productId,
-        batchId: '',
-        requestedQuantity: item.approvedQuantity ?? item.requestedQuantity ?? 0,
-        receivedQuantity: 0,
-        notes: item.reason || '',
-      }))
-    )
-    _nextTransferItemRowId = Math.max(_nextTransferItemRowId, sourceItems.length + 100)
-  }
-
-  useEffect(() => {
-    if (!showTransferModal) return
-
-    const key = transferRestockRequestId.trim().toLowerCase()
-    if (!key) {
-      setTransferSourceRequest(null)
-      // Không reset các field chọn kho/cửa hàng về '' vì sẽ làm select hiển thị sai (VD: show cửa hàng khi đang chọn WAREHOUSE)
-      // Chỉ clear dữ liệu gắn với request nguồn
-      setTransferItems([])
-      return
-    }
-
-    const matched = requests.find(
-      r => r.id.toLowerCase() === key || r.requestNumber.toLowerCase() === key
-    )
-
-    if (matched) {
-      applyRequestToTransferForm(matched)
-    } else {
-      setTransferSourceRequest(null)
-    }
-  }, [transferRestockRequestId, showTransferModal, requests])
-
-  // Load batches when warehouse changes
-  useEffect(() => {
-    if (!showTransferModal || !transferFromLocationId || !token) {
-      setBatches([])
-      return
-    }
-
-    const loadBatches = async () => {
-      setIsLoadingBatches(true)
-      try {
-        const data = await ProductBatchAPIService.getByWarehouse(transferFromLocationId)
-        setBatches(data)
-      } catch (error) {
-        console.error('Error loading batches:', error)
-        setBatches([])
-      } finally {
-        setIsLoadingBatches(false)
-      }
-    }
-
-    loadBatches()
-  }, [transferFromLocationId, showTransferModal, token])
-
-  const addTransferItemRow = () => {
-    _nextTransferItemRowId++
-    setTransferItems(rows => [
-      ...rows,
-      {
-        id: _nextTransferItemRowId,
-        productId: '',
-        batchId: '',
-        requestedQuantity: 0,
-        receivedQuantity: 0,
-        notes: '',
-      },
-    ])
-  }
-
-  const removeTransferItemRow = (id: number) => {
-    setTransferItems(rows => rows.filter(row => row.id !== id))
-  }
-
-  const updateTransferItemRow = <K extends keyof TransferItemRow>(
-    id: number,
-    field: K,
-    value: TransferItemRow[K]
-  ) => {
-    setTransferItems(rows => rows.map(row => (row.id === id ? { ...row, [field]: value } : row)))
+  const handleUpdateStatus = async (id: string, status: 'APPROVED' | 'REJECTED') => {
+    if (!confirm(`Bạn có chắc muốn ${status === 'APPROVED' ? 'duyệt' : 'từ chối'} yêu cầu này?`)) return
+    try {
+      await RestockAPIService.updateStatus(id, status, status === 'REJECTED' ? 'Rejected by approver' : undefined)
+      await fetchRequests()
+    } catch { alert('Không thể cập nhật trạng thái. Vui lòng thử lại.') }
   }
 
   const handleCreateTransfer = async () => {
-    if (!transferFromLocationType || !transferFromLocationId || !transferToLocationType || !transferToLocationId) {
-      alert('Vui lòng nhập đầy đủ điểm đi và điểm đến.')
-      return
-    }
-    if (!transferExpectedDelivery || !transferRestockRequestId) {
-      alert('Vui lòng nhập đầy đủ expectedDelivery và restockRequestId.')
-      return
-    }
-    if (transferItems.length === 0) {
-      alert('Vui lòng thêm ít nhất 1 sản phẩm vận chuyển.')
-      return
-    }
-
-    const invalidItem = transferItems.find(
-      item =>
-        !item.productId ||
-        !item.batchId ||
-        item.requestedQuantity < 0 ||
-        item.receivedQuantity < 0
+    if (!transferFromLocationType || !transferFromLocationId || !transferToLocationType || !transferToLocationId)
+      { alert('Vui lòng nhập đầy đủ điểm đi và điểm đến.'); return }
+    if (!transferExpectedDelivery || !transferRestockRequestId)
+      { alert('Vui lòng nhập đầy đủ thời gian giao hàng và mã yêu cầu.'); return }
+    if (!transferItems.length) { alert('Vui lòng thêm ít nhất 1 sản phẩm.'); return }
+    const invalid = transferItems.find(i =>
+      !i.productId || !i.batchId || Number(i.requestedQuantity || 0) < 0
     )
-
-    if (invalidItem) {
-      alert('Mỗi dòng sản phẩm cần có productId, batchId, requestedQuantity và receivedQuantity hợp lệ.')
-      return
-    }
-
-
+    if (invalid) { alert('Mỗi sản phẩm cần có productId, batchId và số lượng hợp lệ.'); return }
     try {
       setIsSubmittingTransfer(true)
-      const normalizedShippedBy = UUID_REGEX.test(transferShippedBy.trim())
-        ? transferShippedBy.trim()
-        : undefined
-
+      const normalizedShippedBy = UUID_REGEX.test(transferShippedBy.trim()) ? transferShippedBy.trim() : undefined
       const transfer = await TransferAPIService.create({
-        fromLocationType: transferFromLocationType,
-        fromLocationId: transferFromLocationId,
-        toLocationType: transferToLocationType,
-        toLocationId: transferToLocationId,
+        fromLocationType: transferFromLocationType, fromLocationId: transferFromLocationId,
+        toLocationType: transferToLocationType, toLocationId: transferToLocationId,
         expectedDelivery: new Date(transferExpectedDelivery).toISOString(),
         ...(normalizedShippedBy ? { shippedBy: normalizedShippedBy } : {}),
-        restockRequestId: transferRestockRequestId,
-        notes: transferNotes,
-        items: transferItems.map(item => ({
-          productId: item.productId,
-          batchId: item.batchId,
-          requestedQuantity: item.requestedQuantity,
-          receivedQuantity: item.receivedQuantity,
-          notes: item.notes,
+        restockRequestId: transferRestockRequestId, notes: transferNotes,
+        // Convert string → number only here at submit time
+        items: transferItems.map(i => ({
+          productId: i.productId,
+          batchId: i.batchId,
+          requestedQuantity: Number(i.requestedQuantity || 0),
+          receivedQuantity: Number(i.receivedQuantity || 0),
+          notes: i.notes,
         })),
       })
-
       alert(`Tạo đơn vận chuyển thành công: ${transfer.transferNumber || transfer.id}`)
-      closeTransferModal()
-      await fetchRequests()
+      closeTransferModal(); fetchRequests(); fetchTransfers()
     } catch (err) {
-      console.error('Transfer creation error:', err)
-      const errorMsg = (err as any)?.response?.data?.message || (err as any)?.message || 'Không thể tạo đơn vận chuyển. Vui lòng kiểm tra dữ liệu và thử lại.'
-      alert(errorMsg)
-    } finally {
-      setIsSubmittingTransfer(false)
-    }
+      const msg = (err as any)?.response?.data?.message || (err as any)?.message || 'Không thể tạo đơn vận chuyển.'
+      alert(msg)
+    } finally { setIsSubmittingTransfer(false) }
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6">
-      {/* Transfer Modal */}
+    <div className="space-y-6 pb-10">
+
+      {/* ══════════════════════════════════════════════════════
+          TRANSFER MODAL
+      ══════════════════════════════════════════════════════ */}
       {showTransferModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded bg-blue-500 flex items-center justify-center">
-                  <Package size={12} className="text-white" />
-                </span>
-                <h2 className="text-base font-bold text-gray-900">Tạo Đơn Vận Chuyển</h2>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+                  <Truck size={14} className="text-white" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-gray-900">Tạo Đơn Vận Chuyển</h2>
+                  {transferSourceRequest && (
+                    <p className="text-xs text-blue-600 mt-0.5">Theo yêu cầu: {transferSourceRequest.requestNumber}</p>
+                  )}
+                </div>
               </div>
-              <button onClick={closeTransferModal} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
+              <button onClick={closeTransferModal} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
                 <X size={18} />
               </button>
             </div>
 
-            <div className="px-6 py-5 space-y-5">
-              <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-sm text-blue-700">
-                Đơn sẽ tạo theo yêu cầu: <span className="font-semibold">{transferSourceRequest?.requestNumber || 'Chưa chọn'}</span>
-              </div>
+            <div className="px-6 py-5 space-y-6">
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <SelectField
-                  label="TỪ LOẠI KHO"
-                  required
-                  value={transferFromLocationType}
-                  onChange={setTransferFromLocationType}
-                  options={[
-                    { value: 'WAREHOUSE', label: 'WAREHOUSE' },
-                    { value: 'STORE', label: 'STORE' },
-                  ]}
-                />
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">TỪ KHO *</label>
-                  <div className="relative">
-                    <select
-                      value={transferFromLocationId}
-                      onChange={(e) => setTransferFromLocationId(e.target.value)}
-                      className="w-full appearance-none border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8"
-                    >
-                      <option value="">
-                        {transferFromLocationType === 'WAREHOUSE' ? 'Chọn kho nguồn' : 'Chọn cửa hàng nguồn'}
-                      </option>
-                      {(transferFromLocationType === 'WAREHOUSE' ? warehouseSourceOptions : storeOptions).map((w) => (
-                        <option key={w.id} value={w.id}>
-                          {w.name}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+              {/* Section 1: Yêu cầu nguồn */}
+              <div>
+                <SectionLabel>Yêu cầu nguồn</SectionLabel>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Chọn yêu cầu</label>
+                    <div className="relative">
+                      <select
+                        value={transferSourceRequest?.id || ''}
+                        onChange={e => setTransferRestockRequestId(e.target.value)}
+                        className="w-full appearance-none border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 pr-8"
+                      >
+                        <option value="">Chọn theo mã yêu cầu</option>
+                        {transferRequestOptions.map(r => (
+                          <option key={r.id} value={r.id}>{r.requestNumber}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={14} />
+                    </div>
                   </div>
-                </div>
-                <SelectField
-                  label="ĐẾN LOẠI KHO"
-                  required
-                  value={transferToLocationType}
-                  onChange={setTransferToLocationType}
-                  options={[
-                    { value: 'STORE', label: 'STORE' },
-                    { value: 'WAREHOUSE', label: 'WAREHOUSE' },
-                  ]}
-                />
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">ĐẾN KHO *</label>
-                  <div className="relative">
-                    <select
-                      value={transferToLocationId}
-                      onChange={(e) => setTransferToLocationId(e.target.value)}
-                      className="w-full appearance-none border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8"
-                    >
-                      <option value="">
-                        {transferToLocationType === 'WAREHOUSE' ? 'Chọn kho đích' : 'Chọn cửa hàng đích'}
-                      </option>
-                      {(transferToLocationType === 'WAREHOUSE' ? warehouseSourceOptions : storeOptions).map((w) => (
-                        <option key={w.id} value={w.id}>
-                          {w.name}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">DỰ KIẾN GIAO HÀNG *</label>
-                  <input
-                    type="datetime-local"
-                    value={transferExpectedDelivery}
-                    onChange={e => setTransferExpectedDelivery(e.target.value)}
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">SHIPPED BY *</label>
-                  <input
-                    value={transferShippedBy}
-                    onChange={e => setTransferShippedBy(e.target.value)}
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Nhập UUID người giao hàng"
-                  />
-                </div>
-                <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">CHỌN YÊU CẦU</label>
-                  <div className="relative">
-                    <select
-                      value={transferSourceRequest?.id || ''}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">ID yêu cầu <span className="text-red-400">*</span></label>
+                    <input
+                      value={transferRestockRequestId}
                       onChange={e => setTransferRestockRequestId(e.target.value)}
-                      className="w-full appearance-none border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8"
-                    >
-                      <option value="">Chọn theo mã yêu cầu</option>
-                      {transferRequestOptions.map(r => (
-                        <option key={r.id} value={r.id}>
-                          {r.requestNumber}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                      placeholder="UUID hoặc mã yêu cầu (VD: RST-2026-001)"
+                      className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                    />
                   </div>
-                </div>
-
-                <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">ID YÊU CẦU *</label>
-                  <input
-                    value={transferRestockRequestId}
-                    onChange={e => setTransferRestockRequestId(e.target.value)}
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Nhập UUID hoặc mã yêu cầu (VD: RST-2026-001)"
-                  />
-                </div>
-                <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">GHI CHÚ</label>
-                  <textarea
-                    value={transferNotes}
-                    onChange={e => setTransferNotes(e.target.value)}
-                    rows={2}
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Ghi chú đơn vận chuyển"
-                  />
                 </div>
               </div>
 
+              {/* Section 2: Tuyến vận chuyển */}
+              <div>
+                <SectionLabel>Tuyến vận chuyển</SectionLabel>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <SelectField label="Loại kho đi" required value={transferFromLocationType} onChange={setTransferFromLocationType}
+                    options={[{ value: 'WAREHOUSE', label: 'WAREHOUSE' }, { value: 'STORE', label: 'STORE' }]} />
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Kho đi <span className="text-red-400">*</span></label>
+                    <div className="relative">
+                      <select value={transferFromLocationId} onChange={e => setTransferFromLocationId(e.target.value)}
+                        className="w-full appearance-none border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 pr-8">
+                        <option value="">Chọn kho nguồn</option>
+                        {(transferFromLocationType === 'WAREHOUSE' ? warehouseSourceOptions : storeOptions).map(w => (
+                          <option key={w.id} value={w.id}>{w.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={14} />
+                    </div>
+                  </div>
+                  <SelectField label="Loại kho đến" required value={transferToLocationType} onChange={setTransferToLocationType}
+                    options={[{ value: 'STORE', label: 'STORE' }, { value: 'WAREHOUSE', label: 'WAREHOUSE' }]} />
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Kho đến <span className="text-red-400">*</span></label>
+                    <div className="relative">
+                      <select value={transferToLocationId} onChange={e => setTransferToLocationId(e.target.value)}
+                        className="w-full appearance-none border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 pr-8">
+                        <option value="">Chọn kho đích</option>
+                        {(transferToLocationType === 'WAREHOUSE' ? warehouseSourceOptions : storeOptions).map(w => (
+                          <option key={w.id} value={w.id}>{w.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={14} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Thông tin giao hàng */}
+              <div>
+                <SectionLabel>Thông tin giao hàng</SectionLabel>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Dự kiến giao <span className="text-red-400">*</span></label>
+                    <input type="datetime-local" value={transferExpectedDelivery} onChange={e => setTransferExpectedDelivery(e.target.value)}
+                      className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Người giao (UUID)</label>
+                    <input value={transferShippedBy} onChange={e => setTransferShippedBy(e.target.value)}
+                      placeholder="UUID người giao hàng"
+                      className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Ghi chú</label>
+                    <input value={transferNotes} onChange={e => setTransferNotes(e.target.value)}
+                      placeholder="Ghi chú đơn vận chuyển"
+                      className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 4: Sản phẩm */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <span className="font-semibold text-gray-800 text-sm">Sản phẩm</span>
-                  <button
-                    onClick={addTransferItemRow}
-                    className="flex items-center gap-1 text-blue-600 text-sm font-medium hover:text-blue-700 transition-colors"
-                  >
-                    <Plus size={15} />
-                    Thêm sản phẩm
+                  <SectionLabel>Danh sách sản phẩm</SectionLabel>
+                  <button onClick={addTransferItemRow} className="flex items-center gap-1 text-blue-600 text-xs font-semibold hover:text-blue-700">
+                    <Plus size={13} /> Thêm sản phẩm
                   </button>
                 </div>
-
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">MÃ SẢN PHẨM</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">MÃ LÔ HÀNG</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">SỐ LƯỢNG YÊU CẦU</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">SỐ LƯỢNG NHẬN</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">GHI CHÚ</th>
-                        <th className="w-8" />
+                        {['Sản phẩm', 'Lô hàng', 'SL yêu cầu', 'SL nhận', 'Ghi chú', ''].map(h => (
+                          <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {transferItems.map((item, idx) => (
+                      {transferItems.length === 0 ? (
+                        <tr><td colSpan={6} className="px-4 py-6 text-center text-xs text-gray-400">Chưa có sản phẩm</td></tr>
+                      ) : transferItems.map((item, idx) => (
                         <tr key={item.id} className={idx !== transferItems.length - 1 ? 'border-b border-gray-100' : ''}>
-                          <td className="px-4 py-3">
-                            <select
-                              value={item.productId}
-                              onChange={e => updateTransferItemRow(item.id, 'productId', e.target.value)}
-                              className="appearance-none border border-gray-200 rounded-md bg-white text-sm text-gray-800 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
-                            >
-                              <option value="">{isLoadingProducts ? 'Đang tải sản phẩm...' : 'Chọn productId'}</option>
-                              {products.map(p => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                              ))}
+                          <td className="px-4 py-2.5">
+                            <select value={item.productId} onChange={e => updateTransferItemRow(item.id, 'productId', e.target.value)}
+                              className="appearance-none border border-gray-200 rounded-md bg-white text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/40 w-full">
+                              <option value="">{isLoadingProducts ? 'Đang tải...' : 'Chọn sản phẩm'}</option>
+                              {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                             </select>
                           </td>
-                          <td className="px-4 py-3">
-                            <select
-                              value={item.batchId}
-                              onChange={e => updateTransferItemRow(item.id, 'batchId', e.target.value)}
-                              className="appearance-none border border-gray-200 rounded-md bg-white text-sm text-gray-800 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
-                            >
-                              <option value="">{isLoadingBatches ? 'Đang tải lô hàng...' : 'Chọn lô hàng'}</option>
-                              {batches.map(b => (
-                                <option key={b.id} value={b.id}>{b.batchNumber} (Số lượng: {b.quantity})</option>
-                              ))}
+                          <td className="px-4 py-2.5">
+                            <select value={item.batchId} onChange={e => updateTransferItemRow(item.id, 'batchId', e.target.value)}
+                              className="appearance-none border border-gray-200 rounded-md bg-white text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/40 w-full">
+                              <option value="">{isLoadingBatches ? 'Đang tải...' : 'Chọn lô'}</option>
+                              {batches.map(b => <option key={b.id} value={b.id}>{b.batchNumber} ({b.quantity})</option>)}
                             </select>
                           </td>
-                          <td className="px-4 py-3">
+                          {/* ── requestedQuantity: string state, sanitize on change ── */}
+                          <td className="px-4 py-2.5">
                             <input
-                              type="number"
-                              min={0}
+                              type="text"
+                              inputMode="numeric"
                               value={item.requestedQuantity}
-                              onChange={e => updateTransferItemRow(item.id, 'requestedQuantity', parseInt(e.target.value) || 0)}
-                              className="border border-gray-200 rounded-md px-2 py-1 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              onChange={e => updateTransferItemRow(
+                                item.id, 'requestedQuantity',
+                                sanitizeNumericInput(e.target.value)
+                              )}
+                              className="border border-gray-200 rounded-md px-2 py-1.5 text-sm w-20 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                             />
                           </td>
-                          <td className="px-4 py-3">
+                          {/* ── receivedQuantity: string state, sanitize on change ── */}
+                          <td className="px-4 py-2.5">
                             <input
-                              type="number"
-                              min={0}
+                              type="text"
+                              inputMode="numeric"
                               value={item.receivedQuantity}
-                              onChange={e => updateTransferItemRow(item.id, 'receivedQuantity', parseInt(e.target.value) || 0)}
-                              className="border border-gray-200 rounded-md px-2 py-1 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              onChange={e => updateTransferItemRow(
+                                item.id, 'receivedQuantity',
+                                sanitizeNumericInput(e.target.value)
+                              )}
+                              className="border border-gray-200 rounded-md px-2 py-1.5 text-sm w-20 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                             />
                           </td>
-                          <td className="px-4 py-3">
-                            <input
-                              value={item.notes}
-                              onChange={e => updateTransferItemRow(item.id, 'notes', e.target.value)}
-                              className="border border-gray-200 rounded-md px-2 py-1 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="Ghi chú item"
-                            />
+                          <td className="px-4 py-2.5">
+                            <input value={item.notes} onChange={e => updateTransferItemRow(item.id, 'notes', e.target.value)}
+                              placeholder="Ghi chú..."
+                              className="border border-gray-200 rounded-md px-2 py-1.5 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
                           </td>
-                          <td className="px-3 py-3">
-                            <button
-                              onClick={() => removeTransferItemRow(item.id)}
-                              className="p-1 rounded hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors"
-                            >
-                              <Trash2 size={14} />
+                          <td className="px-3 py-2.5">
+                            <button onClick={() => removeTransferItemRow(item.id)}
+                              className="p-1 rounded hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors">
+                              <Trash2 size={13} />
                             </button>
                           </td>
                         </tr>
@@ -934,21 +890,16 @@ export default function WarehouseRequestsPage() {
             </div>
 
             <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
-              <span className="text-sm text-gray-500">{transferItems.length} item trong đơn</span>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={closeTransferModal}
-                  className="px-5 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
-                >
+              <span className="text-xs text-gray-500">{transferItems.length} sản phẩm</span>
+              <div className="flex gap-3">
+                <button onClick={closeTransferModal}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors">
                   Hủy
                 </button>
-                <button
-                  onClick={handleCreateTransfer}
-                  disabled={isSubmittingTransfer}
-                  className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-60"
-                >
-                  {isSubmittingTransfer && <Loader2 size={14} className="animate-spin" />}
-                  Tạo đơn vận chuyển
+                <button onClick={handleCreateTransfer} disabled={isSubmittingTransfer}
+                  className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-60">
+                  {isSubmittingTransfer && <Loader2 size={13} className="animate-spin" />}
+                  <Truck size={13} /> Tạo đơn vận chuyển
                 </button>
               </div>
             </div>
@@ -956,210 +907,129 @@ export default function WarehouseRequestsPage() {
         </div>
       )}
 
-      {/*  Create Modal  */}
+      {/* ══════════════════════════════════════════════════════
+          CREATE REQUEST MODAL
+      ══════════════════════════════════════════════════════ */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            {/* Modal header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded bg-green-500 flex items-center justify-center">
-                  <Package size={12} className="text-white" />
-                </span>
-                <h2 className="text-base font-bold text-gray-900">Tạo Yêu Cầu Nhập Hàng Mới</h2>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-green-600 flex items-center justify-center">
+                  <Package size={14} className="text-white" />
+                </div>
+                <h2 className="text-sm font-bold text-gray-900">Tạo Yêu Cầu Nhập Hàng</h2>
               </div>
-              <button onClick={closeModal} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
-                <X size={18} />
-              </button>
+              <button onClick={closeModal} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18} /></button>
             </div>
 
-            {/* Modal body */}
-            <div className="px-6 py-5 space-y-4">
-              {/* Row 1 */}
-              <div className="grid grid-cols-3 gap-4">
-                <SelectField
-                  label="KHO"
-                  required
-                  value={fromWarehouseId}
-                  onChange={setFromWarehouseId}
-                  options={[
-                    { value: '', label: isLoadingWarehouses ? 'Đang tải kho...' : 'Chọn Kho' },
-                    ...warehouses.map(w => ({
-                      value: w.id,
-                      label: w.name,
-                    })),
-                  ]}
-                />
-                <SelectField
-                  label="Tới kho"
-                  required
-                  value={toWarehouseId}
-                  onChange={setToWarehouseId}
-                  options={[
-                    { value: '', label: isLoadingWarehouses ? 'Đang tải kho...' : 'Chọn kho' },
-                    ...warehouses.map(w => ({
-                      value: w.id,
-                      label: w.name,
-                    })),
-                  ]}
-                />
-                <SelectField
-                  label="MỨC ĐỘ ƯU TIÊN"
-                  value={priority}
-                  onChange={setPriority}
-                  options={[
-                    { value: 'NORMAL', label: 'Bình thường' },
-                    { value: 'HIGH', label: 'Cao' },
-                    { value: 'URGENT', label: 'Khẩn cấp' },
-                  ]}
-                />
-              </div>
+            <div className="px-6 py-5 space-y-6">
 
-              {/* Row 2 */}
-              <div className="grid grid-cols-3 gap-4">
-                <SelectField
-                  label="ĐỊA ĐIỂM"
-                  value={fromLocType}
-                  onChange={setFromLocType}
-                  options={[
-                    { value: 'WAREHOUSE', label: 'Kho' },
-                    { value: 'STORE', label: 'Cửa Hàng' },
-                  ]}
-                />
-                <SelectField
-                  label="TỚI ĐỊA ĐIỂM"
-                  value={toLocType}
-                  onChange={setToLocType}
-                  options={[
-                    { value: 'STORE', label: 'Cửa Hàng' },
-                    { value: 'WAREHOUSE', label: 'Kho' },
-                  ]}
-                />
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">GHI CHÚ</label>
-                  <textarea
-                    rows={3}
-                    placeholder="Lý do nhập hàng, hướng dẫn cụ thể..."
-                    value={notes}
-                    onChange={e => setNotes(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
+              {/* Section 1: Tuyến kho */}
+              <div>
+                <SectionLabel>Tuyến kho</SectionLabel>
+                <div className="grid grid-cols-3 gap-4">
+                  <SelectField label="Kho nguồn" required value={fromWarehouseId} onChange={setFromWarehouseId}
+                    options={[{ value: '', label: isLoadingWarehouses ? 'Đang tải...' : 'Chọn kho' },
+                      ...warehouses.map(w => ({ value: w.id, label: w.name }))]} />
+                  <SelectField label="Loại nguồn" value={fromLocType} onChange={setFromLocType}
+                    options={[{ value: 'WAREHOUSE', label: 'Kho' }, { value: 'STORE', label: 'Cửa hàng' }]} />
+                  <div />
+                  <SelectField label="Kho đích" required value={toWarehouseId} onChange={setToWarehouseId}
+                    options={[{ value: '', label: isLoadingWarehouses ? 'Đang tải...' : 'Chọn kho đích' },
+                      ...warehouses.map(w => ({ value: w.id, label: w.name }))]} />
+                  <SelectField label="Loại đích" value={toLocType} onChange={setToLocType}
+                    options={[{ value: 'STORE', label: 'Cửa hàng' }, { value: 'WAREHOUSE', label: 'Kho' }]} />
+                  <SelectField label="Mức độ ưu tiên" value={priority} onChange={setPriority}
+                    options={[{ value: 'NORMAL', label: 'Bình thường' }, { value: 'HIGH', label: 'Cao' }, { value: 'URGENT', label: 'Khẩn cấp' }]} />
                 </div>
               </div>
 
-              {/* Products table */}
+              {/* Section 2: Ghi chú */}
+              <div>
+                <SectionLabel>Ghi chú</SectionLabel>
+                <textarea rows={2} placeholder="Lý do nhập hàng, hướng dẫn cụ thể..." value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-green-500/40" />
+              </div>
+
+              {/* Section 3: Sản phẩm */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Package size={15} className="text-gray-500" />
-                    <span className="font-semibold text-gray-800 text-sm">Sản Phẩm Yêu Cầu</span>
-                  </div>
-                  <button
-                    onClick={addProductRow}
-                    className="flex items-center gap-1 text-green-600 text-sm font-medium hover:text-green-700 transition-colors"
-                  >
-                    <Plus size={15} />
-                    Thêm Sản Phẩm
+                  <SectionLabel>Danh sách sản phẩm</SectionLabel>
+                  <button onClick={addProductRow} className="flex items-center gap-1 text-green-600 text-xs font-semibold hover:text-green-700">
+                    <Plus size={13} /> Thêm sản phẩm
                   </button>
                 </div>
-
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">SẢN PHẨM</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">ĐVT</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">SL HIỆN TẠI</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">SL YÊU CẦU</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">LÝ DO</th>
-                        <th className="w-8" />
+                        {['Sản phẩm', 'ĐVT', 'Hiện tại', 'Yêu cầu', 'Lý do', ''].map(h => (
+                          <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
                       {productRows.map((row, idx) => (
                         <tr key={row.id} className={idx !== productRows.length - 1 ? 'border-b border-gray-100' : ''}>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-2.5">
                             <div className="relative">
-                              <select
-                                value={row.productId}
-                                onChange={e => updateRow(row.id, 'productId', e.target.value)}
-                                className="appearance-none border border-gray-200 rounded-md bg-white text-sm text-gray-800 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500 pr-6 w-full"
-                              >
-                                <option value="">{isLoadingProducts ? 'Đang tải sản phẩm...' : 'Chọn sản phẩm'}</option>
-                                {products.map(p => (
-                                  <option key={p.id} value={p.id}>{p.name}</option>
-                                ))}
+                              <select value={row.productId} onChange={e => updateRow(row.id, 'productId', e.target.value)}
+                                className="appearance-none border border-gray-200 rounded-md bg-white text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-green-500/40 pr-6 w-full">
+                                <option value="">{isLoadingProducts ? 'Đang tải...' : 'Chọn sản phẩm'}</option>
+                                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                               </select>
-                              <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={13} />
+                              <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={12} />
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-gray-500 text-sm">{row.unit || '—'}</td>
-                          <td className="px-4 py-3 text-gray-600 text-sm">{row.currentQty}</td>
-                          <td className="px-4 py-3">
-                            <input
-                              type="number"
-                              min={1}
-                              value={row.requestQty || ''}
-                              onChange={e => updateRow(row.id, 'requestQty', parseInt(e.target.value) || 0)}
-                              className="w-16 border border-gray-200 rounded-lg px-2 py-1 text-sm text-center text-green-600 font-semibold focus:outline-none focus:ring-2 focus:ring-green-500"
-                            />
-                          </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-2.5 text-gray-500 text-xs">{row.unit || '—'}</td>
+                          <td className="px-4 py-2.5 text-gray-600 text-xs">{row.currentQty}</td>
+                          {/* ── requestQty: string state, sanitize on change ── */}
+                          <td className="px-4 py-2.5">
                             <input
                               type="text"
-                              value={row.reason}
-                              onChange={e => updateRow(row.id, 'reason', e.target.value)}
-                              placeholder="Thêm lý do..."
-                              className="w-full border-0 bg-transparent text-sm text-gray-500 italic focus:outline-none"
+                              inputMode="numeric"
+                              value={row.requestQty}
+                              onChange={e => updateRow(row.id, 'requestQty', sanitizeNumericInput(e.target.value))}
+                              placeholder="0"
+                              className="w-16 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center text-green-600 font-semibold focus:outline-none focus:ring-2 focus:ring-green-500/40"
                             />
                           </td>
-                          <td className="px-3 py-3">
-                            <button
-                              onClick={() => removeProductRow(row.id)}
-                              className="p-1 rounded hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors"
-                            >
-                              <Trash2 size={14} />
+                          <td className="px-4 py-2.5">
+                            <input type="text" value={row.reason} onChange={e => updateRow(row.id, 'reason', e.target.value)}
+                              placeholder="Lý do..."
+                              className="w-full border-0 bg-transparent text-sm text-gray-500 italic focus:outline-none" />
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <button onClick={() => removeProductRow(row.id)}
+                              className="p-1 rounded hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors">
+                              <Trash2 size={13} />
                             </button>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                  <div className="px-4 py-3 border-t border-gray-100">
-                    <button
-                      onClick={addProductRow}
-                      className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-green-600 transition-colors"
-                    >
-                      <Plus size={14} className="text-green-500" />
-                      Thêm hàng mới
+                  <div className="px-4 py-2.5 border-t border-gray-100">
+                    <button onClick={addProductRow} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-green-600 transition-colors">
+                      <Plus size={13} className="text-green-500" /> Thêm hàng mới
                     </button>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Modal footer */}
             <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
-              <span className="text-sm text-gray-500">
-                Sản phẩm yêu cầu:{' '}
-                <span className="font-medium text-gray-700">
-                  {productRows.filter(r => r.productId).length} sản phẩm tổng cộng
-                </span>
-              </span>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={closeModal}
-                  className="px-5 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
-                >
+              <span className="text-xs text-gray-500">{productRows.filter(r => r.productId).length} sản phẩm</span>
+              <div className="flex gap-3">
+                <button onClick={closeModal} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors">
                   Hủy
                 </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-green-500 hover:bg-green-600 rounded-lg transition-colors disabled:opacity-60"
-                >
-                  {isSubmitting && <Loader2 size={14} className="animate-spin" />}
-                  Gửi Yêu Cầu Nhập Hàng →
+                <button onClick={handleSubmit} disabled={isSubmitting}
+                  className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-60">
+                  {isSubmitting && <Loader2 size={13} className="animate-spin" />}
+                  Gửi yêu cầu <ArrowRight size={13} />
                 </button>
               </div>
             </div>
@@ -1167,287 +1037,317 @@ export default function WarehouseRequestsPage() {
         </div>
       )}
 
-      {/*  Header  */}
+      {/* ══════════════════════════════════════════════════════
+          PAGE HEADER
+      ══════════════════════════════════════════════════════ */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Yêu Cầu Nhập Hàng</h1>
-          <p className="text-gray-500 mt-1 text-sm">
-            Quản lý yêu cầu chuyển kho và cấp phát hàng trên toàn mạng lưới phân phối.
-          </p>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Yêu Cầu Nhập Hàng</h1>
+          <p className="text-sm text-gray-500 mt-1">Quản lý yêu cầu chuyển kho và cấp phát hàng trên toàn mạng lưới.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={fetchRequests}
-            className="p-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-            title="Làm mới"
-          >
+          <button onClick={() => { fetchRequests(); fetchTransfers() }}
+            className="p-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors" title="Làm mới">
             <RefreshCw size={15} className="text-gray-500" />
           </button>
-          <button
-            onClick={openTransferModal}
-            disabled={!selectedRequest}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2.5 rounded-lg text-sm transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-          >
-            <Plus size={16} />
-            Tạo Đơn Vận Chuyển
+          <button onClick={() => setShowModal(true)}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2.5 rounded-lg text-sm transition-colors">
+            <Plus size={15} /> Yêu Cầu Nhập
+          </button>
+          <button onClick={openTransferModal}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2.5 rounded-lg text-sm transition-colors">
+            <Truck size={15} /> Tạo Đơn Vận Chuyển
           </button>
         </div>
       </div>
 
-      {/*  Filters  */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-3 flex items-center gap-4 flex-wrap">
-        <div className="flex-1 min-w-[220px] relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-          <input
-            type="text"
-            placeholder="Tìm kiếm theo số yêu cầu (ví dụ: RST-2024-001)"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-          />
-        </div>
+      {/* ══════════════════════════════════════════════════════
+          TABLE 1 — YÊU CẦU NHẬP HÀNG
+      ══════════════════════════════════════════════════════ */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">TRẠNG THÁI</span>
-          <div className="relative">
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              className="appearance-none border border-gray-200 rounded-lg pl-3 pr-7 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
-            >
-              <option value="ALL">Tất Cả Trạng Thái</option>
-              <option value="PENDING">Chờ xử lý</option>
-              <option value="APPROVED">Đã duyệt</option>
-              <option value="PROCESSING">Đang xử lý</option>
-              <option value="COMPLETED">Hoàn thành</option>
-              <option value="REJECTED">Từ chối</option>
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={14} />
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-green-100 flex items-center justify-center">
+              <FileText size={13} className="text-green-600" />
+            </div>
+            <h2 className="text-sm font-bold text-gray-900">Yêu Cầu Nhập Hàng</h2>
+            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">
+              {filtered.length}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+              <input type="text" placeholder="Tìm theo mã yêu cầu..." value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/40 w-52" />
+            </div>
+            <div className="relative">
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+                className="appearance-none border border-gray-200 rounded-lg pl-3 pr-7 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500/40">
+                <option value="ALL">Tất cả trạng thái</option>
+                <option value="PENDING">Chờ xử lý</option>
+                <option value="APPROVED">Đã duyệt</option>
+                <option value="PROCESSING">Đang xử lý</option>
+                <option value="COMPLETED">Hoàn thành</option>
+                <option value="REJECTED">Từ chối</option>
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={13} />
+            </div>
+            <div className="relative">
+              <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)}
+                className="appearance-none border border-gray-200 rounded-lg pl-3 pr-7 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500/40">
+                <option value="ALL">Tất cả ưu tiên</option>
+                <option value="NORMAL">Bình thường</option>
+                <option value="HIGH">Cao</option>
+                <option value="URGENT">Khẩn cấp</option>
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={13} />
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Mức độ ưu tiên</span>
-          <div className="relative">
-            <select
-              value={priorityFilter}
-              onChange={e => setPriorityFilter(e.target.value)}
-              className="appearance-none border border-gray-200 rounded-lg pl-3 pr-7 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
-            >
-              <option value="ALL">Tất cả mức độ</option>
-              <option value="NORMAL">Bình thường</option>
-              <option value="HIGH">Cao</option>
-              <option value="URGENT">Khẩn cấp</option>
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={14} />
+        {error && !isLoading && (
+          <div className="mx-5 mt-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-xl flex items-center justify-between text-sm">
+            {error}
+            <button onClick={fetchRequests} className="text-xs underline hover:no-underline">Thử lại</button>
           </div>
-        </div>
+        )}
 
-        <button className="ml-auto p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-          <SlidersHorizontal size={16} className="text-gray-500" />
-        </button>
-      </div>
-
-      {/*  Loading / Error  */}
-      {isLoading && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 flex flex-col items-center gap-3">
-          <Loader2 size={32} className="animate-spin text-green-500" />
-          <p className="text-gray-500 text-sm">Đang tải dữ liệu...</p>
-        </div>
-      )}
-
-      {error && !isLoading && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center justify-between">
-          <p className="text-sm">{error}</p>
-          <button onClick={fetchRequests} className="text-sm underline hover:no-underline">Thử lại</button>
-        </div>
-      )}
-
-      {/*  Table  */}
-      {!isLoading && !error && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100">
-                {['SỐ YÊU CẦU', 'TỪ KHO', 'TỚI KHO', 'MỨC ĐỘ', 'TRẠNG THÁI', 'NGÀY'].map(col => (
-                  <th key={col} className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
-                    {col}
-                  </th>
+              <tr className="border-b border-gray-100 bg-gray-50/50">
+                {['Số yêu cầu', 'Từ kho', 'Tới kho', 'Ưu tiên', 'Trạng thái', 'Ngày tạo'].map(col => (
+                  <th key={col} className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{col}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center text-gray-400 text-sm">
-                    Không có yêu cầu nào phù hợp với bộ lọc
-                  </td>
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={6} />)
+              ) : reqPagination.paginated.length === 0 ? (
+                <EmptyState text="Không có yêu cầu nào phù hợp với bộ lọc" />
+              ) : reqPagination.paginated.map(req => (
+                <tr key={req.id} onClick={() => setSelectedRequest(req)}
+                  className={`border-b border-gray-50 cursor-pointer transition-colors ${
+                    selectedRequest?.id === req.id
+                      ? 'bg-green-50 border-l-2 border-l-green-500'
+                      : 'hover:bg-gray-50'
+                  }`}
+                >
+                  <td className="px-5 py-3.5 font-semibold text-gray-900">{req.requestNumber}</td>
+                  <td className="px-5 py-3.5 text-gray-600 text-xs">{getWarehouseLabel(req.fromWarehouseId)}</td>
+                  <td className="px-5 py-3.5 text-gray-600 text-xs">{getWarehouseLabel(req.toWarehouseId)}</td>
+                  <td className="px-5 py-3.5"><PriorityBadge priority={req.priority} /></td>
+                  <td className="px-5 py-3.5"><StatusBadge status={req.status} /></td>
+                  <td className="px-5 py-3.5 text-gray-500 text-xs whitespace-nowrap">{fmtDate(req.requestedDate)}</td>
                 </tr>
-              ) : (
-                filtered.map(req => (
-                  <tr
-                    key={req.id}
-                    onClick={() => setSelectedRequest(req)}
-                    className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors ${selectedRequest?.id === req.id ? 'bg-green-50' : ''}`}
-                  >
-                    <td className="px-5 py-3.5 font-semibold text-gray-900">{req.requestNumber}</td>
-                    <td className="px-5 py-3.5 text-gray-600 text-xs">{getWarehouseLabel(req.fromWarehouseId)}</td>
-                    <td className="px-5 py-3.5 text-gray-600 text-xs">{getWarehouseLabel(req.toWarehouseId)}</td>
-                    <td className="px-5 py-3.5">
-                      <PriorityBadge priority={req.priority} />
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <StatusBadge status={req.status} />
-                    </td>
-                    <td className="px-5 py-3.5 text-gray-500 text-xs whitespace-nowrap">{fmtDate(req.requestedDate)}</td>
-                  </tr>
-                ))
-              )}
+              ))}
             </tbody>
           </table>
-
-          {/* Pagination bar */}
-          <div className="px-5 py-3 flex items-center justify-between border-t border-gray-100">
-            <span className="text-sm text-gray-500">
-              Hiển thị {filtered.length} trên {requests.length} kết quả
-            </span>
-            <div className="flex gap-2">
-              <button className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 font-medium text-gray-700 transition-colors">
-                Trước
-              </button>
-              <button className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 font-medium text-gray-700 transition-colors">
-                Sau
-              </button>
-            </div>
-          </div>
         </div>
-      )}
 
-      {/* Bottom panels  */}
+        <PaginationBar
+          page={reqPagination.page} totalPages={reqPagination.totalPages}
+          total={reqPagination.total} pageSize={reqPagination.pageSize}
+          setPage={reqPagination.setPage}
+        />
+      </div>
+
+      {/* ══════════════════════════════════════════════════════
+          DETAIL PANEL
+      ══════════════════════════════════════════════════════ */}
       {selectedRequest && !isLoading && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {/* Detail panel */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold text-gray-900">Chi Tiết Yêu Cầu</h3>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {selectedRequest.requestNumber} â€¢ {fmtDate(selectedRequest.requestedDate)}
-                </p>
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-gray-900 text-base">{selectedRequest.requestNumber}</h3>
+                <StatusBadge status={selectedRequest.status} />
+                <PriorityBadge priority={selectedRequest.priority} />
               </div>
-              <StatusBadge status={selectedRequest.status} />
+              <p className="text-xs text-gray-500 mt-0.5">
+                Tạo: {fmtDate(selectedRequest.requestedDate)}
+                {selectedRequest.approvedDate && ` · Duyệt: ${fmtDate(selectedRequest.approvedDate)}`}
+              </p>
             </div>
-            <div className="p-5 space-y-4">
-              {/* Main info grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">KHO</p>
-                  <p className="text-sm font-medium text-gray-800">{getWarehouseLabel(selectedRequest.fromWarehouseId)}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">TỚI KHO</p>
-                  <p className="text-sm font-medium text-gray-800">{getWarehouseLabel(selectedRequest.toWarehouseId)}</p>
-                </div>
+            {selectedRequest.status === 'PENDING' && (
+              <div className="flex gap-2">
+                <button onClick={() => handleUpdateStatus(selectedRequest.id, 'REJECTED')}
+                  className="flex items-center gap-1.5 border border-gray-200 text-gray-700 font-medium py-1.5 px-3.5 rounded-lg text-xs hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors">
+                  <XCircle size={13} /> Từ chối
+                </button>
+                <button onClick={() => handleUpdateStatus(selectedRequest.id, 'APPROVED')}
+                  className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white font-semibold py-1.5 px-3.5 rounded-lg text-xs transition-colors">
+                  <CheckCircle size={13} /> Duyệt
+                </button>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+            )}
+          </div>
+
+          <div className="p-6">
+            <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+              <div className="xl:col-span-2 space-y-5">
                 <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">LOẠI</p>
-                  <p className="text-sm font-medium text-gray-800">{selectedRequest.fromLocationType} → {selectedRequest.toLocationType}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">MỨC ĐỘ ƯU TIÊN</p>
-                  <div className="flex items-center gap-1">
-                    {selectedRequest.priority === 'URGENT' && <AlertTriangle size={14} className="text-red-500" />}
-                    <PriorityBadge priority={selectedRequest.priority} />
+                  <SectionLabel>Tuyến kho</SectionLabel>
+                  <div className="grid grid-cols-2 gap-4">
+                    <InfoField label="Từ kho" value={getWarehouseLabel(selectedRequest.fromWarehouseId)} icon={MapPin} />
+                    <InfoField label="Tới kho" value={getWarehouseLabel(selectedRequest.toWarehouseId)} icon={MapPin} />
+                    <InfoField label="Loại nguồn" value={`${selectedRequest.fromLocationType} → ${selectedRequest.toLocationType}`} />
                   </div>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">NGƯỜI YÊU CẦU</p>
-                  <p className="text-sm font-medium text-gray-800 break-all">{getUserLabel(selectedRequest.requestedBy)}</p>
+                  <SectionLabel>Nhân sự</SectionLabel>
+                  <div className="grid grid-cols-2 gap-4">
+                    <InfoField label="Người yêu cầu" value={getUserLabel(selectedRequest.requestedBy)} icon={User} />
+                    <InfoField label="Người duyệt" value={getUserLabel(selectedRequest.approvedBy)} icon={User} />
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">NGƯỜI DUYỆT</p>
-                  <p className="text-sm font-medium text-gray-800">{getUserLabel(selectedRequest.approvedBy)}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">NGÀY DUYỆT</p>
-                  <p className="text-sm text-gray-600">{fmtDate(selectedRequest.approvedDate)}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">ID VẬN CHUYỂN</p>
-                  <p className="text-sm text-gray-600 break-all">{selectedRequest.transferId ?? '—'}</p>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">GHI CHÚ</p>
-                <p className="text-sm text-gray-500 italic">{selectedRequest.notes ?? '—'}</p>
+                {selectedRequest.transferId && (
+                  <div>
+                    <SectionLabel>Vận chuyển</SectionLabel>
+                    <InfoField label="Mã vận chuyển" value={selectedRequest.transferId} icon={Truck} highlight />
+                  </div>
+                )}
+                {selectedRequest.notes && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Ghi chú</p>
+                    <p className="text-sm text-gray-600">{selectedRequest.notes}</p>
+                  </div>
+                )}
               </div>
 
-              {/* Action buttons */}
-              {(selectedRequest.status === 'PENDING') && (
-                <div className="flex gap-2 pt-1">
-                  <button
-                    onClick={() => handleUpdateStatus(selectedRequest.id, 'REJECTED')}
-                    className="flex-1 flex items-center justify-center gap-1.5 border border-gray-200 text-gray-700 font-medium py-2 rounded-lg text-sm hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors"
-                  >
-                    <XCircle size={14} />
-                    Từ chối
-                  </button>
-                  <button
-                    onClick={() => handleUpdateStatus(selectedRequest.id, 'APPROVED')}
-                    className="flex-1 flex items-center justify-center gap-1.5 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 rounded-lg text-sm transition-colors"
-                  >
-                    <CheckCircle size={14} />
-                    Duyệt
-                  </button>
+              <div className="xl:col-span-3">
+                <div className="flex items-center justify-between mb-3">
+                  <SectionLabel>Sản phẩm yêu cầu</SectionLabel>
+                  <span className="text-xs text-gray-500">{selectedRequest.items.length} sản phẩm</span>
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* Items panel */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900">Sản Phẩm Yêu Cầu</h3>
-              <span className="text-xs text-gray-500">{selectedRequest.items.length} sản phẩm</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    {['SẢN PHẨM', 'ĐVT', 'HIỆN TẠI', 'YÊU CẦU', 'ĐÃ DUYỆT', 'LÝ DO'].map(h => (
-                      <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedRequest.items.map((item: RestockRequestItem, idx: number) => (
-                    <tr key={item.id} className={idx !== selectedRequest.items.length - 1 ? 'border-b border-gray-100' : ''}>
-                      <td className="px-4 py-3 font-medium text-gray-800">{item.productName}</td>
-                      <td className="px-4 py-3 text-gray-500">{item.unit}</td>
-                      <td className="px-4 py-3 text-gray-600">{item.currentQuantity}</td>
-                      <td className="px-4 py-3 font-semibold text-green-600">{item.requestedQuantity}</td>
-                      <td className="px-4 py-3">
-                        {item.approvedQuantity !== null ? (
-                          <span className="font-semibold text-teal-600">{item.approvedQuantity}</span>
-                        ) : (
-                          <span className="text-gray-300">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-gray-400 italic text-xs">{item.reason}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        {['Sản phẩm', 'ĐVT', 'Hiện tại', 'Yêu cầu', 'Đã duyệt', 'Lý do'].map(h => (
+                          <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedRequest.items.length === 0 ? (
+                        <tr><td colSpan={6} className="px-4 py-6 text-center text-xs text-gray-400">Không có sản phẩm</td></tr>
+                      ) : selectedRequest.items.map((item: RestockRequestItem, idx: number) => (
+                        <tr key={item.id} className={idx !== selectedRequest.items.length - 1 ? 'border-b border-gray-100' : ''}>
+                          <td className="px-4 py-3 font-medium text-gray-800">{item.productName}</td>
+                          <td className="px-4 py-3 text-gray-400 text-xs">{item.unit}</td>
+                          <td className="px-4 py-3 text-gray-500 text-xs">{item.currentQuantity}</td>
+                          <td className="px-4 py-3 font-semibold text-green-600">{item.requestedQuantity}</td>
+                          <td className="px-4 py-3">
+                            {item.approvedQuantity !== null
+                              ? <span className="font-semibold text-teal-600">{item.approvedQuantity}</span>
+                              : <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-gray-400 italic text-xs">{item.reason || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* ══════════════════════════════════════════════════════
+          TABLE 2 — LỊCH SỬ ĐƠN VẬN CHUYỂN
+      ══════════════════════════════════════════════════════ */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center">
+              <Truck size={13} className="text-blue-600" />
+            </div>
+            <h2 className="text-sm font-bold text-gray-900">Lịch Sử Đơn Vận Chuyển</h2>
+            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">
+              {filteredTransfers.length}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+              <input type="text" placeholder="Tìm mã đơn, mã yêu cầu..." value={transferSearch}
+                onChange={e => setTransferSearch(e.target.value)}
+                className="pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/40 w-52" />
+            </div>
+            <div className="relative">
+              <select value={transferStatusFilter} onChange={e => setTransferStatusFilter(e.target.value)}
+                className="appearance-none border border-gray-200 rounded-lg pl-3 pr-7 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+                <option value="ALL">Tất cả trạng thái</option>
+                <option value="PENDING">Chờ xử lý</option>
+                <option value="IN_TRANSIT">Đang vận chuyển</option>
+                <option value="COMPLETED">Hoàn thành</option>
+                <option value="CANCELLED">Đã hủy</option>
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={13} />
+            </div>
+            <button onClick={fetchTransfers} title="Làm mới"
+              className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+              <RefreshCw size={14} className={`text-gray-500 ${isLoadingTransfers ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+        </div>
+
+        {transferError && (
+          <div className="mx-5 mt-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-xl flex items-center justify-between text-sm">
+            {transferError}
+            <button onClick={fetchTransfers} className="text-xs underline">Thử lại</button>
+          </div>
+        )}
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50/50">
+                {['Mã đơn vận chuyển', 'Mã yêu cầu', 'Từ', 'Đến', 'Trạng thái', 'Ngày tạo', 'Giao dự kiến'].map(col => (
+                  <th key={col} className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{col}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {isLoadingTransfers ? (
+                Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} cols={7} />)
+              ) : trPagination.paginated.length === 0 ? (
+                <EmptyState text="Chưa có đơn vận chuyển nào" />
+              ) : trPagination.paginated.map((t, idx) => (
+                <tr key={t.id} className={`border-b border-gray-50 hover:bg-gray-50 transition-colors ${idx === trPagination.paginated.length - 1 ? 'border-b-0' : ''}`}>
+                  <td className="px-5 py-3.5 font-semibold text-blue-600 font-mono text-xs">{t.transferNumber}</td>
+                  <td className="px-5 py-3.5 text-gray-500 text-xs font-mono">
+                    {/* NOTE: map restockRequestId from TransferFromAPI when field confirmed */}
+                    {(t as any).restockRequestId ? String((t as any).restockRequestId).slice(0, 8) + '...' : '—'}
+                  </td>
+                  <td className="px-5 py-3.5 text-gray-600 text-xs">{t.fromLocationId || '—'}</td>
+                  <td className="px-5 py-3.5 text-gray-600 text-xs">{t.toLocationId || '—'}</td>
+                  <td className="px-5 py-3.5"><StatusBadge status={t.status} /></td>
+                  <td className="px-5 py-3.5 text-gray-500 text-xs whitespace-nowrap">{fmtDate(t.transferDate)}</td>
+                  <td className="px-5 py-3.5 text-gray-500 text-xs whitespace-nowrap">
+                    {t.actualDelivery ? fmtDate(t.actualDelivery) : fmtDate(t.expectedDelivery)}
+                    {t.actualDelivery && <span className="ml-1.5 text-teal-600 font-medium text-xs">✓</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <PaginationBar
+          page={trPagination.page} totalPages={trPagination.totalPages}
+          total={trPagination.total} pageSize={trPagination.pageSize}
+          setPage={trPagination.setPage}
+        />
+      </div>
+
     </div>
   )
 }
-

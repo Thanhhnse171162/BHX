@@ -180,7 +180,7 @@ export default function DispatchGoodsPage() {
 
         <button
           className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium shadow-sm"
-          onClick={() => router.push('/warehouse-store/dispatch-goods/create')}
+          onClick={() => router.push('/warehouse-staff/dispatch-goods/create')}
         >
           <Plus size={18}/>
           Tạo phiếu xuất mới

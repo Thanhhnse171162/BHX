@@ -21,27 +21,27 @@ interface SidebarItem {
 const sidebarItems: SidebarItem[] = [
   {
     label: 'Tổng quan',
-    href: '/warehouse-store',
+      href: '/warehouse-staff',
     icon: <LayoutDashboard size={20} />
   },
   {
     label: 'Kho hàng',
-    href: '/warehouse-store/inventory',
+      href: '/warehouse-staff/inventory',
     icon: <Warehouse size={20} />
   },
   {
     label: 'Nhập hàng',
-    href: '/warehouse-store/receive-goods',
+      href: '/warehouse-staff/receive-goods',
     icon: <PlusSquare size={20} />
   },
   {
     label: 'Xuất hàng',
-    href: '/warehouse-store/dispatch-goods',
+      href: '/warehouse-staff/dispatch-goods',
     icon: <Archive size={20} />
   },
   {
     label: 'Báo cáo',
-    href: '/warehouse-store/reports',
+      href: '/warehouse-staff/reports',
     icon: <BarChart3 size={20} />
   }
 ]
