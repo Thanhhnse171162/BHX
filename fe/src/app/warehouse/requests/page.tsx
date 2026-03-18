@@ -110,6 +110,14 @@ let _nextProductRowId = 10
 let _nextTransferItemRowId = 100
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
+function normalizeId(value?: string | null): string {
+  return String(value ?? '').trim().toLowerCase()
+}
+
+function isWarehouseId(id: string): boolean {
+  return normalizeId(id).startsWith('a')
+}
+
 export default function WarehouseRequestsPage() {
   const { user, token } = useAuthStore()
 
@@ -162,6 +170,45 @@ export default function WarehouseRequestsPage() {
   const isWarehouseAdmin = normalizedRole === 'WAREHOUSE_ADMIN' || user?.roleId === 7
   const workplaceId = user?.warehouseId || user?.workplaceId || ''
 
+  // Kho/cửa hàng thuộc quyền kiểm soát của kho tổng (descendants theo parentId)
+  const managedLocationIds = useMemo(() => {
+    const root = normalizeId(workplaceId)
+    if (!root || warehouses.length === 0) return new Set<string>()
+
+    const byParent = new Map<string, string[]>()
+    for (const w of warehouses as any[]) {
+      const pid = normalizeId(w.parentId ?? w.parent_id)
+      const id = normalizeId(w.id)
+      if (!id) continue
+      if (!byParent.has(pid)) byParent.set(pid, [])
+      byParent.get(pid)!.push(id)
+    }
+
+    const visited = new Set<string>()
+    const queue: string[] = [root]
+    while (queue.length) {
+      const cur = queue.shift()!
+      if (visited.has(cur)) continue
+      visited.add(cur)
+      const children = byParent.get(cur) ?? []
+      for (const c of children) queue.push(c)
+    }
+    return visited
+  }, [workplaceId, warehouses])
+
+  const warehouseSourceOptions = useMemo(() => {
+    const allWarehouses = warehouses.filter((w) => isWarehouseId(w.id))
+    // Chỉ hiện các kho thuộc quyền kho tổng đang quản lý (descendants theo parentId)
+    return allWarehouses.filter((w) => managedLocationIds.has(normalizeId(w.id)))
+  }, [warehouses, managedLocationIds])
+
+  const storeOptions = useMemo(() => {
+    // store ids thường bắt đầu bằng 'b' trong seed data
+    const stores = warehouses.filter((w) => !isWarehouseId(w.id))
+    // Chỉ show store/kho con thuộc quyền kiểm soát của kho tổng
+    return stores.filter((w) => managedLocationIds.has(normalizeId(w.id)))
+  }, [warehouses, managedLocationIds])
+
   //  Fetch data 
   const fetchRequests = async () => {
     try {
@@ -179,6 +226,19 @@ export default function WarehouseRequestsPage() {
         } else {
           // Warehouse staff / Store manager xem yêu cầu gắn với kho/cửa hàng của mình
           data = await RestockAPIService.getByWarehouse(workplaceId)
+        }
+
+        // BE endpoint đôi khi chỉ filter theo fromWarehouseId.
+        // Đảm bảo kho hiện tại (đặc biệt kho tổng) nhìn thấy các đơn gửi ĐẾN mình theo toWarehouseId.
+        try {
+          const all = await RestockAPIService.getAll()
+          const wid = workplaceId.toLowerCase()
+          const incoming = all.filter((r) => (r.toWarehouseId || '').toLowerCase() === wid)
+          const merged = [...data, ...incoming]
+          const deduped = merged.filter((r, idx, self) => idx === self.findIndex((x) => x.id === r.id))
+          data = deduped
+        } catch {
+          // ignore: fallback to data from scoped endpoint
         }
       } else {
         data = []
@@ -507,13 +567,8 @@ export default function WarehouseRequestsPage() {
     const key = transferRestockRequestId.trim().toLowerCase()
     if (!key) {
       setTransferSourceRequest(null)
-      setTransferFromLocationType('')
-      setTransferFromLocationId('')
-      setTransferToLocationType('')
-      setTransferToLocationId('')
-      setTransferExpectedDelivery('')
-      setTransferShippedBy('')
-      setTransferNotes('')
+      // Không reset các field chọn kho/cửa hàng về '' vì sẽ làm select hiển thị sai (VD: show cửa hàng khi đang chọn WAREHOUSE)
+      // Chỉ clear dữ liệu gắn với request nguồn
       setTransferItems([])
       return
     }
@@ -679,12 +734,23 @@ export default function WarehouseRequestsPage() {
                 />
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">TỪ KHO *</label>
-                  <input
-                    value={getWarehouseLabel(transferFromLocationId)}
-                    readOnly
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Tên location nguồn"
-                  />
+                  <div className="relative">
+                    <select
+                      value={transferFromLocationId}
+                      onChange={(e) => setTransferFromLocationId(e.target.value)}
+                      className="w-full appearance-none border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8"
+                    >
+                      <option value="">
+                        {transferFromLocationType === 'WAREHOUSE' ? 'Chọn kho nguồn' : 'Chọn cửa hàng nguồn'}
+                      </option>
+                      {(transferFromLocationType === 'WAREHOUSE' ? warehouseSourceOptions : storeOptions).map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                  </div>
                 </div>
                 <SelectField
                   label="ĐẾN LOẠI KHO"
@@ -698,12 +764,23 @@ export default function WarehouseRequestsPage() {
                 />
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">ĐẾN KHO *</label>
-                  <input
-                    value={getWarehouseLabel(transferToLocationId)}
-                    readOnly
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Tên location đích"
-                  />
+                  <div className="relative">
+                    <select
+                      value={transferToLocationId}
+                      onChange={(e) => setTransferToLocationId(e.target.value)}
+                      className="w-full appearance-none border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8"
+                    >
+                      <option value="">
+                        {transferToLocationType === 'WAREHOUSE' ? 'Chọn kho đích' : 'Chọn cửa hàng đích'}
+                      </option>
+                      {(transferToLocationType === 'WAREHOUSE' ? warehouseSourceOptions : storeOptions).map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                  </div>
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">DỰ KIẾN GIAO HÀNG *</label>
