@@ -31,12 +31,12 @@ const sidebarItems: SidebarItem[] = [
   },
   {
     label: 'Nhập hàng',
-      href: '/warehouse-store/receive-goods',
+    href: '/warehouse-store/dispatch-goods',
     icon: <PlusSquare size={20} />
   },
   {
     label: 'Xuất hàng',
-      href: '/warehouse-store/dispatch-goods',
+    href: '/warehouse-store/receive-goods',
     icon: <Archive size={20} />
   },
   {
