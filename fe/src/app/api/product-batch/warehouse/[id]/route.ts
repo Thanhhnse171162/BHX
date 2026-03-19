@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const INVENTORY_URL = process.env.NEXT_PUBLIC_INVENTORY_API_URL || 'http://localhost:5003'
+const INVENTORY_URL =
+  process.env.INVENTORY_URL ||
+  process.env.NEXT_PUBLIC_INVENTORY_URL ||
+  process.env.NEXT_PUBLIC_INVENTORY_API_URL ||
+  'http://localhost:5003'
 
 export async function GET(
   request: NextRequest,
@@ -23,6 +27,7 @@ export async function GET(
       `${INVENTORY_URL}/api/ProductBatch/warehouse/${warehouseId}`,
       {
         method: 'GET',
+        cache: 'no-store',
         headers: {
           'Accept': 'text/plain',
           'Authorization': authorization,
@@ -31,7 +36,12 @@ export async function GET(
     )
 
     const data = await response.json()
-    return NextResponse.json(data, { status: response.status })
+    return NextResponse.json(data, {
+      status: response.status,
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      },
+    })
   } catch (error) {
     console.error('Error fetching batches:', error)
     return NextResponse.json(
