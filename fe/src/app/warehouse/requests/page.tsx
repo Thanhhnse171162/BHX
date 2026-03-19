@@ -413,34 +413,6 @@ export default function WarehouseRequestsPage() {
     fetchWarehouses()
   }, [token, workplaceId, isWarehouseAdmin])
 
-  // ── Auto refresh transfers when another page updates (e.g. receive-goods confirm) ──
-  useEffect(() => {
-    if (!token) return
-
-    const onStorage = (e: StorageEvent) => {
-      if (e.key !== 'transfer_updated') return
-      fetchTransfers()
-      fetchRequests()
-    }
-
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        fetchTransfers()
-        fetchRequests()
-      }
-    }
-
-    window.addEventListener('storage', onStorage)
-    document.addEventListener('visibilitychange', onVisibility)
-    window.addEventListener('focus', onVisibility)
-
-    return () => {
-      window.removeEventListener('storage', onStorage)
-      document.removeEventListener('visibilitychange', onVisibility)
-      window.removeEventListener('focus', onVisibility)
-    }
-  }, [token, fetchTransfers, fetchRequests])
-
   // ── Resolve user names ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!token || requests.length === 0) return
@@ -573,6 +545,65 @@ export default function WarehouseRequestsPage() {
     [requests]
   )
 
+  const reservedByOpenTransfers = useMemo(() => {
+    const reservingStatuses = new Set(['PENDING', 'PROCESSING', 'IN_TRANSIT'])
+    const map = new Map<string, number>()
+    for (const t of transfers) {
+      if (!reservingStatuses.has(String(t.status || '').toUpperCase())) continue
+      if (transferFromLocationId && String(t.fromLocationId || '') !== transferFromLocationId) continue
+      for (const it of t.items || []) {
+        const batchId = String(it.batchId || '').trim()
+        if (!batchId) continue
+        const qty = Number(it.requestedQuantity || 0)
+        if (!Number.isFinite(qty) || qty <= 0) continue
+        map.set(batchId, (map.get(batchId) ?? 0) + qty)
+      }
+    }
+    return map
+  }, [transfers, transferFromLocationId])
+
+  const requestedByBatch = useMemo(() => {
+    const usage = new Map<string, number>()
+    for (const item of transferItems) {
+      const batchId = String(item.batchId || '').trim()
+      if (!batchId) continue
+      const qty = Number(item.requestedQuantity || 0)
+      if (!Number.isFinite(qty) || qty <= 0) continue
+      usage.set(batchId, (usage.get(batchId) ?? 0) + qty)
+    }
+    return usage
+  }, [transferItems])
+
+  const batchQuantityById = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const b of batches) {
+      map.set(String(b.id), Number(b.quantity || 0))
+    }
+    return map
+  }, [batches])
+
+  const remainingByBatch = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const b of batches) {
+      const id = String(b.id)
+      const available = Math.max(0, Number(b.quantity || 0) - (reservedByOpenTransfers.get(id) ?? 0))
+      const consumed = requestedByBatch.get(id) ?? 0
+      map.set(id, Math.max(0, available - consumed))
+    }
+    return map
+  }, [batches, requestedByBatch, reservedByOpenTransfers])
+
+  const effectiveAvailableByBatch = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const b of batches) {
+      const id = String(b.id)
+      const base = Number(b.quantity || 0)
+      const reserved = reservedByOpenTransfers.get(id) ?? 0
+      map.set(id, Math.max(0, base - reserved))
+    }
+    return map
+  }, [batches, reservedByOpenTransfers])
+
   // ── Helpers ────────────────────────────────────────────────────────────────
   const fmtDate = (d: string | null) => {
     if (!d) return '—'
@@ -688,9 +719,20 @@ export default function WarehouseRequestsPage() {
       { alert('Vui lòng nhập đầy đủ thời gian giao hàng và mã yêu cầu.'); return }
     if (!transferItems.length) { alert('Vui lòng thêm ít nhất 1 sản phẩm.'); return }
     const invalid = transferItems.find(i =>
-      !i.productId || !i.batchId || Number(i.requestedQuantity || 0) < 0
+      !i.productId || !i.batchId || Number(i.requestedQuantity || 0) <= 0
     )
-    if (invalid) { alert('Mỗi sản phẩm cần có productId, batchId và số lượng hợp lệ.'); return }
+    if (invalid) { alert('Mỗi sản phẩm cần có productId, batchId và SL yêu cầu > 0.'); return }
+
+    for (const [batchId, totalRequested] of requestedByBatch.entries()) {
+      const batchQty = effectiveAvailableByBatch.get(batchId) ?? (batchQuantityById.get(batchId) ?? 0)
+      if (totalRequested > batchQty) {
+        const matchedBatch = batches.find(b => String(b.id) === batchId)
+        const batchLabel = matchedBatch?.batchNumber || batchId
+        alert(`Lô ${batchLabel} chỉ còn ${batchQty}, nhưng bạn đang yêu cầu ${totalRequested}.`)
+        return
+      }
+    }
+
     try {
       setIsSubmittingTransfer(true)
       const normalizedShippedBy = UUID_REGEX.test(transferShippedBy.trim()) ? transferShippedBy.trim() : undefined
@@ -874,8 +916,24 @@ export default function WarehouseRequestsPage() {
                             <select value={item.batchId} onChange={e => updateTransferItemRow(item.id, 'batchId', e.target.value)}
                               className="appearance-none border border-gray-200 rounded-md bg-white text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/40 w-full">
                               <option value="">{isLoadingBatches ? 'Đang tải...' : 'Chọn lô'}</option>
-                              {batches.map(b => <option key={b.id} value={b.id}>{b.batchNumber} ({b.quantity})</option>)}
+                              {batches
+                                .filter(b => !item.productId || b.productId === item.productId)
+                                .map(b => {
+                                  const id = String(b.id)
+                                  const available = effectiveAvailableByBatch.get(id) ?? Number(b.quantity || 0)
+                                  const remaining = remainingByBatch.get(id) ?? available
+                                  return (
+                                    <option key={b.id} value={b.id}>
+                                      {b.batchNumber} (khả dụng {available} / gốc {b.quantity})
+                                    </option>
+                                  )
+                                })}
                             </select>
+                            {item.batchId && (
+                              <p className="mt-1 text-[11px] text-gray-500">
+                                Còn lại sau phân bổ: {remainingByBatch.get(String(item.batchId)) ?? 0}
+                              </p>
+                            )}
                           </td>
                           {/* ── requestedQuantity: string state, sanitize on change ── */}
                           <td className="px-4 py-2.5">

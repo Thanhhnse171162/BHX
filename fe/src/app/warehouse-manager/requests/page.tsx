@@ -21,6 +21,7 @@ import {
 import { useAuthStore } from '@/store/auth.store'
 import { RestockAPIService, RestockRequestFromAPI, CreateRestockRequestDTO } from '@/services/restock-api.service'
 import { ProductAPIService } from '@/services/product-api.service'
+import { ProductBatchAPIService, type ProductBatchFromAPI } from '@/services/product-batch-api.service'
 import { UserAPIService } from '@/services/user-api.service'
 import { TransferAPIService, TransferFromAPI } from '@/services/transfer-api.service'
 import { ToastContainer, type ToastItem } from '@/shared/ui/Toast'
@@ -66,18 +67,6 @@ interface FormItem {
   reason: string
 }
 
-interface ReceiveTransferItemPayload {
-  transferItemId: string
-  shippedQuantity: number
-  damagedQuantity: number
-  notes?: string
-}
-
-interface ReceiveTransferPayload {
-  items: ReceiveTransferItemPayload[]
-  notes?: string
-}
-
 const ITEM_REASONS = ['Hết hàng', 'Sắp hết', 'Điều phối', 'Khác']
 
 function normalizeId(value?: string | null): string {
@@ -119,37 +108,18 @@ function sumReceivedQty(t: TransferFromAPI) {
   return items.reduce((sum, it) => sum + Number(it.receivedQuantity ?? 0), 0)
 }
 
-function buildReceivePayload(t: TransferFromAPI): ReceiveTransferPayload {
-  const items = Array.isArray(t.items) ? t.items : []
-
-  return {
-    notes: t.notes ?? '',
-    items: items.map((it) => ({
-      transferItemId: String(it.id),
-      shippedQuantity:
-        Number(it.shippedQuantity ?? 0) > 0
-          ? Number(it.shippedQuantity)
-          : Number(it.requestedQuantity ?? 0),
-      damagedQuantity: Number(it.damagedQuantity ?? 0),
-      notes: it.notes ?? '',
-    })),
-  }
-}
-
 function getIncomingTransferUIStatus(apiStatus: string): {
   key: IncomingTransferUIStatusKey
   label: string
   cls: string
-  canConfirm: boolean
 } {
   const s = normalizeApiStatus(apiStatus)
 
-  if (s === 'DELIVERED') {
+  if (s === 'PENDING') {
     return {
       key: 'CHO_DUYET',
       label: 'Chờ duyệt',
       cls: 'bg-amber-50 text-amber-700 border-amber-200',
-      canConfirm: true,
     }
   }
 
@@ -158,7 +128,14 @@ function getIncomingTransferUIStatus(apiStatus: string): {
       key: 'DANG_VAN_CHUYEN',
       label: 'Đang vận chuyển',
       cls: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-      canConfirm: false,
+    }
+  }
+
+  if (s === 'DELIVERED') {
+    return {
+      key: 'CHO_DUYET',
+      label: 'Chờ duyệt',
+      cls: 'bg-amber-50 text-amber-700 border-amber-200',
     }
   }
 
@@ -167,7 +144,6 @@ function getIncomingTransferUIStatus(apiStatus: string): {
       key: 'HOAN_THANH',
       label: 'Hoàn thành',
       cls: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      canConfirm: false,
     }
   }
 
@@ -176,7 +152,6 @@ function getIncomingTransferUIStatus(apiStatus: string): {
       key: 'DA_HUY',
       label: 'Đã hủy',
       cls: 'bg-gray-50 text-gray-600 border-gray-200',
-      canConfirm: false,
     }
   }
 
@@ -185,7 +160,6 @@ function getIncomingTransferUIStatus(apiStatus: string): {
       key: 'TU_CHOI',
       label: 'Từ chối',
       cls: 'bg-red-50 text-red-700 border-red-200',
-      canConfirm: false,
     }
   }
 
@@ -193,7 +167,6 @@ function getIncomingTransferUIStatus(apiStatus: string): {
     key: 'KHAC',
     label: s || '—',
     cls: 'bg-slate-50 text-slate-600 border-slate-200',
-    canConfirm: false,
   }
 }
 
@@ -215,8 +188,11 @@ export default function WarehouseManagerRequestsPage() {
   const [items, setItems] = useState<FormItem[]>([])
   const [loadingLocations, setLoadingLocations] = useState(false)
   const [loadingProducts, setLoadingProducts] = useState(false)
+  const [batchesById, setBatchesById] = useState<Record<string, ProductBatchFromAPI>>({})
+  const [batchesLoading, setBatchesLoading] = useState(false)
 
-  const currentWarehouseId = String(user?.warehouseId ?? user?.workplaceId ?? '').trim()
+  // Dùng chung logic với loadRequests() để tránh lệch id "kho" theo dữ liệu user.
+  const currentWarehouseId = String(user?.warehouseId ?? user?.storeId ?? user?.workplaceId ?? '').trim()
   const normalizedCurrentWarehouseId = currentWarehouseId.toLowerCase()
   const [incomingTransfers, setIncomingTransfers] = useState<TransferFromAPI[]>([])
   const [incomingLoading, setIncomingLoading] = useState(false)
@@ -228,7 +204,7 @@ export default function WarehouseManagerRequestsPage() {
   const [incomingToDate, setIncomingToDate] = useState('')
   const [incomingPage, setIncomingPage] = useState(1)
   const [selectedIncoming, setSelectedIncoming] = useState<TransferFromAPI | null>(null)
-  const [confirmingId, setConfirmingId] = useState<string | null>(null)
+  const [incomingDetailLoadingId, setIncomingDetailLoadingId] = useState<string | null>(null)
 
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const pushToast = useCallback((toast: Omit<ToastItem, 'id' | 'onClose'>) => {
@@ -358,17 +334,9 @@ export default function WarehouseManagerRequestsPage() {
         (t) => String(t.toLocationId ?? '').trim().toLowerCase() === normalizedCurrentWarehouseId,
       )
 
-      const filtered = toThisWarehouse.filter((t) => {
-        const status = normalizeApiStatus(t.status)
-        const receivedQty = sumReceivedQty(t)
-        return (
-          status === 'DELIVERED' ||
-          status === 'COMPLETED' ||
-          Boolean(t.actualDelivery) ||
-          Boolean(t.receivedBy) ||
-          receivedQty > 0
-        )
-      })
+      // Manager chỉ xem đơn vận chuyển đến kho của mình (không cần xác nhận).
+      // Vì vậy hiển thị theo cơ sở "đến kho" và để bộ lọc bên dưới phân loại theo trạng thái.
+      const filtered = toThisWarehouse
 
       setIncomingTransfers(filtered)
       setIncomingDebug({ total: all.length, toThisWarehouse: toThisWarehouse.length, visible: filtered.length })
@@ -431,6 +399,23 @@ export default function WarehouseManagerRequestsPage() {
       .catch(() => setProductsForItems([]))
       .finally(() => setLoadingProducts(false))
   }, [])
+
+  useEffect(() => {
+    // Map batchId -> batchNumber để hiển thị tên lô thay vì id.
+    if (!currentWarehouseId) {
+      setBatchesById({})
+      return
+    }
+    setBatchesLoading(true)
+    ProductBatchAPIService.getByWarehouse(currentWarehouseId)
+      .then((batches) => {
+        const map: Record<string, ProductBatchFromAPI> = {}
+        for (const b of batches) map[String(b.id)] = b
+        setBatchesById(map)
+      })
+      .catch(() => setBatchesById({}))
+      .finally(() => setBatchesLoading(false))
+  }, [currentWarehouseId])
 
   function mapStatus(status: string): RequestStatus {
     if (status === 'APPROVED') return 'Đã duyệt'
@@ -519,31 +504,24 @@ export default function WarehouseManagerRequestsPage() {
     return loc?.name ?? String(id).slice(-8)
   }, [locations])
 
-  const handleConfirmIncomingComplete = useCallback(async (t: TransferFromAPI) => {
-    const ui = getIncomingTransferUIStatus(t.status)
-    if (!ui.canConfirm) return
-
-    setConfirmingId(t.id)
-    try {
-      const payload = buildReceivePayload(t)
-      await TransferAPIService.receiveTransfer(t.id, payload)
-
-      pushToast({
-        type: 'success',
-        message: `Đã xác nhận nhận hàng ${t.transferNumber || t.id}`,
-      })
-
-      await loadIncomingTransfers()
-      setSelectedIncoming((prev) => (prev?.id === t.id ? null : prev))
-    } catch (err: unknown) {
-      pushToast({
-        type: 'error',
-        message: err instanceof Error ? err.message : 'Xác nhận nhận hàng thất bại.',
-      })
-    } finally {
-      setConfirmingId(null)
-    }
-  }, [loadIncomingTransfers, pushToast])
+  const handleViewIncoming = useCallback(
+    async (t: TransferFromAPI) => {
+      setIncomingDetailLoadingId(t.id)
+      try {
+        // Lấy chi tiết theo BE endpoint GET /api/Transfer/transfer/{id}
+        const detail = await TransferAPIService.getById(t.id)
+        setSelectedIncoming(detail)
+      } catch (err: unknown) {
+        pushToast({
+          type: 'error',
+          message: err instanceof Error ? err.message : 'Không thể tải chi tiết đơn vận chuyển.',
+        })
+      } finally {
+        setIncomingDetailLoadingId(null)
+      }
+    },
+    [pushToast],
+  )
 
   const fromWarehouseIdForForm = user?.warehouseId ?? user?.workplaceId ?? ''
   const normalizedFromId = normalizeId(fromWarehouseIdForForm)
@@ -1019,25 +997,15 @@ export default function WarehouseManagerRequestsPage() {
                             <span className={`inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-semibold ${ui.cls}`}>
                               {ui.label}
                             </span>
-                            {ui.canConfirm && (
-                              <button
-                                onClick={() => handleConfirmIncomingComplete(t)}
-                                disabled={confirmingId === t.id}
-                                className="px-3 py-1.5 rounded-lg bg-[#f97316] text-white text-xs font-semibold hover:bg-[#ea580c] disabled:opacity-60 inline-flex items-center gap-2"
-                              >
-                                {confirmingId === t.id && <Loader2 className="w-3 h-3 animate-spin" />}
-                                Xác nhận hoàn thành
-                              </button>
-                            )}
                           </div>
                         </td>
                         <td className="px-5 py-4">
                           <button
-                            onClick={() => setSelectedIncoming(t)}
+                            onClick={() => handleViewIncoming(t)}
                             className="text-gray-400 hover:text-gray-700 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
                             title="Xem chi tiết"
                           >
-                            <Eye className="w-4 h-4" />
+                            {incomingDetailLoadingId === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
                           </button>
                         </td>
                       </tr>
@@ -1397,13 +1365,19 @@ export default function WarehouseManagerRequestsPage() {
                           const expected = Number(it.shippedQuantity ?? 0) > 0 ? Number(it.shippedQuantity) : Number(it.requestedQuantity ?? 0)
                           const actual = Number(it.receivedQuantity ?? 0)
                           const diff = actual - expected
+                          const product = productsForItems.find((p) => p.id === it.productId)
+                          const batch = it.batchId ? batchesById[String(it.batchId)] : undefined
                           return (
                             <tr key={it.id} className="border-t border-gray-100">
                               <td className="px-5 py-3.5">
-                                <p className="font-semibold text-gray-900">{it.productId}</p>
-                                <p className="text-xs text-gray-500">SKU: {it.productId}</p>
+                                <p className="font-semibold text-gray-900">
+                                  {product?.name ?? it.productId ?? '—'}
+                                </p>
+                                <p className="text-xs text-gray-500">SKU: {product?.sku ?? it.productId ?? '—'}</p>
                               </td>
-                              <td className="px-5 py-3.5 text-gray-700 font-mono text-xs">{it.batchId}</td>
+                              <td className="px-5 py-3.5 text-gray-700 font-mono text-xs">
+                                {batchesLoading ? '...' : batch?.batchNumber ?? it.batchId ?? '—'}
+                              </td>
                               <td className="px-5 py-3.5 text-gray-700 font-semibold">{expected.toLocaleString()}</td>
                               <td className="px-5 py-3.5 text-gray-700 font-semibold">{actual.toLocaleString()}</td>
                               <td className="px-5 py-3.5">
@@ -1421,18 +1395,7 @@ export default function WarehouseManagerRequestsPage() {
                 </div>
               </div>
 
-              {getIncomingTransferUIStatus(selectedIncoming.status).canConfirm && (
-                <div className="flex justify-end">
-                  <button
-                    onClick={() => handleConfirmIncomingComplete(selectedIncoming)}
-                    disabled={confirmingId === selectedIncoming.id}
-                    className="px-5 py-2.5 rounded-xl bg-[#f97316] text-white font-semibold hover:bg-[#ea580c] disabled:opacity-60 inline-flex items-center gap-2"
-                  >
-                    {confirmingId === selectedIncoming.id && <Loader2 className="w-4 h-4 animate-spin" />}
-                    Xác nhận hoàn thành
-                  </button>
-                </div>
-              )}
+              {/* Manager chỉ xem chi tiết, không xác nhận nhận hàng. */}
             </div>
           </section>
         </div>
