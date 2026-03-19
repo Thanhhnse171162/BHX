@@ -52,3 +52,36 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   }
 }
 
+/**
+ * GET /api/transfer/transfer/:id
+ * Proxy to backend: GET /api/Transfer/transfer/:id
+ */
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await context.params
+    const url = `${INVENTORY_SERVICE_URL}/api/Transfer/transfer/${encodeURIComponent(id)}`
+    const authorization = getAuthorization(request)
+
+    const response = await axios.get(url, {
+      headers: {
+        Authorization: authorization,
+        Accept: '*/*',
+      },
+    })
+
+    return NextResponse.json(response.data, { status: response.status })
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: error.response?.data?.message || 'Error fetching transfer',
+          error: error.response?.data?.error || undefined,
+        },
+        { status: error.response?.status || 500 },
+      )
+    }
+    return NextResponse.json({ success: false, message: 'Internal server error' }, { status: 500 })
+  }
+}
+
