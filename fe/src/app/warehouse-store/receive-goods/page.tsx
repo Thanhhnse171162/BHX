@@ -41,32 +41,45 @@ interface InspectionItem {
 }
 
 function toInspectionItem(item: TransferItemFromAPI): InspectionItem {
+  const receivedQty = Number((item as any)?.receivedQuantity ?? 0)
+  const shippedQty = Number((item as any)?.shippedQuantity ?? 0)
+  const damagedQty = Number((item as any)?.damagedQuantity ?? 0)
+
   const actualQty =
-    item.receivedQuantity > 0
-      ? String(item.receivedQuantity)
-      : item.shippedQuantity > 0
-        ? String(item.shippedQuantity)
+    receivedQty > 0
+      ? String(receivedQty)
+      : shippedQty > 0
+        ? String(shippedQty)
         : ''
 
   const condition: InspectionItem['condition'] =
-    item.damagedQuantity > 0
+    damagedQty > 0
       ? 'damaged'
-      : item.receivedQuantity === 0 && item.shippedQuantity > 0
+      : receivedQty === 0 && shippedQty > 0
         ? 'missing'
         : ''
 
   return {
     id: item.id,
     productId: item.productId,
-    batchId: item.batchId,
+    batchId: String((item as any)?.batchId ?? ''),
     productName: `Sản phẩm ${item.productId}`,
     expectedQty: item.requestedQuantity,
     actualQty,
     condition,
     note: item.notes ?? '',
-    shippedQuantity: item.shippedQuantity,
-    damagedQuantity: item.damagedQuantity,
+    shippedQuantity: shippedQty,
+    damagedQuantity: damagedQty,
   }
+}
+function toInspectionItemWithName(
+  item: TransferItemFromAPI,
+  productNameMap: Record<string, string>
+): InspectionItem {
+  const base = toInspectionItem(item)
+  const key = String(item.productId ?? '').trim().toLowerCase()
+  const productName = productNameMap[key] || `Sản phẩm ${item.productId}`
+  return { ...base, productName }
 }
 
 // ─── Status UI config ─────────────────────────────────────────────────────────
@@ -103,14 +116,12 @@ export default function ReceiveGoodsPage() {
   const user = useAuthStore(state => state.user)
   const hydrated = useAuthStore(state => state.hydrated)
 
-  // Keep optimistic "COMPLETED" status even if backend list lags behind
-  const [optimisticCompletedIds, setOptimisticCompletedIds] = useState<Record<string, number>>({})
-
   const destinationLocationId = String(user?.workplaceId ?? '')
   const normalizedDestinationId = destinationLocationId.trim().toLowerCase()
 
   // Warehouses/stores lookup for showing names instead of IDs
   const [locations, setLocations] = useState<Array<{ id: string; name?: string }>>([])
+  const [productNameMap, setProductNameMap] = useState<Record<string, string>>({})
 
   // List state
   const [transfers, setTransfers] = useState<TransferFromAPI[]>([])
@@ -118,6 +129,8 @@ export default function ReceiveGoodsPage() {
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<'all' | StatusType>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const PAGE_SIZE = 10
 
   // Inspection modal state
   const [inspectingOrder, setInspectingOrder] = useState<TransferFromAPI | null>(null)
@@ -138,50 +151,17 @@ export default function ReceiveGoodsPage() {
     try {
       const data = await TransferAPIService.getTransfers()
       const list = Array.isArray(data) ? data : []
-      const now = Date.now()
-      // Keep optimistic completion until backend reflects it (safety TTL: 7 days)
-      const TTL = 7 * 24 * 60 * 60 * 1000
-      setTransfers(
-        list.map(t => {
-          const ts = optimisticCompletedIds[t.id]
-          if (ts && now - ts < TTL) {
-            if (String(t.status).toUpperCase() === 'COMPLETED') {
-              try { localStorage.removeItem('transfer_updated') } catch { /* ignore */ }
-              return t
-            }
-            if (t.status !== 'COMPLETED') return { ...t, status: 'COMPLETED' }
-          }
-          return t
-        })
-      )
+      setTransfers(list)
     } catch (err: unknown) {
       setFetchError(err instanceof Error ? err.message : 'Lỗi tải danh sách phiếu')
     } finally {
       setLoading(false)
     }
-  }, [hydrated, optimisticCompletedIds])
+  }, [hydrated])
 
   useEffect(() => {
     fetchTransfers()
   }, [fetchTransfers])
-
-  // Restore optimistic completion after full refresh (based on localStorage)
-  useEffect(() => {
-    if (!hydrated) return
-    try {
-      if (typeof window === 'undefined') return
-      const raw = localStorage.getItem('transfer_updated')
-      const parsed = raw ? JSON.parse(raw) : null
-      const transferId = String(parsed?.transferId ?? '').trim()
-      const at = Number(parsed?.at ?? 0)
-      const TTL = 7 * 24 * 60 * 60 * 1000
-      if (transferId && at && Date.now() - at < TTL) {
-        setOptimisticCompletedIds(prev => ({ ...prev, [transferId]: at }))
-      }
-    } catch {
-      // ignore
-    }
-  }, [hydrated])
 
   useEffect(() => {
     let cancelled = false
@@ -196,6 +176,30 @@ export default function ReceiveGoodsPage() {
         if (!cancelled) setLocations(list)
       } catch {
         if (!cancelled) setLocations([])
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await localApiClient.get('/products')
+        const payload = res.data
+        const list =
+          Array.isArray(payload?.data) ? payload.data :
+          Array.isArray(payload) ? payload :
+          []
+        const map: Record<string, string> = {}
+        for (const p of list) {
+          const id = String((p as any)?.id ?? '').trim().toLowerCase()
+          const name = String((p as any)?.name ?? '').trim()
+          if (id && name) map[id] = name
+        }
+        if (!cancelled) setProductNameMap(map)
+      } catch {
+        if (!cancelled) setProductNameMap({})
       }
     })()
     return () => { cancelled = true }
@@ -229,11 +233,18 @@ export default function ReceiveGoodsPage() {
       !searchQuery.trim() ||
       t.transferNumber.toLowerCase().includes(searchQuery.trim().toLowerCase())
     )
+  const totalPages = Math.max(1, Math.ceil(filteredTransfers.length / PAGE_SIZE))
+  const safePage = Math.min(currentPage, totalPages)
+  const paginatedTransfers = filteredTransfers.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [statusFilter, searchQuery, destinationTransfers.length])
 
   // ─── Inspection helpers ───────────────────────────────────────────────────
   const openInspection = (transfer: TransferFromAPI) => {
     setInspectingOrder(transfer)
-    setInspectionItems((transfer.items ?? []).map(toInspectionItem))
+    setInspectionItems((transfer.items ?? []).map(item => toInspectionItemWithName(item, productNameMap)))
     setInspectorNote(transfer.notes ?? '')
     setStep('detail')
     setConfirmAction(null)
@@ -269,18 +280,6 @@ export default function ReceiveGoodsPage() {
 
     try {
       await TransferAPIService.completeTransferV2(inspectingOrder.id)
-      setOptimisticCompletedIds(prev => ({ ...prev, [inspectingOrder.id]: Date.now() }))
-      setTransfers(prev => prev.map(t => (t.id === inspectingOrder.id ? { ...t, status: 'COMPLETED' } : t)))
-      try {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(
-            'transfer_updated',
-            JSON.stringify({ transferId: inspectingOrder.id, transferNumber: inspectingOrder.transferNumber, at: Date.now() })
-          )
-        }
-      } catch {
-        // ignore
-      }
       await fetchTransfers()
       closeInspection()
     } catch (err: unknown) {
@@ -411,14 +410,16 @@ export default function ReceiveGoodsPage() {
                   <Loader2 size={20} className="animate-spin text-slate-400 mx-auto" />
                 </td>
               </tr>
-            ) : filteredTransfers.length === 0 ? (
+            ) : paginatedTransfers.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-4 py-12 text-center text-slate-400 text-sm">
                   Không có phiếu nào phù hợp
                 </td>
               </tr>
-            ) : filteredTransfers.map(transfer => {
+            ) : paginatedTransfers.map(transfer => {
               const uiStatus = toUIStatus(transfer.status)
+              const normalizedStatus = String(transfer.status).toUpperCase()
+              const canInspect = normalizedStatus === 'PENDING' || normalizedStatus === 'DELIVERED'
               return (
                 <tr key={transfer.id} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
                   <td className="px-4 py-3.5 font-semibold text-emerald-600 font-mono text-xs">
@@ -441,7 +442,7 @@ export default function ReceiveGoodsPage() {
                   </td>
                   <td className="px-4 py-3.5">
                     <div className="flex justify-center">
-                      {uiStatus === 'pending' ? (
+                      {canInspect ? (
                         <button
                           onClick={() => openInspection(transfer)}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-500 text-amber-600 hover:text-white border border-amber-300 hover:border-amber-500 rounded-lg text-xs font-semibold transition-all group"
@@ -451,12 +452,23 @@ export default function ReceiveGoodsPage() {
                           <ArrowRight size={11} className="opacity-0 -ml-1 group-hover:opacity-100 group-hover:ml-0 transition-all" />
                         </button>
                       ) : (
-                        <button
-                          className="text-slate-400 hover:text-emerald-600 transition-colors p-1 rounded-md hover:bg-emerald-50"
-                          onClick={() => alert(`Xem chi tiết: ${transfer.transferNumber}`)}
-                        >
-                          <Eye size={16} />
-                        </button>
+                        uiStatus === 'done' ? (
+                          <button
+                            className="text-slate-400 hover:text-emerald-600 transition-colors p-1 rounded-md hover:bg-emerald-50"
+                            onClick={() => alert(`Xem chi tiết: ${transfer.transferNumber}`)}
+                          >
+                            <Eye size={16} />
+                          </button>
+                        ) : (
+                          <button
+                            disabled
+                            title="Chỉ kiểm tra khi đơn ở trạng thái Chờ xử lý hoặc Đã giao"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-400 border border-slate-200 rounded-lg text-xs font-semibold cursor-not-allowed"
+                          >
+                            <ClipboardCheck size={13} />
+                            Chưa tới kho
+                          </button>
+                        )
                       )}
                     </div>
                   </td>
@@ -467,7 +479,31 @@ export default function ReceiveGoodsPage() {
         </table>
 
         <div className="px-4 py-3 border-t border-slate-100 text-xs text-slate-500">
-          Hiển thị <span className="font-semibold text-slate-700">{filteredTransfers.length}</span> phiếu
+          <div className="flex items-center justify-between">
+            <span>
+              Hiển thị <span className="font-semibold text-slate-700">{paginatedTransfers.length}</span> /{' '}
+              <span className="font-semibold text-slate-700">{filteredTransfers.length}</span> phiếu
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={safePage === 1}
+                className="px-2 py-1 border border-slate-200 rounded text-xs disabled:opacity-40"
+              >
+                Trước
+              </button>
+              <span className="text-xs text-slate-600">
+                {safePage}/{totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={safePage === totalPages}
+                className="px-2 py-1 border border-slate-200 rounded text-xs disabled:opacity-40"
+              >
+                Sau
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
