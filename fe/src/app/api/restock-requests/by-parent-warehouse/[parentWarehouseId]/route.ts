@@ -19,9 +19,13 @@ export async function GET(
   try {
     const url = `${INVENTORY_SERVICE_URL}/api/restock-requests/by-parent-warehouse/${parentWarehouseId}`
 
+    const authHeader = request.headers.get('authorization')
+    const cookieToken = request.cookies.get('auth_token')?.value
+    const authorization = authHeader || (cookieToken ? `Bearer ${cookieToken}` : '')
+
     const response = await axios.get(url, {
       headers: {
-        Authorization: request.headers.get('authorization') || '',
+        Authorization: authorization,
         Accept: '*/*',
       },
     })

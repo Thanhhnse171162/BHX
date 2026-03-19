@@ -16,9 +16,13 @@ export async function GET(request: NextRequest) {
     const queryString = searchParams.toString()
     const url = `${INVENTORY_SERVICE_URL}/api/restock-requests${queryString ? `?${queryString}` : ''}`
 
+    const authHeader = request.headers.get('authorization')
+    const cookieToken = request.cookies.get('auth_token')?.value
+    const authorization = authHeader || (cookieToken ? `Bearer ${cookieToken}` : '')
+
     const response = await axios.get(url, {
       headers: {
-        Authorization: request.headers.get('authorization') || '',
+        Authorization: authorization,
         Accept: '*/*',
       },
     })
@@ -44,9 +48,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const url = `${INVENTORY_SERVICE_URL}/api/restock-requests`
 
+    const authHeader = request.headers.get('authorization')
+    const cookieToken = request.cookies.get('auth_token')?.value
+    const authorization = authHeader || (cookieToken ? `Bearer ${cookieToken}` : '')
+
     const response = await axios.post(url, body, {
       headers: {
-        Authorization: request.headers.get('authorization') || '',
+        Authorization: authorization,
         'Content-Type': 'application/json',
       },
     })

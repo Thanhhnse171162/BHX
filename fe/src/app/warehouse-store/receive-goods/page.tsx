@@ -103,6 +103,9 @@ export default function ReceiveGoodsPage() {
   const user = useAuthStore(state => state.user)
   const hydrated = useAuthStore(state => state.hydrated)
 
+  // Keep optimistic "COMPLETED" status even if backend list lags behind
+  const [optimisticCompletedIds, setOptimisticCompletedIds] = useState<Record<string, number>>({})
+
   const destinationLocationId = String(user?.workplaceId ?? '')
   const normalizedDestinationId = destinationLocationId.trim().toLowerCase()
 
@@ -134,17 +137,51 @@ export default function ReceiveGoodsPage() {
 
     try {
       const data = await TransferAPIService.getTransfers()
-      setTransfers(Array.isArray(data) ? data : [])
+      const list = Array.isArray(data) ? data : []
+      const now = Date.now()
+      // Keep optimistic completion until backend reflects it (safety TTL: 7 days)
+      const TTL = 7 * 24 * 60 * 60 * 1000
+      setTransfers(
+        list.map(t => {
+          const ts = optimisticCompletedIds[t.id]
+          if (ts && now - ts < TTL) {
+            if (String(t.status).toUpperCase() === 'COMPLETED') {
+              try { localStorage.removeItem('transfer_updated') } catch { /* ignore */ }
+              return t
+            }
+            if (t.status !== 'COMPLETED') return { ...t, status: 'COMPLETED' }
+          }
+          return t
+        })
+      )
     } catch (err: unknown) {
       setFetchError(err instanceof Error ? err.message : 'Lỗi tải danh sách phiếu')
     } finally {
       setLoading(false)
     }
-  }, [hydrated])
+  }, [hydrated, optimisticCompletedIds])
 
   useEffect(() => {
     fetchTransfers()
   }, [fetchTransfers])
+
+  // Restore optimistic completion after full refresh (based on localStorage)
+  useEffect(() => {
+    if (!hydrated) return
+    try {
+      if (typeof window === 'undefined') return
+      const raw = localStorage.getItem('transfer_updated')
+      const parsed = raw ? JSON.parse(raw) : null
+      const transferId = String(parsed?.transferId ?? '').trim()
+      const at = Number(parsed?.at ?? 0)
+      const TTL = 7 * 24 * 60 * 60 * 1000
+      if (transferId && at && Date.now() - at < TTL) {
+        setOptimisticCompletedIds(prev => ({ ...prev, [transferId]: at }))
+      }
+    } catch {
+      // ignore
+    }
+  }, [hydrated])
 
   useEffect(() => {
     let cancelled = false
@@ -231,13 +268,27 @@ export default function ReceiveGoodsPage() {
     setSubmitError(null)
 
     try {
-      // TODO: thay bằng API xác nhận nhập kho thực tế
-      setTransfers(prev =>
-        prev.map(t => t.id === inspectingOrder.id ? { ...t, status: 'COMPLETED' } : t)
-      )
+      await TransferAPIService.completeTransferV2(inspectingOrder.id)
+      setOptimisticCompletedIds(prev => ({ ...prev, [inspectingOrder.id]: Date.now() }))
+      setTransfers(prev => prev.map(t => (t.id === inspectingOrder.id ? { ...t, status: 'COMPLETED' } : t)))
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(
+            'transfer_updated',
+            JSON.stringify({ transferId: inspectingOrder.id, transferNumber: inspectingOrder.transferNumber, at: Date.now() })
+          )
+        }
+      } catch {
+        // ignore
+      }
+      await fetchTransfers()
       closeInspection()
     } catch (err: unknown) {
-      setSubmitError(err instanceof Error ? err.message : 'Lỗi xác nhận nhập kho')
+      const axiosMsg =
+        (err as any)?.response?.data?.message ||
+        (err as any)?.response?.data?.error ||
+        (err as any)?.message
+      setSubmitError(typeof axiosMsg === 'string' && axiosMsg.trim() ? axiosMsg : 'Lỗi xác nhận nhập kho')
     } finally {
       setSubmitLoading(false)
     }

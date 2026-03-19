@@ -62,4 +62,10 @@ export class TransferAPIService {
     const response = await localApiClient.get('/transfer/transfers')
     return response.data?.data ?? response.data ?? []
   }
+
+  static async completeTransferV2(transferId: string): Promise<boolean> {
+    const response = await localApiClient.patch(`/transfer/transferV2/${transferId}`)
+    const payload = response.data
+    return Boolean(payload?.data ?? payload)
+  }
 }

@@ -39,6 +39,13 @@ axiosInstance.interceptors.response.use(
       originalRequest._retry = true
 
       if (typeof window !== 'undefined') {
+        // Avoid redirecting during zustand hydration on full page refresh
+        const { hydrated, token } = useAuthStore.getState()
+        const hadAuthHeader = Boolean((originalRequest.headers as any)?.Authorization)
+        if (!hydrated && !token && !hadAuthHeader) {
+          return Promise.reject(error)
+        }
+
         const currentPath = window.location.pathname
         
         // Chỉ redirect nếu KHÔNG ở trang login/register/forgot-password/reset-password
@@ -110,6 +117,13 @@ iamClient.interceptors.response.use(
       originalRequest._retry = true
 
       if (typeof window !== 'undefined') {
+        // Avoid redirecting during zustand hydration on full page refresh
+        const { hydrated, token } = useAuthStore.getState()
+        const hadAuthHeader = Boolean((originalRequest.headers as any)?.Authorization)
+        if (!hydrated && !token && !hadAuthHeader) {
+          return Promise.reject(error)
+        }
+
         const currentPath = window.location.pathname
         
         // Chỉ redirect nếu KHÔNG ở trang login/register/forgot-password/reset-password

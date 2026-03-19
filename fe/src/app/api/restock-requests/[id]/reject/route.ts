@@ -16,9 +16,13 @@ export async function PUT(
     const body = await request.json().catch(() => ({}))
     const url = `${INVENTORY_SERVICE_URL}/api/restock-requests/${id}/reject`
 
+    const authHeader = request.headers.get('authorization')
+    const cookieToken = request.cookies.get('auth_token')?.value
+    const authorization = authHeader || (cookieToken ? `Bearer ${cookieToken}` : '')
+
     const response = await axios.put(url, body, {
       headers: {
-        Authorization: request.headers.get('authorization') || '',
+        Authorization: authorization,
         'Content-Type': 'application/json',
         Accept: '*/*',
       },
