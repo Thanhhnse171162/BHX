@@ -7,17 +7,16 @@ const INVENTORY_SERVICE_URL =
   'http://localhost:5003'
 
 /**
- * GET /api/restock-requests/by-warehouse/[warehouseId]
- * Proxy to backend: GET /api/restock-requests/by-warehouse/:warehouseId
+ * GET /api/stock-movements/by-location/:locationId
+ * Proxy to backend: GET /api/stock-movements/by-location/:locationId
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { warehouseId: string } }
+  { params }: { params: Promise<{ locationId: string }> }
 ) {
-  const { warehouseId } = params
-
   try {
-    const url = `${INVENTORY_SERVICE_URL}/api/restock-requests/by-warehouse/${warehouseId}`
+    const { locationId } = await params
+    const url = `${INVENTORY_SERVICE_URL}/api/stock-movements/by-location/${locationId}`
 
     const authHeader = request.headers.get('authorization')
     const cookieToken = request.cookies.get('auth_token')?.value
@@ -34,11 +33,16 @@ export async function GET(
   } catch (error: unknown) {
     if (axios.isAxiosError(error)) {
       return NextResponse.json(
-        error.response?.data ?? { message: 'Error fetching warehouse restock requests' },
+        {
+          success: false,
+          message: error.response?.data?.message || 'Error fetching stock movements',
+          error: error.response?.data?.error || undefined,
+        },
         { status: error.response?.status || 500 }
       )
     }
 
-    return NextResponse.json({ message: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ success: false, message: 'Internal server error' }, { status: 500 })
   }
 }
+

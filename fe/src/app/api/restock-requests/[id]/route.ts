@@ -18,9 +18,13 @@ export async function PATCH(
     const body = await request.json()
     const url = `${INVENTORY_SERVICE_URL}/api/restock-requests/${params.id}`
 
+    const authHeader = request.headers.get('authorization')
+    const cookieToken = request.cookies.get('auth_token')?.value
+    const authorization = authHeader || (cookieToken ? `Bearer ${cookieToken}` : '')
+
     const response = await axios.patch(url, body, {
       headers: {
-        Authorization: request.headers.get('authorization') || '',
+        Authorization: authorization,
         'Content-Type': 'application/json',
       },
     })
