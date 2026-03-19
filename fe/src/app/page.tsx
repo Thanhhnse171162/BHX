@@ -24,7 +24,7 @@ export default function Home() {
       STORE_MANAGER: '/store-manager',
       WAREHOUSE_MANAGER: '/warehouse-manager',
       WAREHOUSE_ADMIN: '/warehouse',
-      WAREHOUSE_STAFF: '/warehouse-staff',
+      WAREHOUSE_STAFF: '/warehouse-store',
       STAFF: '/cashier',
     }
     const portal = portalMap[user.role]

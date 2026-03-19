@@ -7,6 +7,7 @@ import {
   Eye,
   Filter,
   ClipboardList,
+  Truck,
   CheckCircle2,
   AlertTriangle,
   X,
@@ -21,14 +22,16 @@ import { useAuthStore } from '@/store/auth.store'
 import { RestockAPIService, RestockRequestFromAPI, CreateRestockRequestDTO } from '@/services/restock-api.service'
 import { ProductAPIService } from '@/services/product-api.service'
 import { UserAPIService } from '@/services/user-api.service'
+import { TransferAPIService, TransferFromAPI } from '@/services/transfer-api.service'
+import { ToastContainer, type ToastItem } from '@/shared/ui/Toast'
 
 type RequestPriority = 'CAO' | 'TRUNG BÌNH' | 'THẤP'
 type RequestStatus = 'Chờ duyệt' | 'Đang xử lý' | 'Đã giao' | 'Đã duyệt'
-type RequestType = 'store' | 'warehouse'
+type RequestType = 'store' | 'warehouse' | 'incoming-transfer'
 
 interface RequestItem {
   id: string
-  uniqueId: string  // For React key (must be unique)
+  uniqueId: string
   source: string
   sourceCode: string
   productSummary: string
@@ -63,6 +66,18 @@ interface FormItem {
   reason: string
 }
 
+interface ReceiveTransferItemPayload {
+  transferItemId: string
+  shippedQuantity: number
+  damagedQuantity: number
+  notes?: string
+}
+
+interface ReceiveTransferPayload {
+  items: ReceiveTransferItemPayload[]
+  notes?: string
+}
+
 const ITEM_REASONS = ['Hết hàng', 'Sắp hết', 'Điều phối', 'Khác']
 
 function normalizeId(value?: string | null): string {
@@ -70,6 +85,117 @@ function normalizeId(value?: string | null): string {
 }
 
 const PAGE_SIZE = 4
+
+type IncomingTransferUIStatusKey =
+  | 'CHO_DUYET'
+  | 'DANG_VAN_CHUYEN'
+  | 'HOAN_THANH'
+  | 'DA_HUY'
+  | 'TU_CHOI'
+  | 'KHAC'
+
+function normalizeApiStatus(value?: string | null) {
+  return String(value ?? '').trim().toUpperCase()
+}
+
+function formatDateVI(value?: string | null) {
+  if (!value) return '-'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return String(value)
+  return d.toLocaleDateString('vi-VN')
+}
+
+function sumExpectedQty(t: TransferFromAPI) {
+  const items = Array.isArray(t.items) ? t.items : []
+  return items.reduce((sum, it) => {
+    const shipped = Number(it.shippedQuantity ?? 0)
+    const requested = Number(it.requestedQuantity ?? 0)
+    return sum + (shipped > 0 ? shipped : requested)
+  }, 0)
+}
+
+function sumReceivedQty(t: TransferFromAPI) {
+  const items = Array.isArray(t.items) ? t.items : []
+  return items.reduce((sum, it) => sum + Number(it.receivedQuantity ?? 0), 0)
+}
+
+function buildReceivePayload(t: TransferFromAPI): ReceiveTransferPayload {
+  const items = Array.isArray(t.items) ? t.items : []
+
+  return {
+    notes: t.notes ?? '',
+    items: items.map((it) => ({
+      transferItemId: String(it.id),
+      shippedQuantity:
+        Number(it.shippedQuantity ?? 0) > 0
+          ? Number(it.shippedQuantity)
+          : Number(it.requestedQuantity ?? 0),
+      damagedQuantity: Number(it.damagedQuantity ?? 0),
+      notes: it.notes ?? '',
+    })),
+  }
+}
+
+function getIncomingTransferUIStatus(apiStatus: string): {
+  key: IncomingTransferUIStatusKey
+  label: string
+  cls: string
+  canConfirm: boolean
+} {
+  const s = normalizeApiStatus(apiStatus)
+
+  if (s === 'DELIVERED') {
+    return {
+      key: 'CHO_DUYET',
+      label: 'Chờ duyệt',
+      cls: 'bg-amber-50 text-amber-700 border-amber-200',
+      canConfirm: true,
+    }
+  }
+
+  if (s === 'IN_TRANSIT' || s === 'SHIPPED') {
+    return {
+      key: 'DANG_VAN_CHUYEN',
+      label: 'Đang vận chuyển',
+      cls: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+      canConfirm: false,
+    }
+  }
+
+  if (s === 'COMPLETED') {
+    return {
+      key: 'HOAN_THANH',
+      label: 'Hoàn thành',
+      cls: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      canConfirm: false,
+    }
+  }
+
+  if (s === 'CANCELLED') {
+    return {
+      key: 'DA_HUY',
+      label: 'Đã hủy',
+      cls: 'bg-gray-50 text-gray-600 border-gray-200',
+      canConfirm: false,
+    }
+  }
+
+  if (s === 'REJECTED') {
+    return {
+      key: 'TU_CHOI',
+      label: 'Từ chối',
+      cls: 'bg-red-50 text-red-700 border-red-200',
+      canConfirm: false,
+    }
+  }
+
+  return {
+    key: 'KHAC',
+    label: s || '—',
+    cls: 'bg-slate-50 text-slate-600 border-slate-200',
+    canConfirm: false,
+  }
+}
 
 export default function WarehouseManagerRequestsPage() {
   const user = useAuthStore((s) => s.user)
@@ -90,26 +216,43 @@ export default function WarehouseManagerRequestsPage() {
   const [loadingLocations, setLoadingLocations] = useState(false)
   const [loadingProducts, setLoadingProducts] = useState(false)
 
-  // Load requests from API
+  const currentWarehouseId = String(user?.warehouseId ?? user?.workplaceId ?? '').trim()
+  const normalizedCurrentWarehouseId = currentWarehouseId.toLowerCase()
+  const [incomingTransfers, setIncomingTransfers] = useState<TransferFromAPI[]>([])
+  const [incomingLoading, setIncomingLoading] = useState(false)
+  const [incomingError, setIncomingError] = useState<string | null>(null)
+  const [incomingDebug, setIncomingDebug] = useState<{ total: number; toThisWarehouse: number; visible: number } | null>(null)
+  const [incomingSearch, setIncomingSearch] = useState('')
+  const [incomingStatusFilter, setIncomingStatusFilter] = useState<'ALL' | IncomingTransferUIStatusKey>('ALL')
+  const [incomingFromDate, setIncomingFromDate] = useState('')
+  const [incomingToDate, setIncomingToDate] = useState('')
+  const [incomingPage, setIncomingPage] = useState(1)
+  const [selectedIncoming, setSelectedIncoming] = useState<TransferFromAPI | null>(null)
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
+
+  const [toasts, setToasts] = useState<ToastItem[]>([])
+  const pushToast = useCallback((toast: Omit<ToastItem, 'id' | 'onClose'>) => {
+    setToasts((prev) => [{ ...toast, onClose: () => {}, id: `${Date.now()}-${Math.random()}` }, ...prev].slice(0, 3))
+  }, [])
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id))
+  }, [])
+
   const loadRequests = useCallback(async () => {
     try {
-      // Get warehouse ID - try multiple sources
       const warehouseId = user?.warehouseId ?? user?.storeId ?? user?.workplaceId ?? ''
       if (!warehouseId) {
         setRequests([])
         return
       }
 
-      // Load product and user maps
       let productMap: Record<string, string> = {}
       try {
         const products = await ProductAPIService.getAllProducts()
         for (const p of products) {
           productMap[p.id] = p.name
         }
-      } catch {
-        // Continue without product mapping
-      }
+      } catch {}
 
       let userMap: Record<string, string> = {}
       try {
@@ -118,11 +261,8 @@ export default function WarehouseManagerRequestsPage() {
           const userName = u.full_name || u.fullName || u.name || u.email || u.id
           userMap[u.id] = userName
         }
-      } catch {
-        // Continue without user mapping
-      }
+      } catch {}
 
-      // Load all restock requests
       let allRequests: RestockRequestFromAPI[] = []
       try {
         allRequests = await RestockAPIService.getAll()
@@ -132,23 +272,18 @@ export default function WarehouseManagerRequestsPage() {
         allRequests = []
       }
 
-      // Filter requests where fromWarehouseId = current warehouseId 
-      // (because old data was created with: fromWarehouseId = Warehouse parent, toWarehouseId = Store)
       console.log('📦 warehouse-manager: Filtering by fromWarehouseId =', warehouseId.toLowerCase())
-      const filtered = allRequests.filter(
-        (r) => {
-          const fromVal = (r.fromWarehouseId || '').toLowerCase()
-          const toVal = (r.toWarehouseId || '').toLowerCase()
-          const wid = warehouseId.toLowerCase()
-          const matchFrom = fromVal === wid
-          const matchTo = toVal === wid
-          console.log(`  - request ${r.id}:`, {fromWarehouseId: r.fromWarehouseId, toWarehouseId: r.toWarehouseId, matchFrom, matchTo})
-          return matchFrom || matchTo  // Try both
-        }
-      )
+      const filtered = allRequests.filter((r) => {
+        const fromVal = (r.fromWarehouseId || '').toLowerCase()
+        const toVal = (r.toWarehouseId || '').toLowerCase()
+        const wid = warehouseId.toLowerCase()
+        const matchFrom = fromVal === wid
+        const matchTo = toVal === wid
+        console.log(`  - request ${r.id}:`, { fromWarehouseId: r.fromWarehouseId, toWarehouseId: r.toWarehouseId, matchFrom, matchTo })
+        return matchFrom || matchTo
+      })
       console.log('📦 warehouse-manager: Filtered requests:', filtered.length)
 
-      // Load warehouse manager requests by parent warehouse (BE endpoint)
       const parentWarehouseId = user?.warehouseId ?? user?.workplaceId ?? user?.storeId ?? ''
       let byParentWarehouse: RestockRequestFromAPI[] = []
       if (parentWarehouseId) {
@@ -161,17 +296,16 @@ export default function WarehouseManagerRequestsPage() {
         }
       }
 
-      // Convert to RequestItem format
       const storeItems: RequestItem[] = filtered.map((req) => {
         const productNames = req.items?.map((item) => item.productName || productMap[item.productId] || '--').join(', ') || '--'
         const userName = userMap[req.requestedBy] || req.requestedBy || '--'
         const createdAtDate = req.requestedDate ? new Date(req.requestedDate).toLocaleDateString('vi-VN') : '--/--/----'
 
         return {
-          uniqueId: req.id,  // Use backend ID for unique key
-          id: req.requestNumber || req.id,  // Display ID
+          uniqueId: req.id,
+          id: req.requestNumber || req.id,
           source: userName,
-          sourceCode: req.toWarehouseId || '--',  // Show store ID (destination)
+          sourceCode: req.toWarehouseId || '--',
           productSummary: productNames,
           priority: req.priority === 'URGENT' ? 'CAO' : req.priority === 'HIGH' ? 'TRUNG BÌNH' : 'THẤP',
           status: mapStatus(req.status),
@@ -207,11 +341,55 @@ export default function WarehouseManagerRequestsPage() {
     }
   }, [user?.warehouseId, user?.storeId, user?.workplaceId])
 
+  const loadIncomingTransfers = useCallback(async () => {
+    if (!normalizedCurrentWarehouseId) {
+      setIncomingTransfers([])
+      setIncomingDebug(null)
+      return
+    }
+
+    setIncomingLoading(true)
+    setIncomingError(null)
+    try {
+      const data = await TransferAPIService.getTransfers()
+      const all = Array.isArray(data) ? data : []
+
+      const toThisWarehouse = all.filter(
+        (t) => String(t.toLocationId ?? '').trim().toLowerCase() === normalizedCurrentWarehouseId,
+      )
+
+      const filtered = toThisWarehouse.filter((t) => {
+        const status = normalizeApiStatus(t.status)
+        const receivedQty = sumReceivedQty(t)
+        return (
+          status === 'DELIVERED' ||
+          status === 'COMPLETED' ||
+          Boolean(t.actualDelivery) ||
+          Boolean(t.receivedBy) ||
+          receivedQty > 0
+        )
+      })
+
+      setIncomingTransfers(filtered)
+      setIncomingDebug({ total: all.length, toThisWarehouse: toThisWarehouse.length, visible: filtered.length })
+      setIncomingPage(1)
+    } catch (err: unknown) {
+      setIncomingError(err instanceof Error ? err.message : 'Không thể tải danh sách đơn vận chuyển đến.')
+      setIncomingTransfers([])
+      setIncomingDebug(null)
+    } finally {
+      setIncomingLoading(false)
+    }
+  }, [normalizedCurrentWarehouseId])
+
   useEffect(() => {
     loadRequests()
   }, [loadRequests])
 
-  // Load warehouses (for toWarehouseId suggestions)
+  useEffect(() => {
+    loadIncomingTransfers()
+  }, [loadIncomingTransfers])
+
   useEffect(() => {
     setLoadingLocations(true)
     fetch('/api/warehouses', {
@@ -233,7 +411,6 @@ export default function WarehouseManagerRequestsPage() {
       .finally(() => setLoadingLocations(false))
   }, [])
 
-  // Load products (for items[])
   useEffect(() => {
     setLoadingProducts(true)
     fetch('/api/products', {
@@ -268,6 +445,7 @@ export default function WarehouseManagerRequestsPage() {
       setIsCreateOpen(false)
     }
     setPage(1)
+    setIncomingPage(1)
   }
 
   const filtered = useMemo(
@@ -288,10 +466,88 @@ export default function WarehouseManagerRequestsPage() {
   const urgentCount = filtered.filter((r) => r.priority === 'CAO').length
   const approvedToday = filtered.filter((r) => r.status === 'Đã duyệt').length
 
+  const incomingTransferRequestLabel = useCallback((t: TransferFromAPI) => {
+    const id = String(t.restockRequestId ?? '').trim()
+    if (!id) return { code: '—', sub: '' }
+    const matched = requests.find((r) => String((r as any)?.uniqueId ?? '').toLowerCase() === id.toLowerCase())
+    const code = matched?.id ? `#${matched.id}` : `#${id.slice(0, 8)}…`
+    const sub = matched?.source ? matched.source : ''
+    return { code, sub }
+  }, [requests])
+
+  const incomingDerived = useMemo(() => {
+    const q = incomingSearch.trim().toLowerCase()
+    const from = incomingFromDate ? new Date(incomingFromDate) : null
+    const to = incomingToDate ? new Date(incomingToDate) : null
+
+    const rows = incomingTransfers
+      .filter((t) => {
+        if (!q) return true
+        const code = String(t.transferNumber ?? '').toLowerCase()
+        const req = String(t.restockRequestId ?? '').toLowerCase()
+        return code.includes(q) || req.includes(q)
+      })
+      .filter((t) => {
+        if (incomingStatusFilter === 'ALL') return true
+        const ui = getIncomingTransferUIStatus(t.status)
+        return ui.key === incomingStatusFilter
+      })
+      .filter((t) => {
+        if (!from && !to) return true
+        const d = new Date(t.transferDate)
+        if (Number.isNaN(d.getTime())) return true
+        if (from && d < from) return false
+        if (to) {
+          const end = new Date(to)
+          end.setHours(23, 59, 59, 999)
+          if (d > end) return false
+        }
+        return true
+      })
+
+    const totalPages = Math.max(1, Math.ceil(rows.length / 10))
+    const safePage = Math.min(incomingPage, totalPages)
+    const paged = rows.slice((safePage - 1) * 10, safePage * 10)
+
+    return { rows, paged, totalPages, page: safePage }
+  }, [incomingTransfers, incomingSearch, incomingStatusFilter, incomingFromDate, incomingToDate, incomingPage])
+
+  const getLocationName = useCallback((id?: string | null) => {
+    const key = String(id ?? '').trim().toLowerCase()
+    if (!key) return '—'
+    const loc = locations.find((l) => normalizeId(l.id) === key)
+    return loc?.name ?? String(id).slice(-8)
+  }, [locations])
+
+  const handleConfirmIncomingComplete = useCallback(async (t: TransferFromAPI) => {
+    const ui = getIncomingTransferUIStatus(t.status)
+    if (!ui.canConfirm) return
+
+    setConfirmingId(t.id)
+    try {
+      const payload = buildReceivePayload(t)
+      await TransferAPIService.receiveTransfer(t.id, payload)
+
+      pushToast({
+        type: 'success',
+        message: `Đã xác nhận nhận hàng ${t.transferNumber || t.id}`,
+      })
+
+      await loadIncomingTransfers()
+      setSelectedIncoming((prev) => (prev?.id === t.id ? null : prev))
+    } catch (err: unknown) {
+      pushToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Xác nhận nhận hàng thất bại.',
+      })
+    } finally {
+      setConfirmingId(null)
+    }
+  }, [loadIncomingTransfers, pushToast])
+
   const fromWarehouseIdForForm = user?.warehouseId ?? user?.workplaceId ?? ''
   const normalizedFromId = normalizeId(fromWarehouseIdForForm)
 
-  // Record của kho hiện tại (dùng để lấy tên hiển thị và parent)
   const currentWarehouseRecord = locations.find(
     (loc) => normalizeId(loc.id) === normalizedFromId,
   )
@@ -299,7 +555,6 @@ export default function WarehouseManagerRequestsPage() {
     currentWarehouseRecord?.name ??
     fromWarehouseIdForForm
 
-  // Các cửa hàng/kho con mà kho hiện tại đang quản lý
   const managedChildren = locations.filter(
     (loc) => normalizeId(loc.parentId ?? loc.parent_id) === normalizedFromId,
   )
@@ -309,13 +564,11 @@ export default function WarehouseManagerRequestsPage() {
       (loc) => normalizeId(loc.id) === normalizeId(currentWarehouseRecord.parentId ?? currentWarehouseRecord.parent_id),
     )
 
-  // Danh sách đích được phép chọn: kho cha (nếu có) + các kho/cửa hàng con
   const selectableDestinations = [
     ...(parentWarehouse ? [parentWarehouse] : []),
     ...managedChildren,
   ].filter((loc, index, self) => index === self.findIndex((x) => x.id === loc.id))
 
-  // Helpers cho items trong form
   const addItemByProductId = (productId: string) => {
     if (!productId) return
     if (items.some((i) => i.productId === productId)) return
@@ -357,8 +610,6 @@ export default function WarehouseManagerRequestsPage() {
       setSubmitError('Vui lòng nhập Mã nguồn (kho/điểm nhận yêu cầu).')
       return
     }
-
-    // notes: BE cho phép rỗng, không bắt buộc validate
 
     if (items.length === 0) {
       setSubmitError('Vui lòng thêm ít nhất 1 sản phẩm vào danh sách items.')
@@ -420,6 +671,8 @@ export default function WarehouseManagerRequestsPage() {
 
   return (
     <div className="space-y-6">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-4xl font-bold text-[#1d4b2c]">Quản lý Yêu cầu</h1>
@@ -461,7 +714,20 @@ export default function WarehouseManagerRequestsPage() {
           >
             <span className="inline-flex items-center gap-2">
               <ClipboardList className="w-4 h-4" />
-              Đơn yêu cầu 
+              Đơn yêu cầu
+            </span>
+          </button>
+          <button
+            onClick={() => onChangeTab('incoming-transfer')}
+            className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${
+              activeTab === 'incoming-transfer'
+                ? 'text-[#ea580c] border-[#ea580c]'
+                : 'text-gray-500 border-transparent hover:text-gray-700'
+            }`}
+          >
+            <span className="inline-flex items-center gap-2">
+              <Truck className="w-4 h-4" />
+              Kiểm tra giao hàng
             </span>
           </button>
         </div>
@@ -494,101 +760,329 @@ export default function WarehouseManagerRequestsPage() {
         />
       </div>
 
-      <section className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-2xl font-bold text-gray-900">Danh sách yêu cầu gần đây</h2>
-          <div className="flex items-center gap-2">
-            <button className="px-4 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors inline-flex items-center gap-2">
-              <Filter className="w-4 h-4" />
-              Bộ lọc
-            </button>
-            <button className="px-4 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors inline-flex items-center gap-2">
-              <Download className="w-4 h-4" />
-              Xuất Excel
-            </button>
+      {activeTab !== 'incoming-transfer' ? (
+        <section className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <h2 className="text-2xl font-bold text-gray-900">Danh sách yêu cầu gần đây</h2>
+            <div className="flex items-center gap-2">
+              <button className="px-4 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors inline-flex items-center gap-2">
+                <Filter className="w-4 h-4" />
+                Bộ lọc
+              </button>
+              <button className="px-4 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors inline-flex items-center gap-2">
+                <Download className="w-4 h-4" />
+                Xuất Excel
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 text-gray-500 uppercase text-xs tracking-wider">
-              <tr>
-                <th className="px-5 py-3 text-left">Mã yêu cầu</th>
-                <th className="px-5 py-3 text-left">Cửa hàng / Nguồn</th>
-                <th className="px-5 py-3 text-left">Sản phẩm</th>
-                <th className="px-5 py-3 text-left">Độ ưu tiên</th>
-                <th className="px-5 py-3 text-left">Trạng thái</th>
-                <th className="px-5 py-3 text-left">Ngày tạo</th>
-                <th className="px-5 py-3 text-left">Hành động</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paged.length === 0 ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 text-gray-500 uppercase text-xs tracking-wider">
                 <tr>
-                  <td className="px-5 py-8 text-center text-gray-500" colSpan={7}>
-                    Chưa có yêu cầu nào trong mục này
-                  </td>
+                  <th className="px-5 py-3 text-left">Mã yêu cầu</th>
+                  <th className="px-5 py-3 text-left">Cửa hàng / Nguồn</th>
+                  <th className="px-5 py-3 text-left">Sản phẩm</th>
+                  <th className="px-5 py-3 text-left">Độ ưu tiên</th>
+                  <th className="px-5 py-3 text-left">Trạng thái</th>
+                  <th className="px-5 py-3 text-left">Ngày tạo</th>
+                  <th className="px-5 py-3 text-left">Hành động</th>
                 </tr>
-              ) : (
-                paged.map((row) => (
-                  <tr key={row.uniqueId} className="border-t border-gray-100 hover:bg-gray-50/70 transition-colors">
-                    <td className="px-5 py-4 font-bold text-[#ea580c]">#{row.id}</td>
-                    <td className="px-5 py-4">
-                      <p className="font-semibold text-gray-800">{row.source}</p>
-                      <p className="text-xs text-gray-500">ID: {row.sourceCode}</p>
-                    </td>
-                    <td className="px-5 py-4 text-gray-700">{row.productSummary}</td>
-                    <td className="px-5 py-4">{renderPriority(row.priority)}</td>
-                    <td className="px-5 py-4">{renderStatus(row.status)}</td>
-                    <td className="px-5 py-4 text-gray-500 whitespace-nowrap">{row.createdAt}</td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <button className={actionButtonClass(row.actionLabel)}>{row.actionLabel}</button>
-                        <button className="text-gray-400 hover:text-gray-600">
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      </div>
+              </thead>
+              <tbody>
+                {paged.length === 0 ? (
+                  <tr>
+                    <td className="px-5 py-8 text-center text-gray-500" colSpan={7}>
+                      Chưa có yêu cầu nào trong mục này
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
-          <p className="text-sm text-gray-500">
-            Hiển thị {filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, filtered.length)} trên {filtered.length} yêu cầu
-          </p>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              className="w-8 h-8 rounded-md border border-gray-200 text-gray-500 disabled:opacity-40"
-              disabled={page === 1}
-            >
-              {'<'}
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => (
-              <button
-                key={num}
-                onClick={() => setPage(num)}
-                className={`w-8 h-8 rounded-md text-sm font-semibold ${
-                  page === num ? 'bg-[#f97316] text-white' : 'border border-gray-200 text-gray-600'
-                }`}
-              >
-                {num}
-              </button>
-            ))}
-            <button
-              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-              className="w-8 h-8 rounded-md border border-gray-200 text-gray-500 disabled:opacity-40"
-              disabled={page === totalPages}
-            >
-              {'>'}
-            </button>
+                ) : (
+                  paged.map((row) => (
+                    <tr key={row.uniqueId} className="border-t border-gray-100 hover:bg-gray-50/70 transition-colors">
+                      <td className="px-5 py-4 font-bold text-[#ea580c]">#{row.id}</td>
+                      <td className="px-5 py-4">
+                        <p className="font-semibold text-gray-800">{row.source}</p>
+                        <p className="text-xs text-gray-500">ID: {row.sourceCode}</p>
+                      </td>
+                      <td className="px-5 py-4 text-gray-700">{row.productSummary}</td>
+                      <td className="px-5 py-4">{renderPriority(row.priority)}</td>
+                      <td className="px-5 py-4">{renderStatus(row.status)}</td>
+                      <td className="px-5 py-4 text-gray-500 whitespace-nowrap">{row.createdAt}</td>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <button className={actionButtonClass(row.actionLabel)}>{row.actionLabel}</button>
+                          <button className="text-gray-400 hover:text-gray-600">
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-        </div>
-      </section>
+
+          <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
+            <p className="text-sm text-gray-500">
+              Hiển thị {filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, filtered.length)} trên {filtered.length} yêu cầu
+            </p>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                className="w-8 h-8 rounded-md border border-gray-200 text-gray-500 disabled:opacity-40"
+                disabled={page === 1}
+              >
+                {'<'}
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => (
+                <button
+                  key={num}
+                  onClick={() => setPage(num)}
+                  className={`w-8 h-8 rounded-md text-sm font-semibold ${
+                    page === num ? 'bg-[#f97316] text-white' : 'border border-gray-200 text-gray-600'
+                  }`}
+                >
+                  {num}
+                </button>
+              ))}
+              <button
+                onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                className="w-8 h-8 rounded-md border border-gray-200 text-gray-500 disabled:opacity-40"
+                disabled={page === totalPages}
+              >
+                {'>'}
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Danh sách đơn vận chuyển đến</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Chỉ hiển thị các đơn chuyển đến kho của bạn sau khi Warehouse Staff đã kiểm hàng.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={loadIncomingTransfers}
+                className="px-4 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors inline-flex items-center gap-2 disabled:opacity-60"
+                disabled={incomingLoading}
+              >
+                {incomingLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Filter className="w-4 h-4" />}
+                Làm mới
+              </button>
+              <button className="px-4 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors inline-flex items-center gap-2">
+                <Download className="w-4 h-4" />
+                Xuất Excel
+              </button>
+            </div>
+          </div>
+
+          <div className="px-5 py-4 border-b border-gray-100 bg-white">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={incomingSearch}
+                  onChange={(e) => {
+                    setIncomingSearch(e.target.value)
+                    setIncomingPage(1)
+                  }}
+                  placeholder="Tìm mã vận chuyển hoặc mã yêu cầu..."
+                  className="pl-9 pr-3 h-10 w-[320px] rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-200"
+                />
+              </div>
+
+              <div className="relative">
+                <select
+                  value={incomingStatusFilter}
+                  onChange={(e) => {
+                    setIncomingStatusFilter(e.target.value as 'ALL' | IncomingTransferUIStatusKey)
+                    setIncomingPage(1)
+                  }}
+                  className="h-10 px-3 pr-8 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-200 appearance-none"
+                >
+                  <option value="ALL">Tất cả trạng thái</option>
+                  <option value="CHO_DUYET">Chờ duyệt</option>
+                  <option value="DANG_VAN_CHUYEN">Đang vận chuyển</option>
+                  <option value="HOAN_THANH">Hoàn thành</option>
+                  <option value="DA_HUY">Đã hủy</option>
+                  <option value="TU_CHOI">Từ chối</option>
+                </select>
+                <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={incomingFromDate}
+                  onChange={(e) => {
+                    setIncomingFromDate(e.target.value)
+                    setIncomingPage(1)
+                  }}
+                  className="h-10 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-200"
+                />
+                <span className="text-sm text-gray-400">—</span>
+                <input
+                  type="date"
+                  value={incomingToDate}
+                  onChange={(e) => {
+                    setIncomingToDate(e.target.value)
+                    setIncomingPage(1)
+                  }}
+                  className="h-10 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-200"
+                />
+              </div>
+            </div>
+
+            {!currentWarehouseId && (
+              <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                Tài khoản chưa được gán kho hiện tại, không thể lọc đơn vận chuyển đến.
+              </div>
+            )}
+
+            {incomingError && (
+              <div className="mt-3 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                {incomingError}
+              </div>
+            )}
+
+            {incomingDebug && (
+              <div className="mt-3 text-xs text-gray-500">
+                Debug: đã tải <span className="font-semibold text-gray-700">{incomingDebug.total}</span> đơn · đến kho hiện tại (
+                <span className="font-mono text-gray-700">{currentWarehouseId || '—'}</span>):{' '}
+                <span className="font-semibold text-gray-700">{incomingDebug.toThisWarehouse}</span> · hiển thị:{' '}
+                <span className="font-semibold text-gray-700">{incomingDebug.visible}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 text-gray-500 uppercase text-xs tracking-wider">
+                <tr>
+                  <th className="px-5 py-3 text-left">Mã vận chuyển</th>
+                  <th className="px-5 py-3 text-left">Mã yêu cầu / Nguồn</th>
+                  <th className="px-5 py-3 text-left">Từ kho</th>
+                  <th className="px-5 py-3 text-left">Tổng SL</th>
+                  <th className="px-5 py-3 text-left">SL thực nhận</th>
+                  <th className="px-5 py-3 text-left">Ngày tạo</th>
+                  <th className="px-5 py-3 text-left">Ngày nhận</th>
+                  <th className="px-5 py-3 text-left">Trạng thái</th>
+                  <th className="px-5 py-3 text-left">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {incomingLoading ? (
+                  <tr>
+                    <td className="px-5 py-12 text-center text-gray-500" colSpan={9}>
+                      <Loader2 className="w-5 h-5 animate-spin inline-block mr-2" />
+                      Đang tải danh sách...
+                    </td>
+                  </tr>
+                ) : incomingDerived.paged.length === 0 ? (
+                  <tr>
+                    <td className="px-5 py-12 text-center text-gray-500" colSpan={9}>
+                      Không có đơn vận chuyển đến phù hợp
+                    </td>
+                  </tr>
+                ) : (
+                  incomingDerived.paged.map((t) => {
+                    const ui = getIncomingTransferUIStatus(t.status)
+                    const totalExpected = sumExpectedQty(t)
+                    const totalReceived = sumReceivedQty(t)
+                    const req = incomingTransferRequestLabel(t)
+                    const receivedAt = t.actualDelivery || (totalReceived > 0 ? t.expectedDelivery : null)
+
+                    return (
+                      <tr key={t.id} className="border-t border-gray-100 hover:bg-gray-50/70 transition-colors">
+                        <td className="px-5 py-4">
+                          <p className="font-bold text-[#0f766e]">#{t.transferNumber || t.id}</p>
+                          <p className="text-xs text-gray-500">{t.id.slice(0, 8)}…</p>
+                        </td>
+                        <td className="px-5 py-4">
+                          <p className="font-semibold text-gray-800">{req.code}</p>
+                          <p className="text-xs text-gray-500">{req.sub || `ID: ${(t.restockRequestId || '').slice(0, 8)}…`}</p>
+                        </td>
+                        <td className="px-5 py-4 text-gray-700">{getLocationName(t.fromLocationId)}</td>
+                        <td className="px-5 py-4 text-gray-700 font-semibold">{totalExpected.toLocaleString()}</td>
+                        <td className="px-5 py-4 text-gray-700 font-semibold">{totalReceived.toLocaleString()}</td>
+                        <td className="px-5 py-4 text-gray-500 whitespace-nowrap">{formatDateVI(t.transferDate)}</td>
+                        <td className="px-5 py-4 text-gray-500 whitespace-nowrap">{formatDateVI(receivedAt)}</td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-semibold ${ui.cls}`}>
+                              {ui.label}
+                            </span>
+                            {ui.canConfirm && (
+                              <button
+                                onClick={() => handleConfirmIncomingComplete(t)}
+                                disabled={confirmingId === t.id}
+                                className="px-3 py-1.5 rounded-lg bg-[#f97316] text-white text-xs font-semibold hover:bg-[#ea580c] disabled:opacity-60 inline-flex items-center gap-2"
+                              >
+                                {confirmingId === t.id && <Loader2 className="w-3 h-3 animate-spin" />}
+                                Xác nhận hoàn thành
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-5 py-4">
+                          <button
+                            onClick={() => setSelectedIncoming(t)}
+                            className="text-gray-400 hover:text-gray-700 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                            title="Xem chi tiết"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
+            <p className="text-sm text-gray-500">
+              Hiển thị {incomingDerived.rows.length === 0 ? 0 : (incomingDerived.page - 1) * 10 + 1}-
+              {Math.min(incomingDerived.page * 10, incomingDerived.rows.length)} trên {incomingDerived.rows.length} đơn
+            </p>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setIncomingPage((p) => Math.max(1, p - 1))}
+                className="w-8 h-8 rounded-md border border-gray-200 text-gray-500 disabled:opacity-40"
+                disabled={incomingDerived.page === 1}
+              >
+                {'<'}
+              </button>
+              {Array.from({ length: incomingDerived.totalPages }, (_, i) => i + 1).slice(0, 7).map((num) => (
+                <button
+                  key={num}
+                  onClick={() => setIncomingPage(num)}
+                  className={`w-8 h-8 rounded-md text-sm font-semibold ${
+                    incomingDerived.page === num ? 'bg-[#f97316] text-white' : 'border border-gray-200 text-gray-600'
+                  }`}
+                >
+                  {num}
+                </button>
+              ))}
+              <button
+                onClick={() => setIncomingPage((p) => Math.min(incomingDerived.totalPages, p + 1))}
+                className="w-8 h-8 rounded-md border border-gray-200 text-gray-500 disabled:opacity-40"
+                disabled={incomingDerived.page === incomingDerived.totalPages}
+              >
+                {'>'}
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
 
       {activeTab === 'warehouse' && isCreateOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/25 p-4 pt-20">
@@ -802,6 +1296,144 @@ export default function WarehouseManagerRequestsPage() {
                 </button>
               </div>
             </form>
+          </section>
+        </div>
+      )}
+
+      {selectedIncoming && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/25 p-4 pt-16">
+          <section className="w-full max-w-4xl bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <p className="text-sm text-gray-500">Chi tiết đơn vận chuyển</p>
+                <p className="text-lg font-bold text-gray-900 mt-0.5">
+                  {selectedIncoming.transferNumber || selectedIncoming.id}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedIncoming(null)}
+                className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Mã yêu cầu</p>
+                  <p className="mt-1 font-semibold text-gray-900">
+                    {incomingTransferRequestLabel(selectedIncoming).code}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1 font-mono">
+                    {selectedIncoming.restockRequestId ? selectedIncoming.restockRequestId.slice(0, 12) + '…' : '—'}
+                  </p>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Kho gửi</p>
+                  <p className="mt-1 font-semibold text-gray-900">{getLocationName(selectedIncoming.fromLocationId)}</p>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Kho nhận</p>
+                  <p className="mt-1 font-semibold text-gray-900">{getLocationName(selectedIncoming.toLocationId)}</p>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Trạng thái</p>
+                  <div className="mt-2">
+                    {(() => {
+                      const ui = getIncomingTransferUIStatus(selectedIncoming.status)
+                      return (
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-semibold ${ui.cls}`}>
+                          {ui.label}
+                        </span>
+                      )
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Ngày tạo</p>
+                  <p className="mt-1 text-gray-900 font-semibold">{formatDateVI(selectedIncoming.transferDate)}</p>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Ngày nhận</p>
+                  <p className="mt-1 text-gray-900 font-semibold">{formatDateVI(selectedIncoming.actualDelivery)}</p>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Ghi chú</p>
+                  <p className="mt-1 text-gray-700 text-sm">{selectedIncoming.notes || '—'}</p>
+                </div>
+              </div>
+
+              <div className="border border-gray-200 rounded-2xl overflow-hidden">
+                <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+                  <p className="font-bold text-gray-900">Danh sách sản phẩm</p>
+                  <div className="text-sm text-gray-500">
+                    Tổng SL: <span className="font-semibold text-gray-900">{sumExpectedQty(selectedIncoming).toLocaleString()}</span> ·
+                    Thực nhận: <span className="font-semibold text-gray-900">{sumReceivedQty(selectedIncoming).toLocaleString()}</span>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-white text-gray-500 uppercase text-xs tracking-wider">
+                      <tr>
+                        <th className="px-5 py-3 text-left">Sản phẩm</th>
+                        <th className="px-5 py-3 text-left">Batch</th>
+                        <th className="px-5 py-3 text-left">SL dự kiến</th>
+                        <th className="px-5 py-3 text-left">SL thực nhận</th>
+                        <th className="px-5 py-3 text-left">Chênh lệch</th>
+                        <th className="px-5 py-3 text-left">Ghi chú</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(selectedIncoming.items ?? []).length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="px-5 py-10 text-center text-gray-500">Không có sản phẩm</td>
+                        </tr>
+                      ) : (
+                        (selectedIncoming.items ?? []).map((it) => {
+                          const expected = Number(it.shippedQuantity ?? 0) > 0 ? Number(it.shippedQuantity) : Number(it.requestedQuantity ?? 0)
+                          const actual = Number(it.receivedQuantity ?? 0)
+                          const diff = actual - expected
+                          return (
+                            <tr key={it.id} className="border-t border-gray-100">
+                              <td className="px-5 py-3.5">
+                                <p className="font-semibold text-gray-900">{it.productId}</p>
+                                <p className="text-xs text-gray-500">SKU: {it.productId}</p>
+                              </td>
+                              <td className="px-5 py-3.5 text-gray-700 font-mono text-xs">{it.batchId}</td>
+                              <td className="px-5 py-3.5 text-gray-700 font-semibold">{expected.toLocaleString()}</td>
+                              <td className="px-5 py-3.5 text-gray-700 font-semibold">{actual.toLocaleString()}</td>
+                              <td className="px-5 py-3.5">
+                                <span className={`text-xs font-semibold ${diff === 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                  {diff === 0 ? '0' : diff > 0 ? `+${diff}` : `${diff}`}
+                                </span>
+                              </td>
+                              <td className="px-5 py-3.5 text-gray-500 text-sm">{it.notes || '—'}</td>
+                            </tr>
+                          )
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {getIncomingTransferUIStatus(selectedIncoming.status).canConfirm && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => handleConfirmIncomingComplete(selectedIncoming)}
+                    disabled={confirmingId === selectedIncoming.id}
+                    className="px-5 py-2.5 rounded-xl bg-[#f97316] text-white font-semibold hover:bg-[#ea580c] disabled:opacity-60 inline-flex items-center gap-2"
+                  >
+                    {confirmingId === selectedIncoming.id && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Xác nhận hoàn thành
+                  </button>
+                </div>
+              )}
+            </div>
           </section>
         </div>
       )}
