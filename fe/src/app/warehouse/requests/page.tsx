@@ -9,7 +9,6 @@ import {
 } from 'lucide-react'
 import { RestockAPIService, RestockRequestFromAPI, RestockRequestItem } from '@/services/restock-api.service'
 import { TransferAPIService, TransferFromAPI } from '@/services/transfer-api.service'
-import { StockMovementAPIService } from '@/services/stock-movement-api.service'
 import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
 import { UserAPIService } from '@/services/user-api.service'
 import { WarehouseLookupAPIService } from '@/services/warehouse-lookup-api.service'
@@ -380,64 +379,8 @@ export default function WarehouseRequestsPage() {
     try {
       // NOTE: map to TransferAPIService.getTransfers(workplaceId) when available
       const data = await TransferAPIService.getTransfers()
-      let completedTransferIds = new Set<string>()
-      try {
-        const movements = await StockMovementAPIService.getByLocation(workplaceId)
-        completedTransferIds = new Set(
-          movements
-            .filter(m => m.transferId && String(m.status).toUpperCase() === 'COMPLETED')
-            .map(m => String(m.transferId).toLowerCase())
-        )
-      } catch {
-        // ignore: we can still show transfer list without movements
-      }
-      const now = Date.now()
-      // Keep optimistic completion until backend reflects it (safety TTL: 7 days)
-      const TTL = 7 * 24 * 60 * 60 * 1000
-      let optimisticId = ''
-      let optimisticNumber = ''
-      let optimisticAt = 0
-      try {
-        if (typeof window !== 'undefined') {
-          const raw = localStorage.getItem('transfer_updated')
-          const parsed = raw ? JSON.parse(raw) : null
-          optimisticId = String(parsed?.transferId ?? '').trim()
-          optimisticNumber = String(parsed?.transferNumber ?? '').trim()
-          optimisticAt = Number(parsed?.at ?? 0)
-        }
-      } catch {
-        // ignore
-      }
-
       const list = Array.isArray(data) ? data : []
-      const optimisticKey = optimisticId.toLowerCase()
-      const optimisticNumberKey = optimisticNumber.toLowerCase()
-      const shouldApplyOptimistic = (optimisticId || optimisticNumber) && optimisticAt && now - optimisticAt < TTL
-      const next = list.map(t => {
-            const idKey = String(t.id).toLowerCase()
-            const numKey = String(t.transferNumber ?? '').toLowerCase()
-            const isTarget =
-              (optimisticKey && idKey === optimisticKey) ||
-              (optimisticNumberKey && numKey === optimisticNumberKey)
-            const isCompletedByMovement = completedTransferIds.has(idKey)
-            if (String(t.status).toUpperCase() === 'COMPLETED' || isCompletedByMovement) {
-              // If backend already says COMPLETED (or movements show completed), clear optimistic marker.
-              if (isTarget) {
-                try { localStorage.removeItem('transfer_updated') } catch { /* ignore */ }
-              }
-              return String(t.status).toUpperCase() === 'COMPLETED' ? t : { ...t, status: 'COMPLETED' }
-            }
-
-            if (!shouldApplyOptimistic || !isTarget) return t
-            // If backend already says COMPLETED, keep it and clear optimistic marker.
-            if (String(t.status).toUpperCase() === 'COMPLETED') {
-              try { localStorage.removeItem('transfer_updated') } catch { /* ignore */ }
-              return t
-            }
-            return { ...t, status: 'COMPLETED' }
-          })
-
-      setTransfers(next)
+      setTransfers(list)
     } catch {
       setTransferError('Không thể tải lịch sử đơn vận chuyển.')
     } finally {
@@ -476,24 +419,6 @@ export default function WarehouseRequestsPage() {
 
     const onStorage = (e: StorageEvent) => {
       if (e.key !== 'transfer_updated') return
-      try {
-        const parsed = e.newValue ? JSON.parse(e.newValue) : null
-        const transferId = String(parsed?.transferId ?? '').trim()
-        const transferNumber = String(parsed?.transferNumber ?? '').trim()
-        if (transferId) {
-          const key = transferId.toLowerCase()
-          setTransfers(prev =>
-            prev.map(t => (String(t.id).toLowerCase() === key ? { ...t, status: 'COMPLETED' } : t))
-          )
-        } else if (transferNumber) {
-          const key = transferNumber.toLowerCase()
-          setTransfers(prev =>
-            prev.map(t => (String(t.transferNumber ?? '').toLowerCase() === key ? { ...t, status: 'COMPLETED' } : t))
-          )
-        }
-      } catch {
-        // ignore
-      }
       fetchTransfers()
       fetchRequests()
     }
@@ -1440,7 +1365,7 @@ export default function WarehouseRequestsPage() {
                   <td className="px-5 py-3.5"><StatusBadge status={t.status} /></td>
                   <td className="px-5 py-3.5 text-gray-500 text-xs whitespace-nowrap">{fmtDate(t.transferDate)}</td>
                   <td className="px-5 py-3.5 text-gray-500 text-xs whitespace-nowrap">
-                    {t.actualDelivery ? fmtDate(t.actualDelivery) : fmtDate(t.expectedDelivery)}
+                    {t.actualDelivery ? fmtDate(t.actualDelivery ?? null) : fmtDate(t.expectedDelivery ?? null)}
                     {t.actualDelivery && <span className="ml-1.5 text-teal-600 font-medium text-xs">✓</span>}
                   </td>
                 </tr>
