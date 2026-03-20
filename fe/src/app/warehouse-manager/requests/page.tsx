@@ -27,7 +27,7 @@ import { TransferAPIService, TransferFromAPI } from '@/services/transfer-api.ser
 import { ToastContainer, type ToastItem } from '@/shared/ui/Toast'
 
 type RequestPriority = 'CAO' | 'TRUNG BÌNH' | 'THẤP'
-type RequestStatus = 'Chờ duyệt' | 'Đang xử lý' | 'Đã giao' | 'Đã duyệt'
+type RequestStatus = 'Chờ duyệt' | 'Đang xử lý' | 'Đã giao' | 'Đã duyệt' | 'Từ chối'
 type RequestType = 'store' | 'warehouse' | 'incoming-transfer'
 
 interface RequestItem {
@@ -412,6 +412,7 @@ export default function WarehouseManagerRequestsPage() {
     if (status === 'APPROVED') return 'Đã duyệt'
     if (status === 'COMPLETED') return 'Đã giao'
     if (status === 'PROCESSING') return 'Đang xử lý'
+    if (status === 'REJECTED') return 'Từ chối'
     return 'Chờ duyệt'
   }
 
@@ -827,19 +828,19 @@ export default function WarehouseManagerRequestsPage() {
                       <td className="px-5 py-4 text-gray-500 whitespace-nowrap">{row.createdAt}</td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
-                          {row.status === 'Chờ duyệt' ? (
+                          {row.status === 'Chờ duyệt' && activeTab === 'store' ? (
                             <>
                               <button
                                 onClick={() => handleApproveRequest(row.uniqueId)}
                                 disabled={actionLoadingId === row.uniqueId}
-                                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-fit"
                               >
                                 {actionLoadingId === row.uniqueId && actionType === 'approve' ? '...' : 'Duyệt'}
                               </button>
                               <button
                                 onClick={() => handleRejectRequest(row.uniqueId)}
                                 disabled={actionLoadingId === row.uniqueId}
-                                className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-fit"
                               >
                                 {actionLoadingId === row.uniqueId && actionType === 'reject' ? '...' : 'Từ chối'}
                               </button>
@@ -1516,6 +1517,10 @@ function renderStatus(status: RequestStatus) {
 
   if (status === 'Đã giao') {
     return <span className="text-emerald-600 font-semibold">• Đã giao</span>
+  }
+
+  if (status === 'Từ chối') {
+    return <span className="text-red-600 font-semibold">• Từ chối</span>
   }
 
   return <span className="text-purple-600 font-semibold">• Đã duyệt</span>
