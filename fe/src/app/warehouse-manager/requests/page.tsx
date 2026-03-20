@@ -239,40 +239,27 @@ export default function WarehouseManagerRequestsPage() {
         }
       } catch {}
 
-      let allRequests: RestockRequestFromAPI[] = []
+      // Tab "Yêu cầu từ Cửa hàng" - GET /api/restock-requests/by-parent-warehouse/{parentWarehouseId}
+      let storeRequests: RestockRequestFromAPI[] = []
       try {
-        allRequests = await RestockAPIService.getAll()
-        console.log('📦 warehouse-manager: All requests loaded:', allRequests.length)
+        storeRequests = await RestockAPIService.getByParentWarehouse(warehouseId)
+        console.log('📦 warehouse-manager: Store requests (by-parent-warehouse) loaded:', storeRequests.length)
       } catch {
-        console.log('📦 warehouse-manager: Failed to load all requests')
-        allRequests = []
+        console.log('📦 warehouse-manager: Failed to load store requests')
+        storeRequests = []
       }
 
-      console.log('📦 warehouse-manager: Filtering by fromWarehouseId =', warehouseId.toLowerCase())
-      const filtered = allRequests.filter((r) => {
-        const fromVal = (r.fromWarehouseId || '').toLowerCase()
-        const toVal = (r.toWarehouseId || '').toLowerCase()
-        const wid = warehouseId.toLowerCase()
-        const matchFrom = fromVal === wid
-        const matchTo = toVal === wid
-        console.log(`  - request ${r.id}:`, { fromWarehouseId: r.fromWarehouseId, toWarehouseId: r.toWarehouseId, matchFrom, matchTo })
-        return matchFrom || matchTo
-      })
-      console.log('📦 warehouse-manager: Filtered requests:', filtered.length)
-
-      const parentWarehouseId = user?.warehouseId ?? user?.workplaceId ?? user?.storeId ?? ''
-      let byParentWarehouse: RestockRequestFromAPI[] = []
-      if (parentWarehouseId) {
-        try {
-          byParentWarehouse = await RestockAPIService.getByParentWarehouse(parentWarehouseId)
-          console.log('📦 warehouse-manager: by-parent-warehouse loaded:', byParentWarehouse.length)
-        } catch {
-          console.log('📦 warehouse-manager: Failed to load by-parent-warehouse')
-          byParentWarehouse = []
-        }
+      // Tab "Đơn yêu cầu" - GET /api/restock-requests/by-warehouse/{warehouseId}
+      let warehouseRequests: RestockRequestFromAPI[] = []
+      try {
+        warehouseRequests = await RestockAPIService.getByWarehouse(warehouseId)
+        console.log('📦 warehouse-manager: Warehouse requests (by-warehouse) loaded:', warehouseRequests.length)
+      } catch {
+        console.log('📦 warehouse-manager: Failed to load warehouse requests')
+        warehouseRequests = []
       }
 
-      const storeItems: RequestItem[] = filtered.map((req) => {
+      const storeItems: RequestItem[] = storeRequests.map((req) => {
         const productNames = req.items?.map((item) => item.productName || productMap[item.productId] || '--').join(', ') || '--'
         const userName = userMap[req.requestedBy] || req.requestedBy || '--'
         const createdAtDate = req.requestedDate ? new Date(req.requestedDate).toLocaleDateString('vi-VN') : '--/--/----'
@@ -291,7 +278,7 @@ export default function WarehouseManagerRequestsPage() {
         }
       })
 
-      const warehouseItems: RequestItem[] = byParentWarehouse.map((req) => {
+      const warehouseItems: RequestItem[] = warehouseRequests.map((req) => {
         const productNames = req.items?.map((item) => item.productName || productMap[item.productId] || '--').join(', ') || '--'
         const userName = userMap[req.requestedBy] || req.requestedBy || '--'
         const createdAtDate = req.requestedDate ? new Date(req.requestedDate).toLocaleDateString('vi-VN') : '--/--/----'
