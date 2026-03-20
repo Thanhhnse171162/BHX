@@ -86,7 +86,7 @@ export default function WarehouseManagerLayout({
     { name: 'Quản lý yêu cầu', href: '/warehouse-manager/requests', icon: ClipboardList },
     { name: 'Tồn kho', href: '/warehouse-manager/inventory', icon: Package },
     { name: 'Lô hàng', href: '/warehouse-manager/shipments', icon: Truck },
-    { name: 'Chuyển kho', href: '/warehouse-manager/transfers', icon: ArrowLeftRight },
+    { name: 'Lịch sử xuất kho', href: '/warehouse-manager/transfers', icon: ArrowLeftRight },
     { name: 'Báo cáo', href: '/warehouse-manager/reports', icon: BarChart3 },
   ]
 

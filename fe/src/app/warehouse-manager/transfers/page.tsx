@@ -23,6 +23,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { TransferAPIService, type TransferFromAPI } from '@/services/transfer-api.service'
 import { RestockAPIService, type RestockRequestFromAPI, type RestockRequestItem } from '@/services/restock-api.service'
 import { ProductBatchAPIService, type ProductBatchFromAPI } from '@/services/product-batch-api.service'
+import { ProductAPIService } from '@/services/product-api.service'
 import { useRouter } from 'next/navigation'
 
 type TransferStatus = 'PENDING' | 'IN_TRANSIT' | 'DELIVERED' | 'COMPLETED'
@@ -328,6 +329,7 @@ function CreateTransferModal({
 
   const [batches, setBatches] = useState<ProductBatchFromAPI[]>([])
   const [batchesLoading, setBatchesLoading] = useState(false)
+  const [productNameById, setProductNameById] = useState<Record<string, string>>({})
 
   const [restockRequests, setRestockRequests] = useState<RestockRequestFromAPI[]>([])
   const [restockLoading, setRestockLoading] = useState(false)
@@ -383,6 +385,7 @@ function CreateTransferModal({
 
     setBatchesLoading(true)
     setBatches([])
+    setProductNameById({})
     void (async () => {
       try {
         const b = await ProductBatchAPIService.getByWarehouse(currentWarehouseId)
@@ -391,6 +394,21 @@ function CreateTransferModal({
         setBatches([])
       } finally {
         setBatchesLoading(false)
+      }
+    })()
+
+    void (async () => {
+      try {
+        const products = await ProductAPIService.getAllProducts()
+        const nextMap: Record<string, string> = {}
+        for (const p of products ?? []) {
+          const id = normalizeId((p as any)?.id)
+          const name = String((p as any)?.name ?? '').trim()
+          if (id && name) nextMap[id] = name
+        }
+        setProductNameById(nextMap)
+      } catch {
+        setProductNameById({})
       }
     })()
 
@@ -428,9 +446,13 @@ function CreateTransferModal({
           const pid = String(it.productId)
           const candidateBatches = batchesByProductId[normalizeId(pid)] ?? []
           const defaultBatch = candidateBatches.length > 0 ? String(candidateBatches[0].id) : ''
+          const resolvedName =
+            productNameById[normalizeId(pid)] ||
+            String((it as any)?.productName ?? '').trim() ||
+            pid
           return {
             productId: pid,
-            productName: it.productName ?? pid,
+            productName: resolvedName,
             batchId: defaultBatch,
             requestedQuantity: Number(it.requestedQuantity ?? 0),
             shippedQuantity: Number(it.requestedQuantity ?? 0),
@@ -446,14 +468,15 @@ function CreateTransferModal({
         setItemsLoading(false)
       }
     })()
-  }, [selectedRestockId, restockRequests, batchesByProductId, open])
+  }, [selectedRestockId, restockRequests, batchesByProductId, open, productNameById])
 
   const selectableRestockRequests = useMemo(() => {
     // Ensure request destination belongs to store children of currentWarehouseId.
     const storeIds = new Set(toStoreOptions.map((s) => normalizeId(s.id)))
     return restockRequests.filter((r) => {
       const toId = normalizeId(r.toWarehouseId)
-      return storeIds.has(toId)
+      const status = String(r.status ?? '').trim().toUpperCase()
+      return storeIds.has(toId) && status === 'APPROVED'
     })
   }, [restockRequests, toStoreOptions])
 
@@ -640,7 +663,6 @@ function CreateTransferModal({
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-[13px] font-semibold text-gray-800 truncate">{it.productName}</p>
-                          <p className="text-[11px] text-gray-500 font-mono mt-0.5">productId: {it.productId}</p>
                         </div>
                         {isOverflow && (
                           <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-full">
@@ -807,16 +829,8 @@ export default function WarehouseManagerTransfersPage() {
       return
     }
 
-    const childrenRes = await fetch(
-      `/api/warehouses?parent_id=${encodeURIComponent(currentWarehouseId)}`,
-      { headers: { Authorization: `Bearer ${token}` } },
-    )
-    const childrenData = await childrenRes.json()
-    const childrenRaw = Array.isArray(childrenData)
-      ? childrenData
-      : Array.isArray(childrenData?.data)
-        ? childrenData.data
-        : []
+    // Filter by BE relationship: store belongs to current warehouse when parentId matches.
+    const childrenRaw = raw.filter((w: any) => normalizeId(w?.parentId) === normalizedCurrentWarehouseId)
 
     const candidates = childrenRaw.map((w: any) => ({
       id: String(w.id),
@@ -825,7 +839,8 @@ export default function WarehouseManagerTransfersPage() {
 
     // Heuristic: store IDs likely start with 'b' (warehouse IDs start with 'a')
     const storeCandidates = candidates.filter((c) => normalizeId(c.id).startsWith('b'))
-    setStoreOptions(storeCandidates.length > 0 ? storeCandidates : candidates)
+    const finalOptions = (storeCandidates.length > 0 ? storeCandidates : candidates).sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+    setStoreOptions(finalOptions)
   }, [token, normalizedCurrentWarehouseId, currentWarehouseId])
 
   const loadTransfers = useCallback(async () => {

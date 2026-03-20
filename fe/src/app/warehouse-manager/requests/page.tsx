@@ -693,13 +693,6 @@ export default function WarehouseManagerRequestsPage() {
           <p className="text-gray-500 mt-1">Theo dõi và xử lý các luồng hàng hóa luân chuyển</p>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.push('/warehouse-manager/requests/create')}
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition-colors"
-          >
-            <Truck className="w-4 h-4" />
-            Tạo đơn vận chuyển
-          </button>
           {activeTab === 'warehouse' && (
             <button
               onClick={() => setIsCreateOpen(true)}
