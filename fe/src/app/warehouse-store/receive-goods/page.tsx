@@ -217,7 +217,7 @@ export default function ReceiveGoodsPage() {
   const destinationTransfers = transfers.filter(
     transfer =>
       normalizedDestinationId !== '' &&
-      transfer.toLocationId?.trim().toLowerCase() === normalizedDestinationId
+      transfer.fromLocationId?.trim().toLowerCase() === normalizedDestinationId
   )
 
   const counts = {
