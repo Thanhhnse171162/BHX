@@ -569,9 +569,6 @@ export default function WarehouseManagerRequestsPage() {
   const currentWarehouseRecord = locations.find(
     (loc) => normalizeId(loc.id) === normalizedFromId,
   )
-  const fromWarehouseDisplayName =
-    currentWarehouseRecord?.name ??
-    fromWarehouseIdForForm
 
   const managedChildren = locations.filter(
     (loc) => normalizeId(loc.parentId ?? loc.parent_id) === normalizedFromId,
@@ -582,10 +579,11 @@ export default function WarehouseManagerRequestsPage() {
       (loc) => normalizeId(loc.id) === normalizeId(currentWarehouseRecord.parentId ?? currentWarehouseRecord.parent_id),
     )
 
-  const selectableDestinations = [
-    ...(parentWarehouse ? [parentWarehouse] : []),
-    ...managedChildren,
-  ].filter((loc, index, self) => index === self.findIndex((x) => x.id === loc.id))
+  // Display parent warehouse as source, not current warehouse
+  const fromWarehouseDisplayName =
+    parentWarehouse?.name ??
+    currentWarehouseRecord?.name ??
+    fromWarehouseIdForForm
 
   const addItemByProductId = (productId: string) => {
     if (!productId) return
@@ -618,14 +616,10 @@ export default function WarehouseManagerRequestsPage() {
     event.preventDefault()
     setSubmitError(null)
 
-    const fromWarehouseId = user?.warehouseId ?? user?.workplaceId ?? user?.storeId ?? ''
+    // Source should be parent warehouse, not current warehouse
+    const fromWarehouseId = parentWarehouse?.id ?? ''
     if (!fromWarehouseId) {
-      setSubmitError('Không xác định được kho nguồn từ tài khoản đăng nhập.')
-      return
-    }
-
-    if (!newRequest.toWarehouseId.trim()) {
-      setSubmitError('Vui lòng nhập Mã nguồn (kho/điểm nhận yêu cầu).')
+      setSubmitError('Kho cha không tồn tại. Vui lòng kiểm tra cấu hình kho của bạn.')
       return
     }
 
@@ -650,7 +644,7 @@ export default function WarehouseManagerRequestsPage() {
     const dto: CreateRestockRequestDTO = {
       fromWarehouseId,
       fromLocationType: 'WAREHOUSE',
-      toWarehouseId: newRequest.toWarehouseId.trim(),
+      toWarehouseId: currentWarehouseRecord?.id ?? '',
       toLocationType: 'WAREHOUSE',
       priority: priorityMap[newRequest.priority],
       notes: newRequest.notes.trim() || undefined,
@@ -1126,7 +1120,7 @@ export default function WarehouseManagerRequestsPage() {
             <form onSubmit={createRequest} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <label className="text-sm text-gray-600">
-                  fromWarehouseId
+                  Từ Kho
                   <div className="relative mt-1">
                     <Warehouse className="w-3 h-3 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
@@ -1138,32 +1132,21 @@ export default function WarehouseManagerRequestsPage() {
                   </div>
                 </label>
                 <label className="text-sm text-gray-600">
-                  toWarehouseId
+                  Tới Kho
                   <div className="relative mt-1">
                     <Search className="w-3 h-3 absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500" />
-                    <select
-                      value={newRequest.toWarehouseId}
-                      onChange={(e) =>
-                        setNewRequest((prev) => ({ ...prev, toWarehouseId: e.target.value }))
-                      }
-                      className="w-full pl-8 pr-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-200 text-sm"
-                    >
-                      <option value="">-- Chọn kho / cửa hàng nhận --</option>
-                      {selectableDestinations.map((loc) => (
-                        <option key={loc.id} value={loc.id}>
-                          {loc.name} ({loc.id})
-                        </option>
-                      ))}
-                    </select>
-                    {loadingLocations && (
-                      <Loader2 className="w-3 h-3 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" />
-                    )}
+                    <input
+                      value={currentWarehouseRecord?.name ?? ''}
+                      readOnly
+                      placeholder="Tự động là kho hiện tại"
+                      className="w-full pl-8 pr-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-gray-700 text-sm"
+                    />
                   </div>
                 </label>
                 <input type="hidden" value="WAREHOUSE" />
                 <input type="hidden" value="WAREHOUSE" />
                 <label className="text-sm text-gray-600">
-                  priority
+                  Ưu Tiên
                   <select
                     value={newRequest.priority}
                     onChange={(e) =>
@@ -1177,7 +1160,7 @@ export default function WarehouseManagerRequestsPage() {
                   </select>
                 </label>
                 <label className="text-sm text-gray-600">
-                  notes
+                  Ghi chú
                   <textarea
                     value={newRequest.notes}
                     onChange={(e) => setNewRequest((prev) => ({ ...prev, notes: e.target.value }))}
