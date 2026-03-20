@@ -68,7 +68,8 @@ export interface InventoryItem {
 }
 
 export interface InventoryApiResponse {
-  message: string
+  success?: boolean
+  message?: string
   data: InventoryItem[]
 }
 
@@ -93,13 +94,16 @@ export class InventoryAPIService {
 
   /**
    * Lấy inventory theo product ID
+   * Frontend: GET /api/inventory/product/{productId} (Next route, chữ thường — khớp app/api/inventory/product/[productId])
+   * Proxy backend: GET /api/Inventory/product/{productId}
    */
   static async getInventoryByProduct(productId: string): Promise<InventoryItem[]> {
     try {
       const response = await localApiClient.get<InventoryApiResponse>(
-        `${this.baseURL}/product/${productId}`
+        `${this.baseURL}/product/${encodeURIComponent(productId)}`
       )
-      return response.data.data
+      const payload = response.data
+      return Array.isArray(payload?.data) ? payload.data : []
     } catch (error) {
       console.error(`Error fetching inventory for product ${productId}:`, error)
       throw error

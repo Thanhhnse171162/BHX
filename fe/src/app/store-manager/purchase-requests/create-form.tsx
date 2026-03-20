@@ -13,7 +13,9 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
+import type { User } from '@/shared/types'
 import { RestockAPIService, CreateRestockRequestDTO } from '@/services/restock-api.service'
+import { InventoryAPIService } from '@/services/inventory-api.service'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface WarehouseOption {
@@ -32,18 +34,36 @@ interface ProductOption {
   categoryName?: string
 }
 
+type InventoryLoadStatus = 'loading' | 'ready' | 'error'
+
 interface FormItem {
   productId: string
   productName: string
   productSku: string
   productUnit: string
   requestedQuantity: number
+  /** SL hiện có tại cửa hàng (STORE + storeLocationId), lấy từ API */
   currentQuantity: number
   reason: string
+  inventoryStatus: InventoryLoadStatus
+  inventoryError?: string
 }
 
 function normalizeId(value?: string | null): string {
   return String(value || '').trim().toLowerCase()
+}
+
+/** Khớp BE: storeLocationId hoặc workplaceId/storeId đã gán cho store manager */
+function getStoreLocationId(user: User | null | undefined): string {
+  if (!user) return ''
+  const u = user as User & { store_location_id?: string }
+  const raw =
+    u.storeLocationId ??
+    u.store_location_id ??
+    u.workplaceId ??
+    u.storeId ??
+    ''
+  return String(raw).trim()
 }
 
 const PRIORITY_OPTIONS = [
@@ -228,6 +248,9 @@ export default function CreateRestockRequestForm({ onClose, onCreated }: CreateF
   function addProduct(p: ProductOption) {
     // Prevent duplicate
     if (items.some((i) => i.productId === p.id)) return
+
+    const storeLocationId = getStoreLocationId(user)
+
     setItems((prev) => [
       ...prev,
       {
@@ -238,8 +261,67 @@ export default function CreateRestockRequestForm({ onClose, onCreated }: CreateF
         requestedQuantity: 1,
         currentQuantity: 0,
         reason: '',
+        inventoryStatus: 'loading',
       },
     ])
+
+    if (!storeLocationId) {
+      setItems((prev) =>
+        prev.map((i) =>
+          i.productId === p.id
+            ? {
+                ...i,
+                inventoryStatus: 'error',
+                inventoryError: 'Chưa xác định được cửa hàng (storeLocationId / workplaceId).',
+                currentQuantity: 0,
+              }
+            : i,
+        ),
+      )
+      return
+    }
+
+    void (async () => {
+      try {
+        const rows = await InventoryAPIService.getInventoryByProduct(p.id)
+        const match = rows.find(
+          (row) =>
+            String(row.locationType).toUpperCase() === 'STORE' &&
+            normalizeId(row.locationId) === normalizeId(storeLocationId),
+        )
+        const qty = match != null ? Number(match.availableQuantity) || 0 : 0
+        setItems((prev) =>
+          prev.map((i) =>
+            i.productId === p.id
+              ? {
+                  ...i,
+                  currentQuantity: qty,
+                  inventoryStatus: 'ready',
+                  inventoryError: undefined,
+                }
+              : i,
+          ),
+        )
+      } catch (err: unknown) {
+        const msg =
+          (err as any)?.response?.data?.message ||
+          (err as any)?.response?.data?.error ||
+          (err instanceof Error ? err.message : null) ||
+          'Không tải được tồn kho'
+        setItems((prev) =>
+          prev.map((i) =>
+            i.productId === p.id
+              ? {
+                  ...i,
+                  currentQuantity: 0,
+                  inventoryStatus: 'error',
+                  inventoryError: typeof msg === 'string' ? msg : 'Lỗi tải tồn kho',
+                }
+              : i,
+          ),
+        )
+      }
+    })()
   }
 
   function removeItem(idx: number) {
@@ -460,7 +542,7 @@ export default function CreateRestockRequestForm({ onClose, onCreated }: CreateF
                       </div>
 
                       {/* Item fields */}
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         <div>
                           <label className="block text-[11px] font-medium text-gray-500 mb-1">
                             SL yêu cầu <span className="text-red-500">*</span>
@@ -472,16 +554,34 @@ export default function CreateRestockRequestForm({ onClose, onCreated }: CreateF
                             onChange={(e) => updateItem(idx, 'requestedQuantity', Math.max(1, Number(e.target.value)))}
                             className="w-full px-2.5 py-1.5 text-[13px] border border-gray-200 rounded-lg outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-100 bg-white text-center font-semibold"
                           />
+                          {item.inventoryStatus === 'ready' && item.requestedQuantity > item.currentQuantity && (
+                            <p className="text-[11px] text-amber-600 font-semibold mt-1">SL vượt tồn kho</p>
+                          )}
                         </div>
-                        <div>
-                          <label className="block text-[11px] font-medium text-gray-500 mb-1">SL hiện có</label>
+                        <div className="relative">
+                          <label className="block text-[11px] font-medium text-gray-500 mb-1 flex items-center gap-1.5">
+                            SL hiện có
+                            {item.inventoryStatus === 'loading' && (
+                              <Loader2 size={12} className="animate-spin text-emerald-500" aria-hidden />
+                            )}
+                          </label>
                           <input
-                            type="number"
-                            min={0}
-                            value={item.currentQuantity}
-                            onChange={(e) => updateItem(idx, 'currentQuantity', Math.max(0, Number(e.target.value)))}
-                            className="w-full px-2.5 py-1.5 text-[13px] border border-gray-200 rounded-lg outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-100 bg-white text-center"
+                            type="text"
+                            readOnly
+                            value={
+                              item.inventoryStatus === 'loading'
+                                ? ''
+                                : item.inventoryStatus === 'error'
+                                  ? '—'
+                                  : String(item.currentQuantity)
+                            }
+                            placeholder={item.inventoryStatus === 'loading' ? 'Đang tải...' : ''}
+                            title={item.inventoryError || 'Tồn kho tại cửa hàng hiện tại'}
+                            className="w-full px-2.5 py-1.5 text-[13px] border border-gray-100 rounded-lg bg-gray-100 text-center text-gray-700 cursor-not-allowed"
                           />
+                          {item.inventoryStatus === 'error' && item.inventoryError && (
+                            <p className="text-[10px] text-red-500 mt-0.5 leading-tight">{item.inventoryError}</p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-[11px] font-medium text-gray-500 mb-1">Lý do</label>
