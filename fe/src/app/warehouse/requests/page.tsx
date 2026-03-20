@@ -545,66 +545,7 @@ export default function WarehouseRequestsPage() {
     [requests]
   )
 
-  const reservedByOpenTransfers = useMemo(() => {
-    const reservingStatuses = new Set(['PENDING', 'PROCESSING', 'IN_TRANSIT'])
-    const map = new Map<string, number>()
-    for (const t of transfers) {
-      if (!reservingStatuses.has(String(t.status || '').toUpperCase())) continue
-      if (transferFromLocationId && String(t.fromLocationId || '') !== transferFromLocationId) continue
-      for (const it of t.items || []) {
-        const batchId = String(it.batchId || '').trim()
-        if (!batchId) continue
-        const qty = Number(it.requestedQuantity || 0)
-        if (!Number.isFinite(qty) || qty <= 0) continue
-        map.set(batchId, (map.get(batchId) ?? 0) + qty)
-      }
-    }
-    return map
-  }, [transfers, transferFromLocationId])
-
-  const requestedByBatch = useMemo(() => {
-    const usage = new Map<string, number>()
-    for (const item of transferItems) {
-      const batchId = String(item.batchId || '').trim()
-      if (!batchId) continue
-      const qty = Number(item.requestedQuantity || 0)
-      if (!Number.isFinite(qty) || qty <= 0) continue
-      usage.set(batchId, (usage.get(batchId) ?? 0) + qty)
-    }
-    return usage
-  }, [transferItems])
-
-  const batchQuantityById = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const b of batches) {
-      map.set(String(b.id), Number(b.quantity || 0))
-    }
-    return map
-  }, [batches])
-
-  const remainingByBatch = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const b of batches) {
-      const id = String(b.id)
-      const available = Math.max(0, Number(b.quantity || 0) - (reservedByOpenTransfers.get(id) ?? 0))
-      const consumed = requestedByBatch.get(id) ?? 0
-      map.set(id, Math.max(0, available - consumed))
-    }
-    return map
-  }, [batches, requestedByBatch, reservedByOpenTransfers])
-
-  const effectiveAvailableByBatch = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const b of batches) {
-      const id = String(b.id)
-      const base = Number(b.quantity || 0)
-      const reserved = reservedByOpenTransfers.get(id) ?? 0
-      map.set(id, Math.max(0, base - reserved))
-    }
-    return map
-  }, [batches, reservedByOpenTransfers])
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
+  // ── Helpers ──────────────────────────────────────────────────────────────────
   const fmtDate = (d: string | null) => {
     if (!d) return '—'
     return new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -722,16 +663,6 @@ export default function WarehouseRequestsPage() {
       !i.productId || !i.batchId || Number(i.requestedQuantity || 0) <= 0
     )
     if (invalid) { alert('Mỗi sản phẩm cần có productId, batchId và SL yêu cầu > 0.'); return }
-
-    for (const [batchId, totalRequested] of requestedByBatch.entries()) {
-      const batchQty = effectiveAvailableByBatch.get(batchId) ?? (batchQuantityById.get(batchId) ?? 0)
-      if (totalRequested > batchQty) {
-        const matchedBatch = batches.find(b => String(b.id) === batchId)
-        const batchLabel = matchedBatch?.batchNumber || batchId
-        alert(`Lô ${batchLabel} chỉ còn ${batchQty}, nhưng bạn đang yêu cầu ${totalRequested}.`)
-        return
-      }
-    }
 
     try {
       setIsSubmittingTransfer(true)
@@ -918,22 +849,12 @@ export default function WarehouseRequestsPage() {
                               <option value="">{isLoadingBatches ? 'Đang tải...' : 'Chọn lô'}</option>
                               {batches
                                 .filter(b => !item.productId || b.productId === item.productId)
-                                .map(b => {
-                                  const id = String(b.id)
-                                  const available = effectiveAvailableByBatch.get(id) ?? Number(b.quantity || 0)
-                                  const remaining = remainingByBatch.get(id) ?? available
-                                  return (
-                                    <option key={b.id} value={b.id}>
-                                      {b.batchNumber} (khả dụng {available} / gốc {b.quantity})
-                                    </option>
-                                  )
-                                })}
+                                .map(b => (
+                                  <option key={b.id} value={b.id}>
+                                    {b.batchNumber} ({b.quantity})
+                                  </option>
+                                ))}
                             </select>
-                            {item.batchId && (
-                              <p className="mt-1 text-[11px] text-gray-500">
-                                Còn lại sau phân bổ: {remainingByBatch.get(String(item.batchId)) ?? 0}
-                              </p>
-                            )}
                           </td>
                           {/* ── requestedQuantity: string state, sanitize on change ── */}
                           <td className="px-4 py-2.5">

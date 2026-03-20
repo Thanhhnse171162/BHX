@@ -1226,7 +1226,7 @@ export default function WarehouseManagerRequestsPage() {
                         <div className="grid grid-cols-3 gap-2">
                           <div>
                             <label className="block text-[11px] text-gray-600 mb-1">
-                              requestedQuantity *
+                              Số lượng yêu cầu *
                             </label>
                             <input
                               type="number"
@@ -1244,7 +1244,7 @@ export default function WarehouseManagerRequestsPage() {
                           </div>
                           <div>
                             <label className="block text-[11px] text-gray-600 mb-1">
-                              currentQuantity
+                              Số lượng hiện tại
                             </label>
                             <input
                               type="number"
@@ -1261,7 +1261,7 @@ export default function WarehouseManagerRequestsPage() {
                             />
                           </div>
                           <div>
-                            <label className="block text-[11px] text-gray-600 mb-1">reason</label>
+                            <label className="block text-[11px] text-gray-600 mb-1">Lý do</label>
                             <div className="relative">
                               <select
                                 value={item.reason}
