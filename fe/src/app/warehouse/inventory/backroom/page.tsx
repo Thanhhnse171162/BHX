@@ -1,152 +1,214 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { Search, Package, ArrowRight, Edit, Warehouse, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Search, ArrowUpDown, Package, AlertTriangle, RefreshCw } from 'lucide-react'
 import { Input } from '@/shared/ui/Input'
 import { Button } from '@/shared/ui/Button'
+import useAuthStore from '@/store/auth.store'
+import { ProductBatchAPIService, type ProductBatchFromAPI } from '@/services/product-batch-api.service'
+import { ProductAPIService, type ProductFromAPI } from '@/services/product-api.service'
+import { WarehouseLookupAPIService } from '@/services/warehouse-lookup-api.service'
 
-// Batch-level inventory interface matching database structure
-interface BatchInventoryItem {
-  id: string
-  batch_code: string
-  product_name: string
-  product_sku: string
-  warehouse_name: string
-  warehouse_location: string
-  slot_code: string
-  quantity: number
-  manufacture_date: string
-  expiration_date: string
-  created_at: string
+function normalizeId(value?: string | null): string {
+  return String(value || '').trim().toLowerCase()
 }
 
-// Mock batch-level data from database (in production, this would come from API)
-const batchInventory: BatchInventoryItem[] = [
-  { id: '0014D6EF-226C-4284-BA59-132DA01793EC', batch_code: 'BATCH-PRODUCT1-20250110', product_name: 'Cải Thảo', product_sku: 'RAU-002', warehouse_name: 'Central Warehouse', warehouse_location: 'District 1, HCMC', slot_code: 'A-01-02', quantity: 350, manufacture_date: '2025-01-15', expiration_date: '2027-01-15', created_at: '2025-07-02 03:22:39.9266667' },
-  { id: '8AB8F86E-D5D8-40FD-BDB0-1F56C0E19000', batch_code: 'BATCH-PRODUCT2-20250310', product_name: 'Cải Xanh', product_sku: 'RAU-001', warehouse_name: 'Central Warehouse', warehouse_location: 'District 1, HCMC', slot_code: 'A-03-01', quantity: 500, manufacture_date: '2025-03-10', expiration_date: '2026-10-10', created_at: '2026-01-02 03:22:39.9300000' },
-  { id: 'E060DEB4-CF16-4CB5-A137-CAAF261F3D3A', batch_code: 'BATCH-PRODUCT3-20250315', product_name: 'Rau Muống', product_sku: 'RAU-001', warehouse_name: 'North Warehouse', warehouse_location: 'Cau Giay, Hanoi', slot_code: 'B-02-02', quantity: 200, manufacture_date: '2025-03-15', expiration_date: '2027-03-15', created_at: '2026-02-02 03:22:39.9300000' },
-  { id: '3C6F1A5C-1E63-4E61-9B76-6DB81C1BFCW00', batch_code: 'BATCH-PRODUCT8-20250320', product_name: 'Sữa TH True Milk', product_sku: 'SUA-002', warehouse_name: 'Coastal Warehouse', warehouse_location: 'Hai Phong City', slot_code: 'C-01-01', quantity: 450, manufacture_date: '2025-03-20', expiration_date: '2026-09-20', created_at: '2026-03-02 03:22:39.9300000' },
-  { id: 'EBD4C5E-7697-4CA5-BD97-E98CFC9063A8', batch_code: 'BATCH-PRODUCT2-20250215', product_name: 'Cam Sành', product_sku: 'TC-001', warehouse_name: 'North Warehouse', warehouse_location: 'Cau Giay, Hanoi', slot_code: 'B-01-01', quantity: 280, manufacture_date: '2025-02-15', expiration_date: '2027-02-15', created_at: '2025-10-02 03:22:39.9266667' },
-  { id: '2BB52011-EA29-4C8C-BDC1-F086E5A1010E', batch_code: 'BATCH-PRODUCT7-20250301', product_name: 'Gạo Jasmine', product_sku: 'GAO-002', warehouse_name: 'Central Warehouse', warehouse_location: 'District 1, HCMC', slot_code: 'A-02-01', quantity: 800, manufacture_date: '2025-03-01', expiration_date: '2026-03-01', created_at: '2025-12-02 03:22:39.9300000' },
-  { id: '16D39B8A-E196-44B7-8CF5-81FD838024TD', batch_code: 'BATCH-PRODUCT1-20250110-S2', product_name: 'Cải Thảo', product_sku: 'RAU-002', warehouse_name: 'North Warehouse', warehouse_location: 'Cau Giay, Hanoi', slot_code: 'B-03-01', quantity: 220, manufacture_date: '2025-01-10', expiration_date: '2027-01-10', created_at: '2026-01-15 03:22:39.9266667' },
-  { id: 'B223E599-FD5E-464F-91FB-CEC87B521B39', batch_code: 'BATCH-PRODUCT5-20250220', product_name: 'Coca Cola 330ml', product_sku: 'BEV-001', warehouse_name: 'Central Warehouse', warehouse_location: 'District 1, HCMC', slot_code: 'A-05-02', quantity: 600, manufacture_date: '2025-02-20', expiration_date: '2026-08-20', created_at: '2025-11-20 03:22:39.9300000' },
-  { id: '1B98D37-FB4A-4E5C-9A7B-2A9C79CD5A90', batch_code: 'BATCH-PRODUCT6-20250225', product_name: 'Pepsi 330ml', product_sku: 'BEV-002', warehouse_name: 'Coastal Warehouse', warehouse_location: 'Hai Phong City', slot_code: 'C-02-01', quantity: 550, manufacture_date: '2025-02-25', expiration_date: '2026-08-25', created_at: '2025-11-25 03:22:39.9300000' },
-  { id: '6DAB994E-9FEB-456D-8153-DCE111A025C5', batch_code: 'BATCH-PRODUCT4-20250305', product_name: 'Trứng gà', product_sku: 'EGG-001', warehouse_name: 'Central Warehouse', warehouse_location: 'District 1, HCMC', slot_code: 'A-04-01', quantity: 360, manufacture_date: '2025-03-05', expiration_date: '2026-04-05', created_at: '2025-09-15 03:22:39.9300000' },
-  { id: '0AA913D3-E41A-4B54-81AE-F2B74D7D13F7', batch_code: 'BATCH-PRODUCT9-20250118', product_name: 'Bánh mì sandwich', product_sku: 'BRD-003', warehouse_name: 'North Warehouse', warehouse_location: 'Cau Giay, Hanoi', slot_code: 'B-04-02', quantity: 180, manufacture_date: '2025-01-18', expiration_date: '2026-02-18', created_at: '2025-08-05 03:22:39.9300000' },
-]
-
 export default function BackroomStockPage() {
+  const { user, token } = useAuthStore()
+
+  const [rows, setRows] = useState<ProductBatchFromAPI[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   const [searchTerm, setSearchTerm] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [sortField, setSortField] = useState<'receivedAt' | 'quantity'>('receivedAt')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+
+  const [productMap, setProductMap] = useState<Record<string, ProductFromAPI>>({})
+  const [warehouseName, setWarehouseName] = useState('')
+
+  const workplaceId =
+    user?.workplaceId ||
+    (user as any)?.workplace_id ||
+    (user as any)?.workplace?.id ||
+    user?.warehouseId ||
+    user?.storeId ||
+    ''
+
   const itemsPerPage = 10
 
-  // Filter data
-  const filteredData = useMemo(() => {
-    return batchInventory.filter(item => {
-      const matchesSearch = 
-        item.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.product_sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.batch_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.warehouse_name.toLowerCase().includes(searchTerm.toLowerCase())
-      
-      return matchesSearch
-    })
-  }, [searchTerm])
+  const fetchData = async () => {
+    if (!token) {
+      setRows([])
+      setIsLoading(false)
+      setError('Bạn chưa đăng nhập.')
+      return
+    }
 
-  // Paginated data
+    if (!workplaceId) {
+      setRows([])
+      setIsLoading(false)
+      setError('Tài khoản chưa được gán kho/cửa hàng để xem tồn kho theo lô.')
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const [batches, products] = await Promise.all([
+        ProductBatchAPIService.getByWarehouse(workplaceId),
+        ProductAPIService.getAllProducts().catch(() => []),
+      ])
+
+      const map: Record<string, ProductFromAPI> = {}
+      for (const p of products) map[normalizeId(p.id)] = p
+
+      setProductMap(map)
+      setRows(Array.isArray(batches) ? batches : [])
+
+      try {
+        const info = await WarehouseLookupAPIService.getById(workplaceId)
+        setWarehouseName(info?.name || '')
+      } catch {
+        setWarehouseName('')
+      }
+    } catch {
+      setRows([])
+      setError('Không thể tải dữ liệu lô theo kho/cửa hàng hiện tại.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, workplaceId])
+
+  const stats = useMemo(() => {
+    const totalQuantity = rows.reduce((sum, r) => sum + Math.max(0, Number(r.quantity || 0)), 0)
+    const expiredCount = rows.filter(r => String(r.status || '').toUpperCase() === 'EXPIRED').length
+
+    return {
+      totalQuantity,
+      expiredCount,
+      totalBatches: rows.length,
+    }
+  }, [rows])
+
+  const filteredAndSortedData = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase()
+
+    const filtered = rows.filter((item) => {
+      const product = productMap[normalizeId(item.productId)]
+      const productName = String(product?.name || '').toLowerCase()
+      const sku = String(product?.sku || '').toLowerCase()
+      const status = String(item.status || '').toLowerCase()
+      const localWarehouseName = String(warehouseName || '').toLowerCase()
+
+      const matchesSearch =
+        !q ||
+        String(item.batchNumber || '').toLowerCase().includes(q) ||
+        String(item.id || '').toLowerCase().includes(q) ||
+        String(item.productId || '').toLowerCase().includes(q) ||
+        productName.includes(q) ||
+        sku.includes(q) ||
+        status.includes(q) ||
+        localWarehouseName.includes(q)
+
+      const mfgDate = String(item.manufacturingDate || '').slice(0, 10)
+      const expDate = String(item.expiryDate || '').slice(0, 10)
+
+      let matchesDateRange = true
+      if (dateFrom && dateTo) {
+        matchesDateRange =
+          (mfgDate >= dateFrom && mfgDate <= dateTo) ||
+          (expDate >= dateFrom && expDate <= dateTo)
+      } else if (dateFrom) {
+        matchesDateRange = mfgDate >= dateFrom || expDate >= dateFrom
+      } else if (dateTo) {
+        matchesDateRange = mfgDate <= dateTo || expDate <= dateTo
+      }
+
+      return matchesSearch && matchesDateRange
+    })
+
+    filtered.sort((a, b) => {
+      let aValue: number
+      let bValue: number
+
+      if (sortField === 'receivedAt') {
+        aValue = new Date(a.receivedAt || a.manufacturingDate || 0).getTime()
+        bValue = new Date(b.receivedAt || b.manufacturingDate || 0).getTime()
+      } else {
+        aValue = Math.abs(Number(a.quantity || 0))
+        bValue = Math.abs(Number(b.quantity || 0))
+      }
+
+      return sortOrder === 'asc' ? aValue - bValue : bValue - aValue
+    })
+
+    return filtered
+  }, [rows, productMap, searchTerm, dateFrom, dateTo, sortField, sortOrder, warehouseName])
+
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
-    return filteredData.slice(startIndex, endIndex)
-  }, [filteredData, currentPage])
+    return filteredAndSortedData.slice(startIndex, endIndex)
+  }, [filteredAndSortedData, currentPage])
 
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage)
+  const totalPages = Math.max(1, Math.ceil(filteredAndSortedData.length / itemsPerPage))
 
-  // Reset to page 1 when search changes
-  useMemo(() => {
+  useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm])
+  }, [searchTerm, dateFrom, dateTo])
 
-  // Handle transfer to shelf
-  const handleTransferToShelf = (batchCode: string) => {
-    console.log('Transfer to shelf:', batchCode)
-    alert(`Transfer batch ${batchCode} to shelf - API integration needed`)
-  }
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+  }, [currentPage, totalPages])
 
-  // Handle stock adjustment
-  const handleAdjustStock = (batchCode: string) => {
-    console.log('Adjust stock:', batchCode)
-    alert(`Adjust stock for batch ${batchCode} - Modal integration needed`)
-  }
-  
-  // Format date
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('vi-VN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    })
-  }
-
-  // Check if expiry is near (within 30 days)
-  const isExpiryNear = (expiryDate: string) => {
-    const expDate = new Date(expiryDate)
-    const today = new Date()
-    const days = Math.floor((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-    return days <= 30 && days >= 0
-  }
-  
-  // Check if expired
-  const isExpired = (expiryDate: string) => {
-    const expDate = new Date(expiryDate)
-    const today = new Date()
-    return expDate < today
-  }
-
-  // Status badge for stock level
-  const StockStatusBadge = ({ expiryDate }: { expiryDate: string }) => {
-    if (isExpired(expiryDate)) {
-      return <span className="px-2.5 py-1 rounded-full text-xs font-medium border bg-red-100 text-red-800 border-red-200">Hết hạn</span>
+  const handleSort = (field: 'receivedAt' | 'quantity') => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortOrder('desc')
     }
-    if (isExpiryNear(expiryDate)) {
-      return <span className="px-2.5 py-1 rounded-full text-xs font-medium border bg-orange-100 text-orange-800 border-orange-200">Thấp</span>
-    }
-    return <span className="px-2.5 py-1 rounded-full text-xs font-medium border bg-green-100 text-green-800 border-green-200">Tốt</span>
   }
 
   return (
     <div className="space-y-6 p-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Tồn kho theo lô</h1>
-        <p className="text-gray-600 mt-1">Quản lý tồn kho và chuyển kho theo lô</p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Tồn kho theo lô</h1>
+          <p className="text-gray-600 mt-1">
+            Hiển thị lô theo đúng kho/cửa hàng được gán cho tài khoản hiện tại.
+          </p>
+          {workplaceId && (
+            <p className="text-xs text-gray-500 mt-1">
+              Kho hiện tại: {warehouseName || workplaceId}
+            </p>
+          )}
+        </div>
+        <Button variant="outline" size="sm" onClick={fetchData} className="gap-2" disabled={isLoading}>
+          <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} /> Làm mới
+        </Button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 font-medium">Tổng SKU theo lô</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">{batchInventory.length}</p>
-            </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Package className="text-blue-600" size={24} />
-            </div>
-          </div>
-        </div>
-
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 font-medium">Tổng tồn kho theo lô</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">
-                {batchInventory.reduce((sum, item) => sum + item.quantity, 0).toLocaleString()}
-              </p>
+              <p className="text-3xl font-bold text-green-600 mt-2">{stats.totalQuantity}</p>
+              <p className="text-xs text-gray-500 mt-1">đơn vị</p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <Warehouse className="text-green-600" size={24} />
+              <Package className="text-green-600" size={24} />
             </div>
           </div>
         </div>
@@ -154,233 +216,216 @@ export default function BackroomStockPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Sản phẩm gần hết hạn</p>
-              <p className="text-3xl font-bold text-orange-600 mt-2">
-                {batchInventory.filter(item => isExpiryNear(item.expiration_date)).length}
-              </p>
+              <p className="text-sm text-gray-600 font-medium">Lô hết hạn</p>
+              <p className="text-3xl font-bold text-red-600 mt-2">{stats.expiredCount}</p>
+              <p className="text-xs text-gray-500 mt-1">/{stats.totalBatches} lô</p>
             </div>
-            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-              <svg className="text-orange-600" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/>
-                <path d="M12 6v6l4 2"/>
-              </svg>
+            <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+              <AlertTriangle className="text-red-600" size={24} />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Search and Actions */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          {/* Search */}
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <Input
+              type="text"
+              placeholder="Tìm theo mã lô, sản phẩm, SKU, trạng thái..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 w-full"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Từ ngày</label>
               <Input
-                type="text"
-                placeholder="Tìm theo tên sản phẩm, SKU hoặc danh mục..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Đến ngày</label>
+              <Input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="w-full"
               />
             </div>
           </div>
+
+          {(dateFrom || dateTo) && (
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setDateFrom('')
+                  setDateTo('')
+                }}
+              >
+                Xóa bộ lọc ngày
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Backroom Stock Table */}
+      {error && (
+        <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
+          {error}
+        </div>
+      )}
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  ID
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Mã lô</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Sản phẩm</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Kho</th>
+                <th
+                  className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('quantity')}
+                >
+                  <div className="flex items-center gap-1">
+                    Số lượng
+                    <ArrowUpDown size={14} />
+                  </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Mã lô
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Sản phẩm
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  SKU
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Kho
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Vị trí
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Số lượng kho sau
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Ngày hết hạn
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Trạng thái
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Hành động
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Ngày SX</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Ngày HSD</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Trạng thái</th>
+                <th
+                  className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('receivedAt')}
+                >
+                  <div className="flex items-center gap-1">
+                    Nhập lúc
+                    <ArrowUpDown size={14} />
+                  </div>
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {paginatedData.length === 0 ? (
+              {isLoading ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-12 text-center text-gray-500">
-                    <Warehouse className="mx-auto mb-3 text-gray-400" size={48} />
-                    <p className="text-lg font-medium">Không tìm thấy sản phẩm</p>
-                    <p className="text-sm mt-1">Thử điều chỉnh tìm kiếm</p>
+                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                    Đang tải dữ liệu...
+                  </td>
+                </tr>
+              ) : paginatedData.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                    Không có dữ liệu lô cho kho/cửa hàng hiện tại
                   </td>
                 </tr>
               ) : (
-                paginatedData.map((item) => (
-                  <tr 
-                    key={item.id} 
-                    className={`hover:bg-gray-50 transition-colors ${
-                      isExpired(item.expiration_date) ? 'bg-red-50' : isExpiryNear(item.expiration_date) ? 'bg-orange-50' : ''
-                    }`}
-                  >
-                    <td className="px-6 py-4">
-                      <div className="text-xs text-gray-500 font-mono truncate max-w-[120px]" title={item.id}>
-                        {item.id.substring(0, 8)}...
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-mono text-sm font-semibold text-gray-900">{item.batch_code}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">Tạo: {formatDate(item.created_at)}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-gray-900">{item.product_name}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-600 font-mono">{item.product_sku}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">{item.warehouse_name}</div>
-                      <div className="text-xs text-gray-500">{item.warehouse_location}</div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className="inline-block bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-mono font-semibold">
-                        {item.slot_code}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <div className="text-sm font-semibold text-gray-900">
-                        {item.quantity}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <div className={`text-sm ${
-                        isExpired(item.expiration_date) ? 'text-red-600 font-semibold' : 
-                        isExpiryNear(item.expiration_date) ? 'text-orange-600 font-semibold' : 
-                        'text-gray-600'
-                      }`}>
-                        {formatDate(item.expiration_date)}
-                        {isExpired(item.expiration_date) && (
-                          <div className="text-xs mt-1">(Hết hạn!)</div>
-                        )}
-                        {!isExpired(item.expiration_date) && isExpiryNear(item.expiration_date) && (
-                          <div className="text-xs mt-1">(Sắp hết hạn!)</div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <StockStatusBadge expiryDate={item.expiration_date} />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex gap-2 justify-center">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleTransferToShelf(item.batch_code)}
-                          className="text-[#2d6e3e] border-[#2d6e3e] hover:bg-[#2d6e3e] hover:text-white"
-                          disabled={isExpired(item.expiration_date)}
-                        >
-                          <ArrowRight size={16} className="mr-1" />
-                          Chuyển
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleAdjustStock(item.batch_code)}
-                          className="text-gray-700 hover:bg-gray-100"
-                        >
-                          <Edit size={16} className="mr-1" />
-                          Điều chỉnh
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                paginatedData.map((item) => {
+                  const product = productMap[normalizeId(item.productId)]
+                  const status = String(item.status || '').toUpperCase()
+
+                  return (
+                    <tr key={item.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <div className="text-sm font-medium text-gray-900">{item.batchNumber}</div>
+                        <div className="text-xs text-gray-500">ID: {item.id}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-sm font-medium text-gray-900">{product?.name || item.productId}</div>
+                        <div className="text-xs text-gray-500">{product?.sku || 'N/A'}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-sm text-gray-900">{warehouseName || workplaceId}</div>
+                        <div className="text-xs text-gray-500">{item.warehouseId}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-sm font-semibold text-green-600">
+                          {Math.max(0, Number(item.quantity || 0))}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {item.manufacturingDate ? new Date(item.manufacturingDate).toLocaleDateString('vi-VN') : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {item.expiryDate ? new Date(item.expiryDate).toLocaleDateString('vi-VN') : '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${
+                          status === 'EXPIRED'
+                            ? 'bg-red-100 text-red-700'
+                            : status === 'AVAILABLE'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {status || 'N/A'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-sm text-gray-900">
+                          {item.receivedAt ? new Date(item.receivedAt).toLocaleDateString('vi-VN') : '—'}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {item.receivedAt ? new Date(item.receivedAt).toLocaleTimeString('vi-VN') : '—'}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
         </div>
-      </div>
 
-      {/* Pagination */}
-      {filteredData.length > 0 && totalPages > 1 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
           <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-600">
-              Hiển thị {((currentPage - 1) * itemsPerPage) + 1} đến {Math.min(currentPage * itemsPerPage, filteredData.length)} trong {filteredData.length} mục
+            <div className="text-sm text-gray-700">
+              Hiển thị <span className="font-medium">{filteredAndSortedData.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}</span> đến{' '}
+              <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredAndSortedData.length)}</span>{' '}
+              trong <span className="font-medium">{filteredAndSortedData.length}</span> kết quả
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className={`p-2 rounded-lg border transition-colors ${
-                  currentPage === 1
-                    ? 'border-gray-200 text-gray-400 cursor-not-allowed'
-                    : 'border-gray-300 text-gray-700 hover:bg-gray-100'
-                }`}
               >
-                <ChevronLeft size={20} />
-              </button>
+                Trước
+              </Button>
               <div className="flex items-center gap-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                  if (
-                    page === 1 ||
-                    page === totalPages ||
-                    (page >= currentPage - 1 && page <= currentPage + 1)
-                  ) {
-                    return (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`min-w-[2.5rem] px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          currentPage === page
-                            ? 'bg-[#2d6e3e] text-white'
-                            : 'text-gray-700 hover:bg-gray-100'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    )
-                  } else if (page === currentPage - 2 || page === currentPage + 2) {
-                    return <span key={page} className="px-2 text-gray-400">...</span>
-                  }
-                  return null
-                })}
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <Button
+                    key={page}
+                    variant={currentPage === page ? 'primary' : 'outline'}
+                    size="sm"
+                    onClick={() => setCurrentPage(page)}
+                    className={currentPage === page ? 'bg-[#2d6e3e] text-white' : ''}
+                  >
+                    {page}
+                  </Button>
+                ))}
               </div>
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className={`p-2 rounded-lg border transition-colors ${
-                  currentPage === totalPages
-                    ? 'border-gray-200 text-gray-400 cursor-not-allowed'
-                    : 'border-gray-300 text-gray-700 hover:bg-gray-100'
-                }`}
               >
-                <ChevronRight size={20} />
-              </button>
+                Tiếp
+              </Button>
             </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
