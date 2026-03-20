@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Plus, Search, Eye, CheckCircle2, Clock3, Truck, AlertCircle, RefreshCw, X } from 'lucide-react'
 import { TransferAPIService, type TransferFromAPI } from '@/services/transfer-api.service'
 import { WarehouseLookupAPIService } from '@/services/warehouse-lookup-api.service'
+import { ProductAPIService } from '@/services/product-api.service'
 import { useAuthStore } from '@/store/auth.store'
 
 type StatusType = 'done' | 'pending' | 'shipped' | 'cancelled'
@@ -28,6 +29,8 @@ interface DispatchOrder {
 
 interface ReceiveItemForm {
   transferItemId: string
+  productId: string
+  productName: string
   shippedQuantity: number
   damagedQuantity: number
   notes: string
@@ -65,6 +68,7 @@ export default function DispatchGoodsPage() {
   const [receiveItems, setReceiveItems] = useState<ReceiveItemForm[]>([])
   const [receiveNotes, setReceiveNotes] = useState('')
   const [nameMap, setNameMap] = useState<Record<string, string>>({})
+  const [productNameMap, setProductNameMap] = useState<Record<string, string>>({})
 
   const workplaceId = useMemo(
     () =>
@@ -154,6 +158,27 @@ export default function DispatchGoodsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, workplaceKey])
 
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const rows = await ProductAPIService.getAllProducts()
+        const nextMap: Record<string, string> = {}
+        for (const p of rows ?? []) {
+          const id = normalizeId((p as any)?.id)
+          const name = String((p as any)?.name ?? '').trim()
+          if (id && name) nextMap[id] = name
+        }
+        if (!cancelled) setProductNameMap(nextMap)
+      } catch {
+        if (!cancelled) setProductNameMap({})
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const filteredOrders = orders.filter(order => {
     const matchesStatus = statusFilter === 'all' ? true : order.status === statusFilter
     const matchesSearch = order.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -179,8 +204,12 @@ export default function DispatchGoodsPage() {
       const shipped = Number(item.shippedQuantity ?? 0)
       const requested = Number(item.requestedQuantity ?? 0)
       const receiveQty = shipped > 0 ? shipped : requested
+      const pid = String(item.productId ?? '')
+      const pname = productNameMap[normalizeId(pid)] || pid
       return {
         transferItemId: item.id,
+        productId: pid,
+        productName: pname,
         shippedQuantity: Math.max(0, receiveQty),
         damagedQuantity: Number(item.damagedQuantity ?? 0),
         notes: String(item.notes ?? ''),
@@ -337,7 +366,7 @@ export default function DispatchGoodsPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50">
                     <tr>
-                      <th className="p-3 text-left text-xs font-semibold text-slate-600 uppercase">transferItemId</th>
+                      <th className="p-3 text-left text-xs font-semibold text-slate-600 uppercase">Sản phẩm</th>
                       <th className="p-3 text-left text-xs font-semibold text-slate-600 uppercase">shippedQuantity</th>
                       <th className="p-3 text-left text-xs font-semibold text-slate-600 uppercase">damagedQuantity</th>
                       <th className="p-3 text-left text-xs font-semibold text-slate-600 uppercase">notes</th>
@@ -351,7 +380,10 @@ export default function DispatchGoodsPage() {
                     ) : (
                       receiveItems.map((item) => (
                         <tr key={item.transferItemId} className="border-t border-slate-100">
-                          <td className="p-3 text-xs font-mono text-slate-700 break-all">{item.transferItemId}</td>
+                          <td className="p-3 text-xs text-slate-700">
+                            <p className="font-semibold">{item.productName || item.productId}</p>
+                            <p className="font-mono text-[11px] text-slate-500">{item.productId}</p>
+                          </td>
                           <td className="p-3">
                             <input
                               type="number"

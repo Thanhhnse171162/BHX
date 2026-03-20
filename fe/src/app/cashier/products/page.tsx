@@ -382,6 +382,15 @@ export default function CashierProductsPage() {
     [incomingTransfers, selectedTransferId],
   )
 
+  const productNameById = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const p of products) {
+      const key = String(p.id ?? '').trim().toLowerCase()
+      if (key) map[key] = p.name
+    }
+    return map
+  }, [products])
+
   const openReceiveModal = async () => {
     if (!user?.workplaceId) {
       setReceiveError('Không xác định được cửa hàng hiện tại để nhận hàng')
@@ -868,7 +877,7 @@ export default function CashierProductsPage() {
                       <table className="w-full text-sm">
                         <thead className="bg-gray-50 text-gray-600">
                           <tr>
-                            <th className="px-3 py-2 text-left">Product ID</th>
+                            <th className="px-3 py-2 text-left">Sản phẩm</th>
                             <th className="px-3 py-2 text-left">SL nhận</th>
                             <th className="px-3 py-2 text-left">SL hỏng</th>
                             <th className="px-3 py-2 text-left">Ghi chú</th>
@@ -877,7 +886,9 @@ export default function CashierProductsPage() {
                         <tbody>
                           {receiveItems.map(item => (
                             <tr key={item.transferItemId} className="border-t border-gray-100">
-                              <td className="px-3 py-2 text-xs text-gray-700">{item.productId}</td>
+                              <td className="px-3 py-2 text-xs text-gray-700">
+                                {productNameById[String(item.productId ?? '').trim().toLowerCase()] || item.productId}
+                              </td>
                               <td className="px-3 py-2">
                                 <input
                                   type="number"
