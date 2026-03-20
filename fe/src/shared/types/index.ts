@@ -45,6 +45,8 @@ export interface User {
   roleId?: number
   permissions: Permission[]
   storeId?: string
+  /** ID cửa hàng dùng khớp tồn kho STORE (nếu BE trả field này) */
+  storeLocationId?: string
   warehouseId?: string
   workplaceType?: 'STORE' | 'WAREHOUSE' | null
   workplaceId?: string | null
