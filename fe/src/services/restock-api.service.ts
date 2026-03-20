@@ -98,6 +98,20 @@ export class RestockAPIService {
     return payload?.data ?? payload
   }
 
+  static async approve(id: string): Promise<RestockRequestFromAPI> {
+    if (!id) throw new Error('Request ID is required')
+    const response = await localApiClient.put(`${this.base}/${id}/approve`)
+    const payload = response.data
+    return payload?.data ?? payload
+  }
+
+  static async reject(id: string): Promise<RestockRequestFromAPI> {
+    if (!id) throw new Error('Request ID is required')
+    const response = await localApiClient.put(`${this.base}/${id}/reject`)
+    const payload = response.data
+    return payload?.data ?? payload
+  }
+
   static async updateStatus(
     id: string,
     status: 'APPROVED' | 'REJECTED',

@@ -206,6 +206,10 @@ export default function WarehouseManagerRequestsPage() {
   const [selectedIncoming, setSelectedIncoming] = useState<TransferFromAPI | null>(null)
   const [incomingDetailLoadingId, setIncomingDetailLoadingId] = useState<string | null>(null)
 
+  // Action states for approve/reject
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
+  const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null)
+
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const pushToast = useCallback((toast: Omit<ToastItem, 'id' | 'onClose'>) => {
     setToasts((prev) => [{ ...toast, onClose: () => {}, id: `${Date.now()}-${Math.random()}` }, ...prev].slice(0, 3))
@@ -510,6 +514,54 @@ export default function WarehouseManagerRequestsPage() {
     [pushToast],
   )
 
+  const handleApproveRequest = useCallback(
+    async (requestId: string) => {
+      setActionLoadingId(requestId)
+      setActionType('approve')
+      try {
+        await RestockAPIService.approve(requestId)
+        pushToast({
+          type: 'success',
+          message: 'Duyệt yêu cầu thành công!',
+        })
+        await loadRequests()
+      } catch (err: unknown) {
+        pushToast({
+          type: 'error',
+          message: err instanceof Error ? err.message : 'Duyệt yêu cầu thất bại.',
+        })
+      } finally {
+        setActionLoadingId(null)
+        setActionType(null)
+      }
+    },
+    [pushToast, loadRequests],
+  )
+
+  const handleRejectRequest = useCallback(
+    async (requestId: string) => {
+      setActionLoadingId(requestId)
+      setActionType('reject')
+      try {
+        await RestockAPIService.reject(requestId)
+        pushToast({
+          type: 'success',
+          message: 'Từ chối yêu cầu thành công!',
+        })
+        await loadRequests()
+      } catch (err: unknown) {
+        pushToast({
+          type: 'error',
+          message: err instanceof Error ? err.message : 'Từ chối yêu cầu thất bại.',
+        })
+      } finally {
+        setActionLoadingId(null)
+        setActionType(null)
+      }
+    },
+    [pushToast, loadRequests],
+  )
+
   const fromWarehouseIdForForm = user?.warehouseId ?? user?.workplaceId ?? ''
   const normalizedFromId = normalizeId(fromWarehouseIdForForm)
 
@@ -775,7 +827,26 @@ export default function WarehouseManagerRequestsPage() {
                       <td className="px-5 py-4 text-gray-500 whitespace-nowrap">{row.createdAt}</td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
-                          <button className={actionButtonClass(row.actionLabel)}>{row.actionLabel}</button>
+                          {row.status === 'Chờ duyệt' ? (
+                            <>
+                              <button
+                                onClick={() => handleApproveRequest(row.uniqueId)}
+                                disabled={actionLoadingId === row.uniqueId}
+                                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {actionLoadingId === row.uniqueId && actionType === 'approve' ? '...' : 'Duyệt'}
+                              </button>
+                              <button
+                                onClick={() => handleRejectRequest(row.uniqueId)}
+                                disabled={actionLoadingId === row.uniqueId}
+                                className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {actionLoadingId === row.uniqueId && actionType === 'reject' ? '...' : 'Từ chối'}
+                              </button>
+                            </>
+                          ) : (
+                            <span className={actionButtonClass(row.actionLabel)}>{row.actionLabel}</span>
+                          )}
                           <button className="text-gray-400 hover:text-gray-600">
                             <Eye className="w-4 h-4" />
                           </button>
