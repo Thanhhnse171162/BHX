@@ -263,10 +263,10 @@ export default function CreateRestockRequestForm({ onClose, onCreated }: CreateF
     }
 
     const dto: CreateRestockRequestDTO = {
-      fromWarehouseId: toWarehouseId,  // Store (where request comes FROM)
-      fromLocationType: 'STORE',
-      toWarehouseId: fromWarehouseId,  // Warehouse (where request goes TO)
-      toLocationType: 'WAREHOUSE',
+      fromWarehouseId: fromWarehouseId,  // Warehouse (kho nguồn)
+      fromLocationType: 'WAREHOUSE',
+      toWarehouseId: toWarehouseId,  // Store (cửa hàng)
+      toLocationType: 'STORE',
       priority,
       notes: notes.trim() || undefined,
       items: items.map((i) => ({
