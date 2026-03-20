@@ -137,6 +137,7 @@ export default function ReceiveGoodsPage() {
   const [inspectionItems, setInspectionItems] = useState<InspectionItem[]>([])
   const [inspectorNote, setInspectorNote] = useState('')
   const [step, setStep] = useState<'detail' | 'inspect'>('detail')
+  const [viewOnly, setViewOnly] = useState(false)
   const [confirmAction, setConfirmAction] = useState<'complete' | 'cancel' | null>(null)
   const [submitLoading, setSubmitLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -242,11 +243,12 @@ export default function ReceiveGoodsPage() {
   }, [statusFilter, searchQuery, destinationTransfers.length])
 
   // ─── Inspection helpers ───────────────────────────────────────────────────
-  const openInspection = (transfer: TransferFromAPI) => {
+  const openInspection = (transfer: TransferFromAPI, readonly = false) => {
     setInspectingOrder(transfer)
     setInspectionItems((transfer.items ?? []).map(item => toInspectionItemWithName(item, productNameMap)))
     setInspectorNote(transfer.notes ?? '')
     setStep('detail')
+    setViewOnly(readonly)
     setConfirmAction(null)
     setSubmitError(null)
   }
@@ -254,6 +256,7 @@ export default function ReceiveGoodsPage() {
   const closeInspection = () => {
     setInspectingOrder(null)
     setInspectionItems([])
+    setViewOnly(false)
     setConfirmAction(null)
     setSubmitError(null)
   }
@@ -455,7 +458,7 @@ export default function ReceiveGoodsPage() {
                         uiStatus === 'done' ? (
                           <button
                             className="text-slate-400 hover:text-emerald-600 transition-colors p-1 rounded-md hover:bg-emerald-50"
-                            onClick={() => alert(`Xem chi tiết: ${transfer.transferNumber}`)}
+                            onClick={() => openInspection(transfer, true)}
                           >
                             <Eye size={16} />
                           </button>
@@ -533,7 +536,9 @@ export default function ReceiveGoodsPage() {
               {([
                 { key: 'detail', label: 'Thông tin phiếu', num: 1 },
                 { key: 'inspect', label: 'Kiểm tra thực tế', num: 2 },
-              ] as const).map(s => (
+              ] as const)
+                .filter(s => !viewOnly || s.key === 'detail')
+                .map(s => (
                 <button
                   key={s.key}
                   onClick={() => setStep(s.key)}
@@ -772,7 +777,17 @@ export default function ReceiveGoodsPage() {
             </div>
 
             <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between gap-3">
-              {step === 'detail' ? (
+              {viewOnly ? (
+                <>
+                  <span className="text-xs text-slate-500">Chế độ xem chi tiết</span>
+                  <button
+                    onClick={closeInspection}
+                    className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition-colors"
+                  >
+                    Đóng
+                  </button>
+                </>
+              ) : step === 'detail' ? (
                 <>
                   <button
                     onClick={closeInspection}
