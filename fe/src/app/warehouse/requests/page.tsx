@@ -76,6 +76,8 @@ function StatusBadge({ status }: { status: string }) {
     COMPLETED:  { dot: 'bg-teal-500',   bg: 'bg-teal-50 border border-teal-200',     text: 'text-teal-700',   label: 'Hoàn thành' },
     REJECTED:   { dot: 'bg-red-500',    bg: 'bg-red-50 border border-red-200',       text: 'text-red-700',    label: 'Từ chối' },
     IN_TRANSIT: { dot: 'bg-indigo-500', bg: 'bg-indigo-50 border border-indigo-200', text: 'text-indigo-700', label: 'Đang vận chuyển' },
+    SHIPPED:    { dot: 'bg-sky-500',    bg: 'bg-sky-50 border border-sky-200',       text: 'text-sky-700',    label: 'Đã xuất kho' },
+    DELIVERED:  { dot: 'bg-cyan-500',   bg: 'bg-cyan-50 border border-cyan-200',     text: 'text-cyan-700',   label: 'Đã giao đến kho nhận' },
     CANCELLED:  { dot: 'bg-gray-400',   bg: 'bg-gray-50 border border-gray-200',     text: 'text-gray-600',   label: 'Đã hủy' },
   }
   const s = map[status] ?? { dot: 'bg-gray-400', bg: 'bg-gray-50 border border-gray-200', text: 'text-gray-600', label: status }
@@ -267,6 +269,7 @@ export default function WarehouseRequestsPage() {
   const [transferError, setTransferError] = useState<string | null>(null)
   const [transferSearch, setTransferSearch] = useState('')
   const [transferStatusFilter, setTransferStatusFilter] = useState('ALL')
+  const [receivingTransferId, setReceivingTransferId] = useState<string | null>(null)
 
   // ── Modal state ────────────────────────────────────────────────────────────
   const [showModal, setShowModal] = useState(false)
@@ -310,7 +313,13 @@ export default function WarehouseRequestsPage() {
   // ── Derived user/workplace info ────────────────────────────────────────────
   const normalizedRole = String(user?.role ?? '').toUpperCase().replace(/\s+/g, '_')
   const isWarehouseAdmin = normalizedRole === 'WAREHOUSE_ADMIN' || user?.roleId === 7
-  const workplaceId = user?.warehouseId || user?.workplaceId || ''
+  const workplaceId =
+    user?.workplaceId ||
+    (user as any)?.workplace_id ||
+    (user as any)?.workplace?.id ||
+    user?.warehouseId ||
+    user?.storeId ||
+    ''
 
   const managedLocationIds = useMemo(() => {
     const root = normalizeId(workplaceId)
@@ -380,7 +389,13 @@ export default function WarehouseRequestsPage() {
       // NOTE: map to TransferAPIService.getTransfers(workplaceId) when available
       const data = await TransferAPIService.getTransfers()
       const list = Array.isArray(data) ? data : []
-      setTransfers(list)
+      const wid = normalizeId(workplaceId)
+      const related = list.filter((t) => {
+        const fromId = normalizeId(t.fromLocationId)
+        const toId = normalizeId(t.toLocationId)
+        return fromId === wid || toId === wid
+      })
+      setTransfers(related)
     } catch {
       setTransferError('Không thể tải lịch sử đơn vận chuyển.')
     } finally {
@@ -523,6 +538,14 @@ export default function WarehouseRequestsPage() {
       return matchSearch && matchStatus
     })
   }, [transfers, transferSearch, transferStatusFilter])
+
+  const receiveableTransferStatus = useMemo(() => new Set(['SHIPPED', 'IN_TRANSIT', 'DELIVERED']), [])
+
+  const canReceiveTransfer = useCallback((transfer: TransferFromAPI) => {
+    const toThisWorkplace = normalizeId(transfer.toLocationId) === normalizeId(workplaceId)
+    const status = String(transfer.status || '').toUpperCase().trim()
+    return toThisWorkplace && receiveableTransferStatus.has(status)
+  }, [workplaceId, receiveableTransferStatus])
 
   // ── Pagination ─────────────────────────────────────────────────────────────
   const reqPagination = usePagination(filtered, 10)
@@ -688,6 +711,43 @@ export default function WarehouseRequestsPage() {
       const msg = (err as any)?.response?.data?.message || (err as any)?.message || 'Không thể tạo đơn vận chuyển.'
       alert(msg)
     } finally { setIsSubmittingTransfer(false) }
+  }
+
+  const handleReceiveTransfer = async (transfer: TransferFromAPI) => {
+    if (!canReceiveTransfer(transfer)) return
+    const ok = confirm('Xác nhận kho đã nhận hàng cho đơn vận chuyển này?')
+    if (!ok) return
+
+    const items = Array.isArray(transfer.items) ? transfer.items : []
+    if (items.length === 0) {
+      alert('Đơn vận chuyển chưa có sản phẩm để xác nhận nhận hàng.')
+      return
+    }
+
+    try {
+      setReceivingTransferId(transfer.id)
+      await TransferAPIService.receiveTransfer(transfer.id, {
+        items: items.map((item) => {
+          const shipped = Number(item.shippedQuantity ?? 0)
+          const requested = Number(item.requestedQuantity ?? 0)
+          const fallbackQty = shipped > 0 ? shipped : requested
+          return {
+            transferItemId: item.id,
+            shippedQuantity: Math.max(0, fallbackQty),
+            damagedQuantity: 0,
+            notes: '',
+          }
+        }),
+        notes: 'Kho nhận đã xác nhận nhận hàng',
+      })
+      alert('Xác nhận nhận hàng thành công!')
+      await fetchTransfers()
+    } catch (err) {
+      const msg = (err as any)?.response?.data?.message || (err as any)?.message || 'Xác nhận nhận hàng thất bại.'
+      alert(msg)
+    } finally {
+      setReceivingTransferId(null)
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -1298,7 +1358,9 @@ export default function WarehouseRequestsPage() {
                 className="appearance-none border border-gray-200 rounded-lg pl-3 pr-7 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/40">
                 <option value="ALL">Tất cả trạng thái</option>
                 <option value="PENDING">Chờ xử lý</option>
+                <option value="SHIPPED">Đã xuất kho</option>
                 <option value="IN_TRANSIT">Đang vận chuyển</option>
+                <option value="DELIVERED">Đã giao đến kho nhận</option>
                 <option value="COMPLETED">Hoàn thành</option>
                 <option value="CANCELLED">Đã hủy</option>
               </select>
@@ -1322,14 +1384,14 @@ export default function WarehouseRequestsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/50">
-                {['Mã đơn vận chuyển', 'Mã yêu cầu', 'Từ', 'Đến', 'Trạng thái', 'Ngày tạo', 'Giao dự kiến'].map(col => (
+                {['Mã đơn vận chuyển', 'Mã yêu cầu', 'Từ', 'Đến', 'Trạng thái', 'Ngày tạo', 'Giao dự kiến', 'Thao tác'].map(col => (
                   <th key={col} className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{col}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {isLoadingTransfers ? (
-                Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} cols={7} />)
+                Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} cols={8} />)
               ) : trPagination.paginated.length === 0 ? (
                 <EmptyState text="Chưa có đơn vận chuyển nào" />
               ) : trPagination.paginated.map((t, idx) => (
@@ -1346,6 +1408,20 @@ export default function WarehouseRequestsPage() {
                   <td className="px-5 py-3.5 text-gray-500 text-xs whitespace-nowrap">
                     {t.actualDelivery ? fmtDate(t.actualDelivery ?? null) : fmtDate(t.expectedDelivery ?? null)}
                     {t.actualDelivery && <span className="ml-1.5 text-teal-600 font-medium text-xs">✓</span>}
+                  </td>
+                  <td className="px-5 py-3.5">
+                    {canReceiveTransfer(t) ? (
+                      <button
+                        onClick={() => handleReceiveTransfer(t)}
+                        disabled={receivingTransferId === t.id}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {receivingTransferId === t.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                        Xác nhận nhận
+                      </button>
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
                   </td>
                 </tr>
               ))}

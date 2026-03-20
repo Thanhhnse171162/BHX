@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   CirclePlus,
   Download,
@@ -171,6 +172,7 @@ function getIncomingTransferUIStatus(apiStatus: string): {
 }
 
 export default function WarehouseManagerRequestsPage() {
+  const router = useRouter()
   const user = useAuthStore((s) => s.user)
   const [requests, setRequests] = useState<RequestItem[]>([])
   const [activeTab, setActiveTab] = useState<RequestType>('store')
@@ -690,15 +692,24 @@ export default function WarehouseManagerRequestsPage() {
           <h1 className="text-4xl font-bold text-[#1d4b2c]">Quản lý Yêu cầu</h1>
           <p className="text-gray-500 mt-1">Theo dõi và xử lý các luồng hàng hóa luân chuyển</p>
         </div>
-        {activeTab === 'warehouse' && (
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => setIsCreateOpen(true)}
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#f97316] text-white font-semibold hover:bg-[#ea580c] transition-colors"
+            onClick={() => router.push('/warehouse-manager/requests/create')}
+            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition-colors"
           >
-            <CirclePlus className="w-4 h-4" />
-            Tạo yêu cầu mới
+            <Truck className="w-4 h-4" />
+            Tạo đơn vận chuyển
           </button>
-        )}
+          {activeTab === 'warehouse' && (
+            <button
+              onClick={() => setIsCreateOpen(true)}
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#f97316] text-white font-semibold hover:bg-[#ea580c] transition-colors"
+            >
+              <CirclePlus className="w-4 h-4" />
+              Tạo yêu cầu mới
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="border-b border-gray-200">

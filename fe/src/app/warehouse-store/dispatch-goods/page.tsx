@@ -1,27 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Eye, CheckCircle2, Clock3, Truck, AlertCircle, X, Loader } from 'lucide-react'
-import { TransferAPIService, ReceiveTransferDTO, TransferFromAPI } from '@/services/transfer-api.service'
-import { localApiClient } from '@/shared/api/http'
+import { Plus, Search, Eye, CheckCircle2, Clock3, Truck, AlertCircle, RefreshCw, X } from 'lucide-react'
+import { TransferAPIService, type TransferFromAPI } from '@/services/transfer-api.service'
+import { WarehouseLookupAPIService } from '@/services/warehouse-lookup-api.service'
+import { useAuthStore } from '@/store/auth.store'
 
-type StatusType = 'done' | 'pending' | 'shipped' | 'cancelled' | 'intransit'
-
-interface DispatchItem {
-  id: string
-  productId: string
-  batchId?: string | null
-  requestedQuantity: number
-  shippedQuantity?: number | null
-  receivedQuantity?: number | null
-  damagedQuantity: number
-  notes?: string | null
-}
+type StatusType = 'done' | 'pending' | 'shipped' | 'cancelled'
 
 interface DispatchOrder {
   id: string
-  transferNumber: string
   code: string
   destination: string
   source: string
@@ -31,328 +20,227 @@ interface DispatchOrder {
   totalQty: number
   status: StatusType
   priority: 'high' | 'medium' | 'low'
-  items: DispatchItem[]
+  rawStatus: string
+  toLocationId: string
+  items: TransferFromAPI['items']
+  notes?: string | null
 }
 
-interface ReceiveItem {
+interface ReceiveItemForm {
   transferItemId: string
   shippedQuantity: number
   damagedQuantity: number
   notes: string
 }
 
-const STATIC_LOCATION_NAMES: Record<string, string> = {
-  'a0000001-0001-0001-0001-000000000001': 'Kho HCM',
-  'a0000001-0001-0001-0001-000000000002': 'Kho Chi Nhánh Quận 12',
-  'a0000001-0001-0001-0001-000000000003': 'Kho Chi Nhánh Bình Dương',
-  'a0000001-0001-0001-0001-000000000004': 'Kho Chi Nhánh Long An',
-  'b0000001-0001-0001-0001-000000000001': 'Cửa Hàng Thủ Đức',
-  'b0000001-0001-0001-0001-000000000002': 'Cửa Hàng Giải Phóng HCM',
-  'b0000001-0001-0001-0001-000000000003': 'Cửa Hàng Bình Dương',
-  'b0000001-0001-0001-0001-000000000004': 'Cửa Hàng Củ Chi',
-  'b0000001-0001-0001-0001-000000000005': 'Cửa Hàng Biên Hòa',
-  'b0000001-0001-0001-0001-000000000006': 'Cửa Hàng Quận 7',
+function normalizeId(value?: string | null): string {
+  return String(value ?? '').trim().toLowerCase()
 }
 
-const mapStatus = (status?: string): StatusType => {
-  const normalized = String(status ?? '').toUpperCase()
-  if (normalized === 'COMPLETED') return 'done'
-  if (normalized === 'CANCELLED') return 'cancelled'
-  if (normalized === 'SHIPPED' || normalized === 'IN_TRANSIT') return 'intransit'
+function formatDate(value?: string | null): string {
+  if (!value) return '-'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return String(value)
+  return d.toLocaleString('vi-VN')
+}
+
+function mapTransferStatus(status?: string): StatusType {
+  const s = String(status ?? '').trim().toUpperCase()
+  if (s === 'COMPLETED') return 'done'
+  if (s === 'CANCELLED' || s === 'REJECTED') return 'cancelled'
+  if (s === 'SHIPPED' || s === 'IN_TRANSIT' || s === 'DELIVERED') return 'shipped'
   return 'pending'
 }
 
-const formatDate = (value?: string | null) => {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const year = date.getFullYear()
-  return `${day}/${month}/${year}`
-}
-
-const mapTransferToDispatchOrder = (transfer: TransferFromAPI): DispatchOrder => {
-  const items = (transfer.items ?? []).map(item => ({
-    id: item.id,
-    productId: item.productId,
-    batchId: item.batchId,
-    requestedQuantity: Number(item.requestedQuantity ?? 0),
-    shippedQuantity: item.shippedQuantity,
-    receivedQuantity: item.receivedQuantity,
-    damagedQuantity: Number(item.damagedQuantity ?? 0),
-    notes: item.notes,
-  }))
-
-  const totalQty = items.reduce((sum, item) => {
-    const qty = Number(item.shippedQuantity ?? item.requestedQuantity ?? 0)
-    return sum + (Number.isFinite(qty) ? qty : 0)
-  }, 0)
-
-  return {
-    id: transfer.id,
-    transferNumber: transfer.transferNumber,
-    code: transfer.transferNumber,
-    destination: transfer.toLocationId,
-    source: transfer.fromLocationId,
-    createdAt: formatDate(transfer.transferDate),
-    shippedAt: formatDate(transfer.actualDelivery ?? transfer.expectedDelivery),
-    totalSku: items.length,
-    totalQty,
-    status: mapStatus(transfer.status),
-    priority: 'medium',
-    items,
-  }
-}
-
-const DISPATCH_ORDERS: DispatchOrder[] = [
-  {
-    id: 'f5ec79f2-f580-4e3a-a347-6e57da1312bd',
-    transferNumber: 'TRF-2026-001',
-    code: 'DIS-240801-001',
-    destination: 'Cửa hàng Quận 1',
-    source: 'Kho Quận 12',
-    createdAt: '01/08/2024',
-    shippedAt: '02/08/2024',
-    totalSku: 12,
-    totalQty: 1250,
-    status: 'intransit',
-    priority: 'high',
-    items: [
-      {
-        id: 'd14e14a7-f2f3-453c-9a9f-61fd08e6fd3a',
-        productId: 'f0000001-0001-0001-0001-000000000005',
-        batchId: 'ba000001-0001-0001-0001-000000000001',
-        requestedQuantity: 10,
-        shippedQuantity: 10,
-        damagedQuantity: 0,
-        notes: null
-      }
-    ]
-  },
-  {
-    id: 'a1b2c3d4-e5f6-4a5b-6c7d-8e9f0a1b2c3d',
-    transferNumber: 'TRF-2026-002',
-    code: 'DIS-240804-015',
-    destination: 'Cửa hàng Quận 3',
-    source: 'Kho Bình Dương',
-    createdAt: '04/08/2024',
-    shippedAt: '05/08/2024',
-    totalSku: 8,
-    totalQty: 450,
-    status: 'intransit',
-    priority: 'medium',
-    items: [
-      {
-        id: 'd14e14a7-f2f3-453c-9a9f-61fd08e6fd3b',
-        productId: 'f0000001-0001-0001-0001-000000000006',
-        batchId: 'ba000001-0001-0001-0001-000000000002',
-        requestedQuantity: 8,
-        shippedQuantity: 8,
-        damagedQuantity: 0,
-        notes: null
-      }
-    ]
-  },
-  {
-    id: 'b2c3d4e5-f6a7-4b6c-7d8e-9f0a1b2c3d4e',
-    transferNumber: 'TRF-2026-003',
-    code: 'DIS-240805-002',
-    destination: 'Cửa hàng Quận 5',
-    source: 'Kho Thủ Đức',
-    createdAt: '05/08/2024',
-    shippedAt: '06/08/2024',
-    totalSku: 5,
-    totalQty: 200,
-    status: 'done',
-    priority: 'low',
-    items: [
-      {
-        id: 'd14e14a7-f2f3-453c-9a9f-61fd08e6fd3c',
-        productId: 'f0000001-0001-0001-0001-000000000007',
-        batchId: 'ba000001-0001-0001-0001-000000000003',
-        requestedQuantity: 5,
-        shippedQuantity: 5,
-        receivedQuantity: 5,
-        damagedQuantity: 0,
-        notes: null
-      }
-    ]
-  },
-]
-
 export default function DispatchGoodsPage() {
   const router = useRouter()
+  const { user, token } = useAuthStore()
 
   const [statusFilter, setStatusFilter] = useState<'all' | StatusType>('all')
   const [searchTerm, setSearchTerm] = useState('')
-  const [dispatchOrders, setDispatchOrders] = useState<DispatchOrder[]>(DISPATCH_ORDERS)
-  const [selectedOrder, setSelectedOrder] = useState<DispatchOrder | null>(null)
-  const [showDetailModal, setShowDetailModal] = useState(false)
-  const [receiveItems, setReceiveItems] = useState<ReceiveItem[]>([])
+  const [orders, setOrders] = useState<DispatchOrder[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [isFetching, setIsFetching] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [notesText, setNotesText] = useState<string>('')
-  const [locationNameMap, setLocationNameMap] = useState<Record<string, string>>(STATIC_LOCATION_NAMES)
+  const [receivingId, setReceivingId] = useState<string | null>(null)
+  const [selectedOrder, setSelectedOrder] = useState<DispatchOrder | null>(null)
+  const [receiveItems, setReceiveItems] = useState<ReceiveItemForm[]>([])
+  const [receiveNotes, setReceiveNotes] = useState('')
+  const [nameMap, setNameMap] = useState<Record<string, string>>({})
 
-  const normalizeId = (v?: string | null) => String(v ?? '').trim().toLowerCase()
+  const workplaceId = useMemo(
+    () =>
+      user?.workplaceId ||
+      (user as any)?.workplace_id ||
+      (user as any)?.workplace?.id ||
+      user?.warehouseId ||
+      user?.storeId ||
+      '',
+    [user],
+  )
 
-  const getLocationLabel = (id?: string | null) => {
-    const raw = String(id ?? '').trim()
-    if (!raw) return '-'
-    const key = normalizeId(raw)
-    return locationNameMap[key] || STATIC_LOCATION_NAMES[key] || raw
-  }
+  const workplaceKey = normalizeId(workplaceId)
 
-  const fetchDispatchOrders = async () => {
-    setIsFetching(true)
-    try {
-      const transfers = await TransferAPIService.getTransfers()
-      setDispatchOrders((transfers ?? []).map(mapTransferToDispatchOrder))
-    } catch {
-      setDispatchOrders(DISPATCH_ORDERS)
-    } finally {
-      setIsFetching(false)
+  const loadOrders = async () => {
+    if (!token || !workplaceKey) {
+      setOrders([])
+      return
     }
-  }
-
-  useEffect(() => {
-    fetchDispatchOrders()
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-
-    ;(async () => {
-      try {
-        const res = await localApiClient.get('/warehouses?status=ACTIVE&is_deleted=0')
-        const payload = res.data
-        const list =
-          Array.isArray(payload?.data) ? payload.data :
-          Array.isArray(payload) ? payload :
-          []
-
-        const dynamicMap: Record<string, string> = {}
-        for (const location of list) {
-          const id = normalizeId((location as any)?.id)
-          const name = String((location as any)?.name ?? '').trim()
-          if (id && name) dynamicMap[id] = name
-        }
-
-        if (!cancelled) {
-          setLocationNameMap({
-            ...STATIC_LOCATION_NAMES,
-            ...dynamicMap,
-          })
-        }
-      } catch {
-        if (!cancelled) setLocationNameMap(STATIC_LOCATION_NAMES)
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  const handleViewDetails = (order: DispatchOrder) => {
-    setSelectedOrder(order)
-    setShowDetailModal(true)
-    setError(null)
-    
-    // Initialize receive items with default values
-    const items: ReceiveItem[] = order.items.map((item) => ({
-      transferItemId: item.id,
-      shippedQuantity: item.shippedQuantity || item.requestedQuantity || 0,
-      damagedQuantity: 0,
-      notes: ''
-    }))
-    setReceiveItems(items)
-  }
-
-  const handleCloseModal = () => {
-    setShowDetailModal(false)
-    setSelectedOrder(null)
-    setReceiveItems([])
-    setNotesText('')
-    setError(null)
-  }
-
-  const handleReceiveItemChange = (index: number, field: keyof ReceiveItem, value: any) => {
-    const newItems = [...receiveItems]
-    newItems[index][field] = value
-    setReceiveItems(newItems)
-  }
-
-  const handleConfirmReceipt = async () => {
-    if (!selectedOrder) return
-
     setIsLoading(true)
-    setError(null)
-
     try {
-      const receiveData: ReceiveTransferDTO = {
-        items: receiveItems,
-        notes: notesText
-      }
+      const list = await TransferAPIService.getTransfers()
+      const transfers = Array.isArray(list) ? list : []
+      const related = transfers.filter((t) => {
+        const fromKey = normalizeId(t.fromLocationId)
+        const toKey = normalizeId(t.toLocationId)
+        return fromKey === workplaceKey || toKey === workplaceKey
+      })
 
-      await TransferAPIService.receiveTransfer(selectedOrder.id, receiveData)
+      const mapped: DispatchOrder[] = related.map((t: TransferFromAPI) => {
+        const items = Array.isArray(t.items) ? t.items : []
+        const totalQty = items.reduce((sum, it) => {
+          const shipped = Number(it.shippedQuantity ?? 0)
+          const requested = Number(it.requestedQuantity ?? 0)
+          return sum + (shipped > 0 ? shipped : requested)
+        }, 0)
 
-      // Update the order status in local state to 'done'
-      setDispatchOrders(prevOrders =>
-        prevOrders.map(order =>
-          order.id === selectedOrder.id
-            ? { ...order, status: 'done' as StatusType }
-            : order
+        return {
+          id: t.id,
+          code: t.transferNumber || t.id,
+          destination: t.toLocationId || '-',
+          source: t.fromLocationId || '-',
+          createdAt: formatDate(t.transferDate),
+          shippedAt: formatDate(t.expectedDelivery),
+          totalSku: items.length,
+          totalQty,
+          status: mapTransferStatus(t.status),
+          priority: 'medium',
+          rawStatus: String(t.status || '').toUpperCase(),
+          toLocationId: t.toLocationId || '',
+          items,
+          notes: t.notes,
+        }
+      })
+
+      setOrders(mapped)
+
+      const uniqueIds = Array.from(new Set(
+        mapped.flatMap((o) => [o.source, o.destination]).map((x) => normalizeId(x)).filter(Boolean),
+      ))
+
+      const unresolved = uniqueIds.filter((id) => !nameMap[id])
+      if (unresolved.length > 0) {
+        const resolved = await Promise.all(
+          unresolved.map(async (id) => {
+            try {
+              const data = await WarehouseLookupAPIService.getById(id)
+              return [id, data?.name || id] as const
+            } catch {
+              return [id, id] as const
+            }
+          }),
         )
-      )
-
-      // Close modal and reset
-      handleCloseModal()
-      alert('Xác nhận nhận hàng thành công!')
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Có lỗi xảy ra khi xác nhận nhận hàng'
-      setError(errorMessage)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleQuickConfirmReceipt = async (order: DispatchOrder) => {
-    if (!(order.status === 'shipped' || order.status === 'intransit')) return
-
-    setIsLoading(true)
-    setError(null)
-    try {
-      const receiveData: ReceiveTransferDTO = {
-        items: (order.items ?? []).map(item => ({
-          transferItemId: item.id,
-          shippedQuantity: Number(item.shippedQuantity ?? item.requestedQuantity ?? 0),
-          damagedQuantity: Number(item.damagedQuantity ?? 0),
-          notes: item.notes ?? '',
-        })),
-        notes: '',
+        setNameMap((prev) => {
+          const next = { ...prev }
+          for (const [id, label] of resolved) next[id] = label
+          return next
+        })
       }
-
-      await TransferAPIService.receiveTransfer(order.id, receiveData)
-      await fetchDispatchOrders()
-      alert('Xác nhận nhận hàng thành công!')
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Có lỗi xảy ra khi xác nhận nhận hàng'
-      setError(errorMessage)
-      alert(errorMessage)
     } finally {
       setIsLoading(false)
     }
   }
 
-  const filteredOrders = dispatchOrders.filter(order => {
+  useEffect(() => {
+    loadOrders()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, workplaceKey])
+
+  const filteredOrders = orders.filter(order => {
     const matchesStatus = statusFilter === 'all' ? true : order.status === statusFilter
     const matchesSearch = order.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.destination.toLowerCase().includes(searchTerm.toLowerCase())
+                         order.destination.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         order.source.toLowerCase().includes(searchTerm.toLowerCase())
     return matchesStatus && matchesSearch
   })
+
+  const canInspectIncoming = (order: DispatchOrder) => {
+    const toCurrentWorkplace = normalizeId(order.toLocationId) === workplaceKey
+    const statusAllowed = order.rawStatus === 'PENDING' || order.rawStatus === 'DELIVERED' || order.rawStatus === 'IN_TRANSIT' || order.rawStatus === 'SHIPPED'
+    return toCurrentWorkplace && statusAllowed
+  }
+
+  const getLocationName = (idOrName: string) => {
+    const key = normalizeId(idOrName)
+    return nameMap[key] || idOrName
+  }
+
+  const openReceiveModal = (order: DispatchOrder) => {
+    const items = Array.isArray(order.items) ? order.items : []
+    const mapped = items.map((item) => {
+      const shipped = Number(item.shippedQuantity ?? 0)
+      const requested = Number(item.requestedQuantity ?? 0)
+      const receiveQty = shipped > 0 ? shipped : requested
+      return {
+        transferItemId: item.id,
+        shippedQuantity: Math.max(0, receiveQty),
+        damagedQuantity: Number(item.damagedQuantity ?? 0),
+        notes: String(item.notes ?? ''),
+      }
+    })
+
+    setSelectedOrder(order)
+    setReceiveItems(mapped)
+    setReceiveNotes(String(order.notes ?? ''))
+  }
+
+  const closeReceiveModal = () => {
+    setSelectedOrder(null)
+    setReceiveItems([])
+    setReceiveNotes('')
+  }
+
+  const updateReceiveItem = <K extends keyof ReceiveItemForm>(
+    transferItemId: string,
+    key: K,
+    value: ReceiveItemForm[K],
+  ) => {
+    setReceiveItems((prev) => prev.map((it) => (it.transferItemId === transferItemId ? { ...it, [key]: value } : it)))
+  }
+
+  const handleReceiveOrder = async () => {
+    if (!selectedOrder) return
+    if (!canInspectIncoming(selectedOrder)) {
+      alert('Phiếu này chưa đến bước kho nhận xác nhận.')
+      return
+    }
+    if (receiveItems.length === 0) {
+      alert('Phiếu chưa có sản phẩm để xác nhận nhận.')
+      return
+    }
+
+    const ok = confirm(`Xác nhận nhận hàng cho phiếu ${selectedOrder.code}?`)
+    if (!ok) return
+
+    try {
+      setReceivingId(selectedOrder.id)
+      await TransferAPIService.receiveTransfer(selectedOrder.id, {
+        items: receiveItems.map((item) => ({
+          transferItemId: item.transferItemId,
+          shippedQuantity: Math.max(0, Number(item.shippedQuantity) || 0),
+          damagedQuantity: Math.max(0, Number(item.damagedQuantity) || 0),
+          notes: item.notes,
+        })),
+        notes: receiveNotes,
+      })
+      alert('Xác nhận nhận hàng thành công.')
+      closeReceiveModal()
+      await loadOrders()
+    } catch (err) {
+      const msg = (err as any)?.response?.data?.message || (err as any)?.message || 'Xác nhận nhận hàng thất bại.'
+      alert(msg)
+    } finally {
+      setReceivingId(null)
+    }
+  }
 
   const statusBadge = (status: StatusType) => {
     switch (status) {
@@ -371,11 +259,10 @@ export default function DispatchGoodsPage() {
           </span>
         )
       case 'shipped':
-      case 'intransit':
         return (
           <span className="px-3 py-1 text-xs rounded-full bg-sky-100 text-sky-700 font-medium flex items-center gap-1 w-fit">
             <Truck size={14} />
-            Đang vận chuyển
+            Đã gửi
           </span>
         )
       case 'cancelled':
@@ -417,6 +304,118 @@ export default function DispatchGoodsPage() {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
+
+      {selectedOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-4xl bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-slate-500">Chi tiết payload nhận hàng</p>
+                <h3 className="text-base font-bold text-slate-900 mt-0.5">{selectedOrder.code}</h3>
+              </div>
+              <button
+                onClick={closeReceiveModal}
+                className="w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"
+              >
+                <X size={16} className="mx-auto" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div className="rounded-lg border border-slate-200 p-3">
+                  <p className="text-xs text-slate-500">Kho nguồn</p>
+                  <p className="font-medium text-slate-800 mt-1">{getLocationName(selectedOrder.source)}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 p-3">
+                  <p className="text-xs text-slate-500">Kho/Cửa hàng đích</p>
+                  <p className="font-medium text-slate-800 mt-1">{getLocationName(selectedOrder.destination)}</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="p-3 text-left text-xs font-semibold text-slate-600 uppercase">transferItemId</th>
+                      <th className="p-3 text-left text-xs font-semibold text-slate-600 uppercase">shippedQuantity</th>
+                      <th className="p-3 text-left text-xs font-semibold text-slate-600 uppercase">damagedQuantity</th>
+                      <th className="p-3 text-left text-xs font-semibold text-slate-600 uppercase">notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {receiveItems.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="p-4 text-center text-slate-500">Không có item</td>
+                      </tr>
+                    ) : (
+                      receiveItems.map((item) => (
+                        <tr key={item.transferItemId} className="border-t border-slate-100">
+                          <td className="p-3 text-xs font-mono text-slate-700 break-all">{item.transferItemId}</td>
+                          <td className="p-3">
+                            <input
+                              type="number"
+                              min={0}
+                              value={item.shippedQuantity}
+                              onChange={(e) => updateReceiveItem(item.transferItemId, 'shippedQuantity', Math.max(0, Number(e.target.value) || 0))}
+                              className="w-24 border border-slate-200 rounded-lg px-2 py-1.5 text-sm"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <input
+                              type="number"
+                              min={0}
+                              value={item.damagedQuantity}
+                              onChange={(e) => updateReceiveItem(item.transferItemId, 'damagedQuantity', Math.max(0, Number(e.target.value) || 0))}
+                              className="w-24 border border-slate-200 rounded-lg px-2 py-1.5 text-sm"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <input
+                              value={item.notes}
+                              onChange={(e) => updateReceiveItem(item.transferItemId, 'notes', e.target.value)}
+                              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm"
+                              placeholder="Ghi chú item"
+                            />
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-500 mb-1">notes</p>
+                <textarea
+                  rows={3}
+                  value={receiveNotes}
+                  onChange={(e) => setReceiveNotes(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                  placeholder="Ghi chú tổng"
+                />
+              </div>
+            </div>
+
+            <div className="px-5 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2">
+              <button
+                onClick={closeReceiveModal}
+                className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-white"
+              >
+                Đóng
+              </button>
+              <button
+                onClick={handleReceiveOrder}
+                disabled={receivingId === selectedOrder.id || !canInspectIncoming(selectedOrder)}
+                className="px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
+              >
+                {receivingId === selectedOrder.id && <RefreshCw size={14} className="animate-spin" />}
+                Xác nhận nhận hàng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* HEADER */}
       <div className="flex items-center justify-between mb-6">
@@ -473,10 +472,11 @@ export default function DispatchGoodsPage() {
           />
 
           <button
-            className="h-10 px-4 border rounded-lg text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-60"
-            onClick={fetchDispatchOrders}
-            disabled={isFetching}
+            className="h-10 px-4 border rounded-lg text-sm text-slate-600 hover:bg-slate-50 inline-flex items-center gap-1.5"
+            onClick={loadOrders}
+            disabled={isLoading}
           >
+            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
             Làm mới
           </button>
 
@@ -509,13 +509,13 @@ export default function DispatchGoodsPage() {
 
           <button
             className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              statusFilter === 'intransit'
+              statusFilter === 'shipped'
                 ? 'bg-emerald-600 text-white'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
-            onClick={() => setStatusFilter('intransit')}
+            onClick={() => setStatusFilter('shipped')}
           >
-            Đang vận chuyển
+            Đã gửi
           </button>
 
           <button
@@ -569,16 +569,16 @@ export default function DispatchGoodsPage() {
             {filteredOrders.map(order => (
 
               <tr
-                key={order.id}
+                key={order.code}
                 className="border-t hover:bg-slate-50 transition-colors"
               >
                 <td className="p-4 font-semibold text-emerald-600">
                   {order.code}
                 </td>
 
-                <td className="p-4">{getLocationLabel(order.source)}</td>
+                <td className="p-4">{getLocationName(order.source)}</td>
 
-                <td className="p-4">{getLocationLabel(order.destination)}</td>
+                <td className="p-4">{getLocationName(order.destination)}</td>
 
                 <td className="p-4">{order.createdAt}</td>
 
@@ -599,31 +599,30 @@ export default function DispatchGoodsPage() {
                 </td>
 
                 <td className="p-4 text-center">
-                  {(order.status === 'shipped' || order.status === 'intransit') && (
-                    <button
-                      className="mr-2 px-2.5 py-1 text-xs rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 disabled:opacity-60"
-                      onClick={() => handleQuickConfirmReceipt(order)}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? (
-                        <span className="inline-flex items-center gap-1">
-                          <Loader size={12} className="animate-spin" />
-                          Đang nhận...
-                        </span>
-                      ) : 'Xác nhận nhận'}
-                    </button>
-                  )}
                   <button
-                    className="text-slate-500 hover:text-emerald-600 transition-colors"
-                    onClick={() => handleViewDetails(order)}
+                    className={`inline-flex items-center justify-center w-9 h-9 rounded-lg border transition-colors ${
+                      canInspectIncoming(order)
+                        ? 'border-amber-300 text-amber-700 hover:bg-amber-50'
+                        : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                    } disabled:opacity-60 disabled:cursor-not-allowed`}
+                    onClick={() => openReceiveModal(order)}
+                    title={canInspectIncoming(order) ? 'Xem chi tiết nhận hàng' : 'Xem chi tiết'}
                   >
-                    <Eye size={18}/>
+                    <Eye size={18} />
                   </button>
                 </td>
 
               </tr>
 
             ))}
+
+            {!isLoading && filteredOrders.length === 0 && (
+              <tr>
+                <td className="p-6 text-center text-slate-500" colSpan={10}>
+                  Hiển thị 0 phiếu
+                </td>
+              </tr>
+            )}
 
           </tbody>
 
@@ -669,124 +668,6 @@ export default function DispatchGoodsPage() {
         </div>
 
       </div>
-
-      {showDetailModal && selectedOrder && (
-        <div className="fixed inset-0 z-50 bg-slate-900/45 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-800">Chi tiết phiếu xuất</h2>
-                <p className="text-sm text-slate-500">{selectedOrder.code}</p>
-              </div>
-              <button
-                type="button"
-                className="p-2 rounded-md hover:bg-slate-100 text-slate-500"
-                onClick={handleCloseModal}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                <div className="rounded-lg border p-3">
-                  <p className="text-slate-500">Kho nguồn</p>
-                  <p className="font-medium text-slate-800">{getLocationLabel(selectedOrder.source)}</p>
-                </div>
-                <div className="rounded-lg border p-3">
-                  <p className="text-slate-500">Cửa hàng đích</p>
-                  <p className="font-medium text-slate-800">{getLocationLabel(selectedOrder.destination)}</p>
-                </div>
-              </div>
-
-              <div className="rounded-lg border overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 text-slate-600">
-                    <tr>
-                      <th className="p-3 text-left font-medium">Transfer Item</th>
-                      <th className="p-3 text-left font-medium">SL giao</th>
-                      <th className="p-3 text-left font-medium">SL hỏng</th>
-                      <th className="p-3 text-left font-medium">Ghi chú</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {receiveItems.map((item, index) => (
-                      <tr key={item.transferItemId} className="border-t">
-                        <td className="p-3 text-slate-700">{item.transferItemId.slice(0, 8)}...</td>
-                        <td className="p-3">
-                          <input
-                            type="number"
-                            min={0}
-                            value={item.shippedQuantity}
-                            onChange={(e) => handleReceiveItemChange(index, 'shippedQuantity', Number(e.target.value || 0))}
-                            className="h-9 w-24 border rounded-md px-2"
-                          />
-                        </td>
-                        <td className="p-3">
-                          <input
-                            type="number"
-                            min={0}
-                            value={item.damagedQuantity}
-                            onChange={(e) => handleReceiveItemChange(index, 'damagedQuantity', Number(e.target.value || 0))}
-                            className="h-9 w-24 border rounded-md px-2"
-                          />
-                        </td>
-                        <td className="p-3">
-                          <input
-                            value={item.notes}
-                            onChange={(e) => handleReceiveItemChange(index, 'notes', e.target.value)}
-                            className="h-9 w-full border rounded-md px-2"
-                            placeholder="Ghi chú..."
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-slate-700">Ghi chú chung</label>
-                <textarea
-                  className="mt-1 w-full min-h-[90px] border rounded-lg p-3 text-sm"
-                  value={notesText}
-                  onChange={(e) => setNotesText(e.target.value)}
-                  placeholder="Nhập ghi chú nhận hàng..."
-                />
-              </div>
-
-              {error && (
-                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
-                  {error}
-                </div>
-              )}
-            </div>
-
-            <div className="px-5 py-4 border-t flex items-center justify-end gap-2">
-              <button
-                type="button"
-                className="px-4 py-2 border rounded-lg text-slate-600 hover:bg-slate-50"
-                onClick={handleCloseModal}
-              >
-                Đóng
-              </button>
-              <button
-                type="button"
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg disabled:opacity-60"
-                onClick={handleConfirmReceipt}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <span className="inline-flex items-center gap-1">
-                    <Loader size={14} className="animate-spin" />
-                    Đang xử lý...
-                  </span>
-                ) : 'Xác nhận nhận hàng'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   )

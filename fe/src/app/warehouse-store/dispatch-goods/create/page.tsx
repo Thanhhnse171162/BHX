@@ -267,7 +267,6 @@ export default function CreateDispatchPage() {
                 <select
                   className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-100"
                   value={selectedProduct ? selectedProduct.unit : ''}
-                  readOnly
                   disabled
                 >
                   <option>{selectedProduct ? selectedProduct.unit : ''}</option>

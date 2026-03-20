@@ -17,9 +17,11 @@ import {
   AlertTriangle,
   XCircle,
   Loader2,
+  Truck,
 } from 'lucide-react'
 import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
 import { InventoryAPIService, InventoryItem } from '@/services/inventory-api.service'
+import { TransferAPIService, TransferFromAPI } from '@/services/transfer-api.service'
 import { useAuthStore } from '@/store/auth.store'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -40,6 +42,14 @@ interface Product {
   expiry: string
   imageColor: string
   imageInitials: string
+}
+
+interface ReceiveTransferItemForm {
+  transferItemId: string
+  productId: string
+  shippedQuantity: number
+  damagedQuantity: number
+  notes: string
 }
 
 // ─── Image helpers ───────────────────────────────────────────────────────────
@@ -265,6 +275,14 @@ export default function CashierProductsPage() {
   const [showFilterPanel, setShowFilterPanel] = useState(false)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(null)
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>(null)
+  const [showReceiveModal, setShowReceiveModal] = useState(false)
+  const [incomingTransfers, setIncomingTransfers] = useState<TransferFromAPI[]>([])
+  const [loadingTransfers, setLoadingTransfers] = useState(false)
+  const [selectedTransferId, setSelectedTransferId] = useState('')
+  const [receiveItems, setReceiveItems] = useState<ReceiveTransferItemForm[]>([])
+  const [receiveNotes, setReceiveNotes] = useState('')
+  const [receiving, setReceiving] = useState(false)
+  const [receiveError, setReceiveError] = useState<string | null>(null)
   const filterRef = useRef<HTMLDivElement>(null)
 
   const { user, hydrated } = useAuthStore()
@@ -358,6 +376,110 @@ export default function CashierProductsPage() {
   )
 
   const activeFilterCount = (statusFilter ? 1 : 0) + (categoryFilter ? 1 : 0)
+
+  const selectedTransfer = useMemo(
+    () => incomingTransfers.find(t => t.id === selectedTransferId) ?? null,
+    [incomingTransfers, selectedTransferId],
+  )
+
+  const openReceiveModal = async () => {
+    if (!user?.workplaceId) {
+      setReceiveError('Không xác định được cửa hàng hiện tại để nhận hàng')
+      return
+    }
+    setShowReceiveModal(true)
+    setLoadingTransfers(true)
+    setReceiveError(null)
+    setSelectedTransferId('')
+    setReceiveItems([])
+    setReceiveNotes('')
+
+    try {
+      const list = await TransferAPIService.getTransfers()
+      const currentStoreId = String(user.workplaceId).trim().toLowerCase()
+      const allowedStatus = new Set(['SHIPPED', 'IN_TRANSIT', 'DELIVERED'])
+      const filtered = (list ?? []).filter(t => {
+        const toId = String(t.toLocationId ?? '').trim().toLowerCase()
+        const status = String(t.status ?? '').toUpperCase()
+        return toId === currentStoreId && allowedStatus.has(status)
+      })
+      setIncomingTransfers(filtered)
+      if (filtered.length > 0) {
+        setSelectedTransferId(filtered[0].id)
+      }
+    } catch (err: any) {
+      setReceiveError(err?.response?.data?.message || err?.message || 'Không tải được danh sách phiếu nhận hàng')
+      setIncomingTransfers([])
+    } finally {
+      setLoadingTransfers(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!selectedTransfer) {
+      setReceiveItems([])
+      return
+    }
+
+    const nextItems: ReceiveTransferItemForm[] = (selectedTransfer.items ?? []).map(item => ({
+      transferItemId: item.id,
+      productId: item.productId,
+      shippedQuantity: Number(item.shippedQuantity ?? item.requestedQuantity ?? 0),
+      damagedQuantity: Number(item.damagedQuantity ?? 0),
+      notes: item.notes ?? '',
+    }))
+
+    setReceiveItems(nextItems)
+    setReceiveNotes(selectedTransfer.notes ?? '')
+  }, [selectedTransfer])
+
+  const updateReceiveItem = (
+    transferItemId: string,
+    field: 'shippedQuantity' | 'damagedQuantity' | 'notes',
+    value: number | string,
+  ) => {
+    setReceiveItems(prev => prev.map(item =>
+      item.transferItemId === transferItemId ? { ...item, [field]: value } : item
+    ))
+  }
+
+  const handleReceiveTransfer = async () => {
+    if (!selectedTransferId) {
+      setReceiveError('Vui lòng chọn phiếu chuyển hàng')
+      return
+    }
+
+    if (receiveItems.length === 0) {
+      setReceiveError('Phiếu chưa có sản phẩm để nhận')
+      return
+    }
+
+    setReceiving(true)
+    setReceiveError(null)
+    try {
+      await TransferAPIService.receiveTransfer(selectedTransferId, {
+        items: receiveItems.map(item => ({
+          transferItemId: item.transferItemId,
+          shippedQuantity: Number(item.shippedQuantity || 0),
+          damagedQuantity: Number(item.damagedQuantity || 0),
+          notes: item.notes,
+        })),
+        notes: receiveNotes,
+      })
+
+      const refreshed = await fetchData()
+      setProducts(refreshed)
+      setShowReceiveModal(false)
+      setIncomingTransfers([])
+      setSelectedTransferId('')
+      setReceiveItems([])
+      setReceiveNotes('')
+    } catch (err: any) {
+      setReceiveError(err?.response?.data?.message || err?.message || 'Nhận hàng thất bại')
+    } finally {
+      setReceiving(false)
+    }
+  }
 
   const filtered = useMemo(() => {
     let list = [...products]
@@ -456,6 +578,14 @@ export default function CashierProductsPage() {
               className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
           </div>
+
+          <button
+            onClick={openReceiveModal}
+            className="ml-auto inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+          >
+            <Truck className="w-4 h-4" />
+            Nhận hàng
+          </button>
         </div>
 
         {/* Filter row */}
@@ -694,6 +824,129 @@ export default function CashierProductsPage() {
       {/* Floating detail panel */}
       {selectedProduct && (
         <ProductDetailPanel product={selectedProduct} onClose={() => setSelectedProduct(null)} />
+      )}
+
+      {showReceiveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="w-full max-w-4xl bg-white rounded-2xl border border-gray-200 shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-gray-900">Nhận hàng từ phiếu chuyển</h3>
+              <button
+                onClick={() => setShowReceiveModal(false)}
+                className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 max-h-[70vh] overflow-auto">
+              {loadingTransfers ? (
+                <div className="py-8 text-center text-gray-500 text-sm">Đang tải danh sách phiếu...</div>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Phiếu chuyển hàng</label>
+                    <select
+                      value={selectedTransferId}
+                      onChange={(e) => setSelectedTransferId(e.target.value)}
+                      className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    >
+                      {incomingTransfers.length === 0 ? (
+                        <option value="">Không có phiếu đang vận chuyển về cửa hàng</option>
+                      ) : (
+                        incomingTransfers.map(t => (
+                          <option key={t.id} value={t.id}>
+                            {t.transferNumber} - {t.status}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+
+                  {selectedTransfer && receiveItems.length > 0 && (
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 text-gray-600">
+                          <tr>
+                            <th className="px-3 py-2 text-left">Product ID</th>
+                            <th className="px-3 py-2 text-left">SL nhận</th>
+                            <th className="px-3 py-2 text-left">SL hỏng</th>
+                            <th className="px-3 py-2 text-left">Ghi chú</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {receiveItems.map(item => (
+                            <tr key={item.transferItemId} className="border-t border-gray-100">
+                              <td className="px-3 py-2 text-xs text-gray-700">{item.productId}</td>
+                              <td className="px-3 py-2">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={item.shippedQuantity}
+                                  onChange={(e) => updateReceiveItem(item.transferItemId, 'shippedQuantity', Number(e.target.value || 0))}
+                                  className="w-24 border border-gray-200 rounded-md px-2 py-1.5"
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={item.damagedQuantity}
+                                  onChange={(e) => updateReceiveItem(item.transferItemId, 'damagedQuantity', Number(e.target.value || 0))}
+                                  className="w-24 border border-gray-200 rounded-md px-2 py-1.5"
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <input
+                                  value={item.notes}
+                                  onChange={(e) => updateReceiveItem(item.transferItemId, 'notes', e.target.value)}
+                                  className="w-full border border-gray-200 rounded-md px-2 py-1.5"
+                                  placeholder="Ghi chú"
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Ghi chú chung</label>
+                    <textarea
+                      value={receiveNotes}
+                      onChange={(e) => setReceiveNotes(e.target.value)}
+                      className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm min-h-[88px]"
+                      placeholder="Ghi chú nhận hàng"
+                    />
+                  </div>
+
+                  {receiveError && (
+                    <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                      {receiveError}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setShowReceiveModal(false)}
+                className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
+              >
+                Đóng
+              </button>
+              <button
+                onClick={handleReceiveTransfer}
+                disabled={receiving || loadingTransfers || incomingTransfers.length === 0 || !selectedTransferId}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60"
+              >
+                {receiving ? 'Đang xác nhận...' : 'Xác nhận nhận hàng'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
