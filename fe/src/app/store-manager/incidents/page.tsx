@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   Clock,
@@ -9,11 +9,14 @@ import {
   MessageSquare,
   Wrench,
   Plus,
-  ChevronRight,
   X,
   Search,
   Filter,
 } from 'lucide-react'
+import { useAuthStore } from '@/store/auth.store'
+import { DamageReportAPIService, DamageReportFromAPI } from '@/services/damage-report-api.service'
+import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
+import { UserAPIService } from '@/services/user-api.service'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Priority = 'urgent' | 'medium' | 'low'
@@ -27,6 +30,7 @@ interface ProgressStep {
 }
 
 interface Incident {
+  reportId: string
   id: string
   title: string
   description: string
@@ -35,73 +39,124 @@ interface Incident {
   timeAgo: string
   category: string
   reporter: string
+  images: string[]
   progress: ProgressStep[]
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-const MOCK_INCIDENTS: Incident[] = [
-  {
-    id: 'ISS-0241',
-    title: 'Tủ đông khu vực sữa hỏng',
-    description: 'Tủ đông số 02 tại khu sữa tươi bị chảy nước từ dưới gầm. Nhiệt độ tăng lên 15°C, nguy cơ hỏng hàng cao.',
-    priority: 'urgent', status: 'pending', timeAgo: '15 phút trước',
-    category: 'Cơ sở vật chất', reporter: 'Trần Thu Hà',
+function mapApiStatus(status?: string): IncidentStatus {
+  const normalized = (status || '').toUpperCase()
+  if (normalized === 'PROCESSING') return 'processing'
+  if (normalized === 'COMPLETED' || normalized === 'APPROVED' || normalized === 'RESOLVED') return 'resolved'
+  return 'pending'
+}
+
+function mapApiPriority(quality?: number): Priority {
+  const q = Number(quality || 0)
+  if (q >= 8) return 'urgent'
+  if (q >= 5) return 'medium'
+  return 'low'
+}
+
+function resolveUserDisplayName(user: { full_name?: string; fullName?: string; name?: string } | null): string {
+  return (user?.full_name || user?.fullName || user?.name || '').trim()
+}
+
+async function buildReporterNameMap(reports: DamageReportFromAPI[]): Promise<Map<string, string>> {
+  const ids = Array.from(new Set(reports.map((row) => (row.reportedBy || '').trim()).filter(Boolean)))
+
+  if (ids.length === 0) return new Map()
+
+  try {
+    const users = await UserAPIService.getIamUsersList()
+    const idToName = new Map(
+      users
+        .map((user) => {
+          const id = String(user.id || '').trim()
+          const name = resolveUserDisplayName(user)
+          return id && name ? ([id, name] as const) : null
+        })
+        .filter(Boolean) as Array<readonly [string, string]>
+    )
+
+    const resolved = ids.map((id) => [id, idToName.get(id) || id] as const)
+    return new Map(resolved)
+  } catch {
+    // Fallback to per-user lookup below when users list endpoint is unavailable.
+  }
+
+  const resolved = await Promise.all(
+    ids.map(async (id) => {
+      try {
+        const localUser = await UserAPIService.getById(id)
+        const localName = resolveUserDisplayName(localUser)
+        if (localName) return [id, localName] as const
+      } catch {
+        // Ignore local user lookup errors and fallback to IAM lookup.
+      }
+
+      try {
+        const iamUser = await UserAPIService.getIamDetailsById(id)
+        const iamName = resolveUserDisplayName(iamUser)
+        if (iamName) return [id, iamName] as const
+      } catch {
+        // Keep UUID if all lookups fail.
+      }
+
+      return [id, id] as const
+    })
+  )
+
+  return new Map(resolved)
+}
+
+function mapDamageReportToIncident(
+  report: DamageReportFromAPI,
+  products: ProductFromAPI[],
+  reporterNameMap: Map<string, string>
+): Incident {
+  const safeProductId = String(report.productId || '').toLowerCase()
+  const product = products.find((row) => row.id.toLowerCase() === safeProductId)
+  const category = (report.damageType || 'Sự cố').trim()
+  const title = product ? `${category} - ${product.name}` : category
+  const createdAt = report.createdAt || new Date().toISOString()
+  const status = mapApiStatus(report.status)
+
+  const reportedBy = (report.reportedBy || '').trim()
+  const reporter = reportedBy ? (reporterNameMap.get(reportedBy) || reportedBy) : 'Hệ thống'
+
+  return {
+    reportId: report.id,
+    id: report.reportNumber || report.id || `DMG-${Date.now()}`,
+    title,
+    description: (report.description || '').trim(),
+    priority: mapApiPriority(report.quality),
+    status,
+    timeAgo: new Date(report.reportedDate || createdAt).toLocaleString('vi-VN'),
+    category,
+    reporter,
+    images: Array.isArray(report.photos) ? report.photos.filter(Boolean) : [],
     progress: [
-      { label: 'Đã tiếp nhận báo cáo', time: '10:15', author: 'Hệ thống', done: true },
-      { label: 'Đang điều phối kỹ thuật', time: '', author: '', done: false },
-      { label: 'Kỹ thuật viên đến hiện trường', time: '', author: '', done: false },
-      { label: 'Hoàn thành xử lý', time: '', author: '', done: false },
+      {
+        label: 'Đã tiếp nhận báo cáo',
+        time: new Date(createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+        author: 'Hệ thống',
+        done: true,
+      },
+      {
+        label: status === 'pending' ? 'Đang chờ phân công xử lý' : 'Đang xử lý',
+        time: '',
+        author: '',
+        done: status !== 'pending',
+      },
+      {
+        label: 'Đã giải quyết',
+        time: '',
+        author: '',
+        done: status === 'resolved',
+      },
     ],
-  },
-  {
-    id: 'ISS-0240',
-    title: 'Máy quét mã vạch quầy 3 lỗi',
-    description: 'Máy quét tại quầy thanh toán số 3 không nhận diện được mã vạch sản phẩm Pepsi và Vinamilk. Cần hỗ trợ IT.',
-    priority: 'medium', status: 'processing', timeAgo: '1 giờ trước',
-    category: 'Thiết bị', reporter: 'Lê Quang Huy',
-    progress: [
-      { label: 'Đã tiếp nhận báo cáo', time: '09:30', author: 'Hệ thống', done: true },
-      { label: 'Đang xử lý', time: '09:45', author: 'IT Support', done: true },
-      { label: 'Hoàn thành', time: '', author: '', done: false },
-    ],
-  },
-  {
-    id: 'ISS-0239',
-    title: 'Hết bao bì khu thanh toán',
-    description: 'Túi đựng đồ tại khu vực thanh toán đã hết, cần bổ sung ngay.',
-    priority: 'low', status: 'processing', timeAgo: '2 giờ trước',
-    category: 'Vật tư', reporter: 'Nguyễn Minh Tuấn',
-    progress: [
-      { label: 'Đã tiếp nhận', time: '08:45', author: 'Hệ thống', done: true },
-      { label: 'Đã thông báo kho', time: '09:00', author: 'Store Manager', done: true },
-      { label: 'Đã bổ sung', time: '', author: '', done: false },
-    ],
-  },
-  {
-    id: 'ISS-0238',
-    title: 'Sản phẩm gạo ST25 nhập sai số lượng',
-    description: 'Phiếu nhập ghi 200 túi nhưng thực tế chỉ có 185 túi. Cần kiểm tra lại với bên cung ứng.',
-    priority: 'medium', status: 'resolved', timeAgo: '1 ngày trước',
-    category: 'Nhập hàng', reporter: 'Phạm Lan Anh',
-    progress: [
-      { label: 'Đã tiếp nhận', time: '09/03 08:00', author: 'Hệ thống', done: true },
-      { label: 'Đã liên hệ nhà cung cấp', time: '09/03 09:30', author: 'Store Manager', done: true },
-      { label: 'Đã xác nhận và điều chỉnh', time: '09/03 14:00', author: 'Phạm Lan Anh', done: true },
-    ],
-  },
-  {
-    id: 'ISS-0237',
-    title: 'Điều hòa khu rau củ quả bị yếu',
-    description: 'Nhiệt độ khu rau củ tăng cao hơn bình thường, nhiều mặt hàng có nguy cơ héo úa nhanh.',
-    priority: 'urgent', status: 'resolved', timeAgo: '2 ngày trước',
-    category: 'Cơ sở vật chất', reporter: 'Võ Thị Mai',
-    progress: [
-      { label: 'Đã tiếp nhận', time: '08/03 10:00', author: 'Hệ thống', done: true },
-      { label: 'Kỹ thuật viên kiểm tra', time: '08/03 11:00', author: 'Kỹ thuật', done: true },
-      { label: 'Đã sửa xong', time: '08/03 14:30', author: 'Kỹ thuật', done: true },
-    ],
-  },
-]
+  }
+}
 
 const priorityConfig: Record<Priority, { label: string; cls: string; dot: string }> = {
   urgent: { label: 'Khẩn cấp',  cls: 'bg-red-100 text-red-700',    dot: 'bg-red-500' },
@@ -115,45 +170,21 @@ const statusConfig: Record<IncidentStatus, { label: string; cls: string; icon: R
   resolved:   { label: 'Đã giải quyết', cls: 'bg-green-50 text-green-700', icon: <CheckCircle2 size={12} /> },
 }
 
-// ─── Incident card ────────────────────────────────────────────────────────────
-function IncidentCard({ incident, onClick }: { incident: Incident; onClick: () => void }) {
-  const pc = priorityConfig[incident.priority]
-  const sc = statusConfig[incident.status]
-  return (
-    <div
-      onClick={onClick}
-      className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md hover:border-green-100 transition-all cursor-pointer"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <span className="font-mono text-[11px] text-gray-400">{incident.id}</span>
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${pc.cls}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${pc.dot}`} />
-              {pc.label}
-            </span>
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${sc.cls}`}>
-              {sc.icon} {sc.label}
-            </span>
-          </div>
-          <h3 className="font-semibold text-gray-900 text-[14px] truncate">{incident.title}</h3>
-          <p className="text-[12px] text-gray-500 mt-1 line-clamp-2">{incident.description}</p>
-        </div>
-        <ChevronRight size={16} className="text-gray-300 flex-shrink-0 mt-1" />
-      </div>
-      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100 text-[11px] text-gray-400">
-        <span className="flex items-center gap-1"><Clock size={11} />{incident.timeAgo}</span>
-        <span>Báo cáo: {incident.reporter}</span>
-        <span className="ml-auto bg-gray-50 px-2 py-0.5 rounded-full">{incident.category}</span>
-      </div>
-    </div>
-  )
-}
-
 // ─── Detail modal ─────────────────────────────────────────────────────────────
-function IncidentDetailModal({ incident, onClose }: { incident: Incident; onClose: () => void }) {
+function IncidentDetailModal({
+  incident,
+  onClose,
+  onApprove,
+  isApproving,
+}: {
+  incident: Incident
+  onClose: () => void
+  onApprove: (incident: Incident) => void
+  isApproving: boolean
+}) {
   const pc = priorityConfig[incident.priority]
   const sc = statusConfig[incident.status]
+  const canApprove = incident.status === 'pending'
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -193,6 +224,20 @@ function IncidentDetailModal({ incident, onClose }: { incident: Incident; onClos
             </div>
           </div>
 
+          {incident.images.length > 0 && (
+            <div>
+              <h4 className="text-[13px] font-semibold text-gray-800 mb-2">Hình ảnh đính kèm ({incident.images.length})</h4>
+              <div className="grid grid-cols-3 gap-2">
+                {incident.images.map((src, index) => (
+                  <div key={`${src}-${index}`} className="aspect-square rounded-xl overflow-hidden bg-gray-100 border border-gray-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={src} alt={`Ảnh sự cố ${index + 1}`} className="w-full h-full object-cover" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Progress */}
           <div>
             <h4 className="text-[13px] font-semibold text-gray-800 mb-3 flex items-center gap-2">
@@ -214,8 +259,17 @@ function IncidentDetailModal({ incident, onClose }: { incident: Incident; onClos
             </div>
           </div>
         </div>
-        <div className="px-6 pb-5">
-          <button onClick={onClose} className="w-full py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-[13px] transition-colors">Đóng</button>
+        <div className="px-6 pb-5 flex items-center gap-2">
+          {canApprove && (
+            <button
+              onClick={() => onApprove(incident)}
+              disabled={isApproving}
+              className="flex-1 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white font-semibold text-[13px] transition-colors"
+            >
+              {isApproving ? 'Đang xác nhận...' : 'Approve'}
+            </button>
+          )}
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-[13px] transition-colors">Đóng</button>
         </div>
       </div>
     </div>
@@ -224,13 +278,58 @@ function IncidentDetailModal({ incident, onClose }: { incident: Incident; onClos
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function IncidentsPage() {
+  const { user } = useAuthStore()
+  const [incidents, setIncidents] = useState<Incident[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('Tất cả')
   const [priorityFilter, setPriorityFilter] = useState<string>('Tất cả')
   const [selected, setSelected] = useState<Incident | null>(null)
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false)
+  const [approvingReportId, setApprovingReportId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 10
+
+  const locationId = user?.workplaceId?.trim() || ''
+  const locationType = user?.workplaceType === 'WAREHOUSE' ? 'WAREHOUSE' : 'STORE'
+
+  const loadReports = useCallback(async () => {
+    if (!locationId) {
+      setIncidents([])
+      setLoadError('Không tìm thấy workplace_id của manager hiện tại.')
+      setIsLoading(false)
+      return
+    }
+
+    setIsLoading(true)
+    setLoadError('')
+
+    try {
+      const [products, reports] = await Promise.all([
+        ProductAPIService.getAllProducts(),
+        DamageReportAPIService.getDamageReports({ locationId, locationType }),
+      ])
+      const reporterNameMap = await buildReporterNameMap(reports)
+      setIncidents(reports.map((row) => mapDamageReportToIncident(row, products, reporterNameMap)))
+    } catch {
+      setIncidents([])
+      setLoadError('Không thể tải danh sách báo cáo sự cố từ hệ thống.')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [locationId, locationType])
+
+  useEffect(() => {
+    loadReports()
+  }, [loadReports])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, statusFilter, priorityFilter])
 
   const filtered = useMemo(() => {
-    let list = MOCK_INCIDENTS
+    let list = incidents
     if (statusFilter !== 'Tất cả') {
       const key = { 'Chờ xử lý': 'pending', 'Đang xử lý': 'processing', 'Đã giải quyết': 'resolved' }[statusFilter]
       if (key) list = list.filter((i) => i.status === key)
@@ -244,13 +343,77 @@ export default function IncidentsPage() {
       list = list.filter((i) => i.title.toLowerCase().includes(q) || i.id.toLowerCase().includes(q) || i.category.toLowerCase().includes(q))
     }
     return list
-  }, [search, statusFilter, priorityFilter])
+  }, [incidents, search, statusFilter, priorityFilter])
 
   const counts = useMemo(() => ({
-    pending:    MOCK_INCIDENTS.filter((i) => i.status === 'pending').length,
-    processing: MOCK_INCIDENTS.filter((i) => i.status === 'processing').length,
-    resolved:   MOCK_INCIDENTS.filter((i) => i.status === 'resolved').length,
-  }), [])
+    pending:    incidents.filter((i) => i.status === 'pending').length,
+    processing: incidents.filter((i) => i.status === 'processing').length,
+    resolved:   incidents.filter((i) => i.status === 'resolved').length,
+  }), [incidents])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const handleOpenDetail = async (incident: Incident) => {
+    setSelected(incident)
+
+    if (incident.images.length > 0 || !incident.reportId) {
+      return
+    }
+
+    try {
+      setIsLoadingDetail(true)
+      const detail = await DamageReportAPIService.getDamageReportById(incident.reportId)
+      const detailImages = Array.isArray(detail?.photos) ? detail!.photos.filter(Boolean) : []
+
+      if (detailImages.length > 0) {
+        setIncidents((prev) =>
+          prev.map((row) =>
+            row.reportId === incident.reportId
+              ? {
+                  ...row,
+                  images: detailImages,
+                  description: row.description || (detail?.description || '').trim(),
+                }
+              : row
+          )
+        )
+
+        setSelected((prev) =>
+          prev && prev.reportId === incident.reportId
+            ? {
+                ...prev,
+                images: detailImages,
+                description: prev.description || (detail?.description || '').trim(),
+              }
+            : prev
+        )
+      }
+    } finally {
+      setIsLoadingDetail(false)
+    }
+  }
+
+  const handleApprove = async (incident: Incident) => {
+    if (!incident.reportId) return
+
+    try {
+      setApprovingReportId(incident.reportId)
+      await DamageReportAPIService.approveDamageReport(incident.reportId)
+      await loadReports()
+      setSelected(null)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Không thể approve báo cáo sự cố.'
+      if (message.toUpperCase().includes('ALREADY') || message.toUpperCase().includes('APPROVED')) {
+        await loadReports()
+        setSelected(null)
+        return
+      }
+      setLoadError(message)
+    } finally {
+      setApprovingReportId(null)
+    }
+  }
 
   return (
     <div className="p-6 space-y-5">
@@ -317,19 +480,113 @@ export default function IncidentsPage() {
         </div>
       </div>
 
-      {/* Cards */}
-      <div className="space-y-3">
-        {filtered.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center text-gray-400">
+      {/* List */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        {isLoading ? (
+          <div className="p-12 text-center text-gray-400">
+            <p>Đang tải báo cáo sự cố...</p>
+          </div>
+        ) : loadError ? (
+          <div className="bg-red-50 border border-red-200 m-4 rounded-xl p-6 text-center text-red-600 text-sm">
+            {loadError}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="p-12 text-center text-gray-400">
             <AlertTriangle size={32} className="mx-auto mb-3 opacity-30" />
             <p>Không có sự cố nào</p>
           </div>
         ) : (
-          filtered.map((inc) => <IncidentCard key={inc.id} incident={inc} onClick={() => setSelected(inc)} />)
+          <>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100 text-[11px] uppercase tracking-wide text-gray-500">
+                  <th className="px-4 py-3 text-left">Mã sự cố</th>
+                  <th className="px-4 py-3 text-left">Tiêu đề</th>
+                  <th className="px-4 py-3 text-left">Danh mục</th>
+                  <th className="px-4 py-3 text-left">Ưu tiên</th>
+                  <th className="px-4 py-3 text-left">Trạng thái</th>
+                  <th className="px-4 py-3 text-left">Thời gian</th>
+                  <th className="px-4 py-3 text-left">Người báo cáo</th>
+                  <th className="px-4 py-3 text-center">Chi tiết</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginated.map((inc) => {
+                  const pc = priorityConfig[inc.priority]
+                  const sc = statusConfig[inc.status]
+                  return (
+                    <tr key={inc.id} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 font-mono text-xs text-gray-500">{inc.id}</td>
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-gray-900 text-[13px] truncate max-w-[320px]">{inc.title}</p>
+                        <p className="text-[12px] text-gray-500 truncate max-w-[320px]">{inc.description || '—'}</p>
+                      </td>
+                      <td className="px-4 py-3 text-[12px] text-gray-600">{inc.category}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${pc.cls}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${pc.dot}`} />
+                          {pc.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${sc.cls}`}>
+                          {sc.icon} {sc.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-[12px] text-gray-600 whitespace-nowrap">{inc.timeAgo}</td>
+                      <td className="px-4 py-3 text-[12px] text-gray-600">{inc.reporter}</td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => handleOpenDetail(inc)}
+                          className="px-3 py-1.5 rounded-lg text-[12px] font-medium bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-colors"
+                        >
+                          Xem
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+
+            <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
+              <p className="text-xs text-gray-500">
+                Hiển thị {(page - 1) * PAGE_SIZE + 1} - {Math.min(page * PAGE_SIZE, filtered.length)} / {filtered.length} sự cố
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-600 disabled:opacity-40 hover:bg-white"
+                >
+                  Trước
+                </button>
+                <span className="text-xs text-gray-600">Trang {page}/{totalPages}</span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-600 disabled:opacity-40 hover:bg-white"
+                >
+                  Sau
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </div>
 
-      {selected && <IncidentDetailModal incident={selected} onClose={() => setSelected(null)} />}
+      {selected && isLoadingDetail && (
+        <div className="text-xs text-gray-500">Đang tải ảnh chi tiết sự cố...</div>
+      )}
+
+      {selected && (
+        <IncidentDetailModal
+          incident={selected}
+          onClose={() => setSelected(null)}
+          onApprove={handleApprove}
+          isApproving={approvingReportId === selected.reportId}
+        />
+      )}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios'
-import { iamClient } from '@/shared/api/http'
+import { useAuthStore } from '@/store/auth.store'
 
 // Call Next.js API route (local DB-backed users)
 const localApiClient: AxiosInstance = axios.create({
@@ -35,10 +35,31 @@ export class UserAPIService {
 
   static async getIamDetailsById(id: string): Promise<UserInfoFromAPI | null> {
     if (!id) return null
-    const res = await iamClient.get(`/api/users/details/${id}`)
-    const payload = res.data
+
+    const headers: HeadersInit = {}
+    if (typeof window !== 'undefined') {
+      const token = useAuthStore.getState().token
+      if (token) headers.Authorization = `Bearer ${token}`
+    }
+
+    const res = await fetch(`/iam/api/users/details/${encodeURIComponent(id)}`, {
+      method: 'GET',
+      headers,
+    })
+
+    if (!res.ok) return null
+
+    const payload = await res.json().catch(() => null)
     if (payload?.data) return payload.data as UserInfoFromAPI
-    return payload as UserInfoFromAPI
+    return (payload as UserInfoFromAPI) || null
+  }
+
+  static async getIamUsersList(): Promise<UserInfoFromAPI[]> {
+    const res = await localApiClient.get('/users/list')
+    const payload = res.data
+    if (Array.isArray(payload)) return payload as UserInfoFromAPI[]
+    if (payload?.data && Array.isArray(payload.data)) return payload.data as UserInfoFromAPI[]
+    return []
   }
 }
 
