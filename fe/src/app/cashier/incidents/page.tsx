@@ -1,10 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   AlertTriangle,
   Clock,
-  Users,
   X,
   Plus,
   ChevronRight,
@@ -13,15 +12,14 @@ import {
   Leaf,
   CheckCircle2,
   Circle,
-  MessageSquare,
-  Image as ImageIcon,
-  Wrench,
   Upload,
-  Camera,
   ChevronLeft,
   Search,
   Eye,
 } from 'lucide-react'
+import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
+import { DamageReportAPIService, DamageReportFromAPI } from '@/services/damage-report-api.service'
+import { useAuthStore } from '@/store/auth.store'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Priority = 'urgent' | 'medium' | 'low'
@@ -54,6 +52,15 @@ interface Incident {
   images?: string[]
   progress: ProgressStep[]
   comments: Comment[]
+}
+
+interface CreateIncidentPayload {
+  productId: string
+  damageType: string
+  reportedDate: string
+  quality: number
+  description: string
+  photos: File[]
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -216,77 +223,66 @@ function IncidentDetailModal({ incident, onClose }: { incident: Incident; onClos
             </div>
           </div>
 
-          {/* Comments */}
-          <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Thảo luận</p>
-            {incident.comments.length === 0 ? (
-              <div className="flex flex-col items-center py-6 text-slate-300">
-                <MessageSquare className="w-8 h-8 mb-2" />
-                <p className="text-sm">Chưa có bình luận</p>
-              </div>
-            ) : (
-              <div className="space-y-3 mb-3">
-                {incident.comments.map((c, i) => (
-                  <div key={i} className="flex gap-3">
-                    <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                      {c.avatar}
-                    </div>
-                    <div className="flex-1 bg-slate-50 rounded-xl p-3 border border-slate-100">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs font-bold text-slate-800">{c.name}</p>
-                        <p className="text-xs text-slate-400">{c.time}</p>
-                      </div>
-                      <p className="text-sm text-slate-700 leading-relaxed">{c.content}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {/* Comment input */}
-            <div className="flex gap-2">
-              <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">NV</div>
-              <div className="flex-1 flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
-                <input type="text" placeholder="Thêm bình luận..." className="flex-1 bg-transparent text-sm outline-none text-slate-700 placeholder-slate-400" />
-                <button className="w-7 h-7 rounded-lg bg-emerald-600 hover:bg-emerald-700 flex items-center justify-center transition-colors">
-                  <ChevronRight className="w-4 h-4 text-white" />
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
-
-        {/* Footer actions */}
-        {incident.status !== 'resolved' && (
-          <div className="px-6 py-4 border-t border-slate-100">
-            <div className="flex gap-2">
-              {incident.status === 'pending' && (
-                <button className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors">
-                  Bắt đầu xử lý
-                </button>
-              )}
-              <button className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors">
-                Đánh dấu hoàn thành
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
 }
 
 // ─── Create Modal ──────────────────────────────────────────────────────────────
-function CreateIncidentModal({ onClose, onCreate }: { onClose: () => void; onCreate: (data: Partial<Incident>) => void }) {
-  const [title, setTitle] = useState('')
+function CreateIncidentModal({
+  onClose,
+  onCreate,
+  products,
+  locationType,
+  locationId,
+}: {
+  onClose: () => void
+  onCreate: (data: CreateIncidentPayload) => Promise<void>
+  products: ProductFromAPI[]
+  locationType: 'STORE' | 'WAREHOUSE'
+  locationId: string
+}) {
+  const [productId, setProductId] = useState('')
+  const [damageType, setDamageType] = useState('')
+  const [reportedDate, setReportedDate] = useState(new Date().toISOString().slice(0, 16))
+  const [quality, setQuality] = useState('1')
   const [description, setDescription] = useState('')
-  const [priority, setPriority] = useState<Priority>('medium')
-  const [category, setCategory] = useState('Cơ sở vật chất')
+  const [photos, setPhotos] = useState<File[]>([])
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!title.trim()) return
-    onCreate({ title, description, priority, category })
-    onClose()
+    setSubmitError('')
+
+    if (!productId || !damageType.trim() || !reportedDate || !description.trim()) {
+      setSubmitError('Vui lòng nhập đầy đủ các trường bắt buộc.')
+      return
+    }
+
+    const parsedQuality = Number(quality)
+    if (!Number.isFinite(parsedQuality) || parsedQuality <= 0) {
+      setSubmitError('Số lượng phải lớn hơn 0.')
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      await onCreate({
+        productId,
+        damageType: damageType.trim(),
+        reportedDate: new Date(reportedDate).toISOString(),
+        quality: parsedQuality,
+        description: description.trim(),
+        photos,
+      })
+      onClose()
+    } catch (error: any) {
+      setSubmitError(error?.message || 'Không thể tạo báo cáo sự cố.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -303,85 +299,129 @@ function CreateIncidentModal({ onClose, onCreate }: { onClose: () => void; onCre
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Title */}
+          {/* Product */}
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">Tiêu đề sự cố <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-medium text-slate-600 mb-1.5">Sản phẩm <span className="text-red-500">*</span></label>
+            <select
+              value={productId}
+              onChange={e => setProductId(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              required
+            >
+              <option value="">Chọn sản phẩm</option>
+              {products.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.name} ({product.sku})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Damage type + quality */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">DamageType <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                value={damageType}
+                onChange={e => setDamageType(e.target.value)}
+                placeholder="VD: hư hại"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">Quality <span className="text-red-500">*</span></label>
+              <input
+                type="number"
+                min={1}
+                value={quality}
+                onChange={e => setQuality(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1.5">ReportedDate <span className="text-red-500">*</span></label>
             <input
-              type="text"
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="Mô tả ngắn gọn sự cố..."
+              type="datetime-local"
+              value={reportedDate}
+              onChange={e => setReportedDate(e.target.value)}
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               required
             />
           </div>
 
-          {/* Priority + Category */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Mức ưu tiên</label>
-              <select
-                value={priority}
-                onChange={e => setPriority(e.target.value as Priority)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="urgent">🔴 Khẩn cấp</option>
-                <option value="medium">🟡 Trung bình</option>
-                <option value="low">🔵 Thấp</option>
-              </select>
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">LocationType</label>
+              <input
+                type="text"
+                value={locationType}
+                readOnly
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 text-slate-600"
+              />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Danh mục</label>
-              <select
-                value={category}
-                onChange={e => setCategory(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                <option>Cơ sở vật chất</option>
-                <option>Thiết bị</option>
-                <option>An toàn</option>
-                <option>Nhân sự</option>
-                <option>Khách hàng</option>
-                <option>Khác</option>
-              </select>
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">LocationId (workplace_id)</label>
+              <input
+                type="text"
+                value={locationId || 'Không có workplace_id'}
+                readOnly
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 text-slate-600"
+              />
             </div>
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">Mô tả chi tiết</label>
+            <label className="block text-xs font-medium text-slate-600 mb-1.5">Description <span className="text-red-500">*</span></label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
-              placeholder="Mô tả đầy đủ tình huống, vị trí xảy ra sự cố..."
+              placeholder="Mô tả đầy đủ tình huống sự cố..."
               rows={3}
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+              required
             />
           </div>
 
           {/* Image upload */}
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">Hình ảnh đính kèm</label>
-            <div className="flex gap-2">
+            <label className="block text-xs font-medium text-slate-600 mb-1.5">Photos</label>
+            <div className="flex gap-2 items-center">
               <label className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-slate-200 hover:border-emerald-400 cursor-pointer transition-colors bg-slate-50 hover:bg-emerald-50">
                 <Upload className="w-4 h-4 text-slate-400" />
                 <span className="text-xs text-slate-500">Tải ảnh lên</span>
-                <input type="file" accept="image/*" multiple className="hidden" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => setPhotos(Array.from(e.target.files || []))}
+                />
               </label>
-              <button type="button" className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed border-slate-200 hover:border-emerald-400 transition-colors bg-slate-50 hover:bg-emerald-50">
-                <Camera className="w-4 h-4 text-slate-400" />
-                <span className="text-xs text-slate-500">Chụp ảnh</span>
-              </button>
+              <span className="text-xs text-slate-500 whitespace-nowrap">{photos.length} ảnh</span>
             </div>
           </div>
+
+          {submitError && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{submitError}</p>
+          )}
 
           {/* Actions */}
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
               Huỷ bỏ
             </button>
-            <button type="submit" className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors">
-              Tạo báo cáo
+            <button
+              type="submit"
+              disabled={submitting || !locationId}
+              className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-sm font-semibold transition-colors"
+            >
+              {submitting ? 'Đang gửi...' : 'Tạo báo cáo'}
             </button>
           </div>
         </form>
@@ -390,17 +430,66 @@ function CreateIncidentModal({ onClose, onCreate }: { onClose: () => void; onCre
   )
 }
 
-// ─── Filter tabs ───────────────────────────────────────────────────────────────
-const FILTER_TABS: { key: Status | 'all'; label: string }[] = [
-  { key: 'all', label: 'Tất cả' },
-  { key: 'pending', label: 'Chờ xử lý' },
-  { key: 'processing', label: 'Đang xử lý' },
-  { key: 'resolved', label: 'Đã giải quyết' },
-]
+function mapApiStatusToLocal(status?: string): Status {
+  const normalized = (status || '').toUpperCase()
+  if (normalized === 'PROCESSING') return 'processing'
+  if (normalized === 'COMPLETED' || normalized === 'APPROVED' || normalized === 'RESOLVED') return 'resolved'
+  return 'pending'
+}
+
+function mapQualityToPriority(quality?: number): Priority {
+  const normalizedQuality = Number(quality || 0)
+  if (normalizedQuality >= 8) return 'urgent'
+  if (normalizedQuality >= 5) return 'medium'
+  return 'low'
+}
+
+function buildIncidentFromDamageReport(report: DamageReportFromAPI, products: ProductFromAPI[]): Incident {
+  const safeProductId = String(report.productId || '').toLowerCase()
+  const matchedProduct = products.find((item) => item.id.toLowerCase() === safeProductId)
+  const safeDamageType = (report.damageType || 'Sự cố').trim()
+  const safeDescription = (report.description || '').trim()
+  const safeStatus = report.status || 'PENDING'
+  const safeQuality = Number(report.quality || 0)
+  const safeReportedDate = report.reportedDate || report.createdAt || new Date().toISOString()
+  const safeCreatedAt = report.createdAt || new Date().toISOString()
+  const safeReportNumber = report.reportNumber || report.id || `DMG-${Date.now()}`
+  const safePhotos = Array.isArray(report.photos) ? report.photos : []
+  const incidentTitle = matchedProduct ? `${safeDamageType} - ${matchedProduct.name}` : safeDamageType
+
+  return {
+    id: safeReportNumber,
+    title: incidentTitle,
+    description: safeDescription,
+    priority: mapQualityToPriority(safeQuality),
+    status: mapApiStatusToLocal(safeStatus),
+    timeAgo: new Date(safeReportedDate).toLocaleString('vi-VN'),
+    count: safeQuality,
+    category: safeDamageType,
+    images: safePhotos,
+    progress: [
+      {
+        label: 'Đã tiếp nhận báo cáo',
+        time: new Date(safeCreatedAt).toLocaleTimeString('vi', { hour: '2-digit', minute: '2-digit' }),
+        author: 'Hệ thống tự động',
+        done: true,
+      },
+      {
+        label: safeStatus.toUpperCase() === 'PENDING' ? 'Đang chờ phân công xử lý' : 'Đang xử lý',
+        time: '',
+        author: '',
+        done: safeStatus.toUpperCase() !== 'PENDING',
+      },
+    ],
+    comments: [],
+  }
+}
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function CashierIncidentsPage() {
+  const { user } = useAuthStore()
   const [incidents, setIncidents] = useState<Incident[]>([])
+  const [products, setProducts] = useState<ProductFromAPI[]>([])
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [activeFilter, setActiveFilter] = useState<Status | 'all'>('all')
@@ -408,8 +497,36 @@ export default function CashierIncidentsPage() {
   const [priorityFilter, setPriorityFilter] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [loadError, setLoadError] = useState('')
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 5
+
+  const locationType: 'STORE' | 'WAREHOUSE' = user?.workplaceType === 'WAREHOUSE' ? 'WAREHOUSE' : 'STORE'
+  const locationId = user?.workplaceId?.trim() || ''
+
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        const [productRows, damageReports] = await Promise.all([
+          ProductAPIService.getAllProducts(),
+          DamageReportAPIService.getDamageReports({
+            locationId,
+            locationType,
+          }).catch(() => []),
+        ])
+
+        setProducts(productRows)
+
+        if (locationId) {
+          setIncidents(damageReports.map((report) => buildIncidentFromDamageReport(report, productRows)))
+        }
+      } catch {
+        setLoadError('Không thể tải dữ liệu báo cáo sự cố.')
+      }
+    }
+
+    loadInitialData()
+  }, [locationId])
 
   const filtered = incidents.filter(i => {
     if (activeFilter !== 'all' && i.status !== activeFilter) return false
@@ -432,24 +549,24 @@ export default function CashierIncidentsPage() {
     setSearch(''); setPriorityFilter(''); setDateFrom(''); setDateTo(''); setActiveFilter('all'); setPage(1)
   }
 
-  const handleCreate = (data: Partial<Incident>) => {
-    const newIncident: Incident = {
-      id: `ISS-${String(Math.floor(Math.random() * 90000) + 10000)}`,
-      title: data.title ?? '',
-      description: data.description ?? '',
-      priority: data.priority ?? 'medium',
-      status: 'pending',
-      timeAgo: 'Vừa xong',
-      count: 1,
-      category: data.category ?? 'Khác',
-      images: [],
-      progress: [
-        { label: 'Đã tiếp nhận báo cáo', time: new Date().toLocaleTimeString('vi', { hour: '2-digit', minute: '2-digit' }), author: 'Hệ thống tự động', done: true },
-        { label: 'Đang chờ phân công xử lý', time: '', author: '', done: false },
-      ],
-      comments: [],
+  const handleCreate = async (payload: CreateIncidentPayload) => {
+    if (!locationId) {
+      throw new Error('Không tìm thấy workplace_id của user đăng nhập.')
     }
-    setIncidents(prev => [newIncident, ...prev])
+
+    const createdReport = await DamageReportAPIService.createDamageReport({
+      locationType,
+      locationId,
+      productId: payload.productId,
+      damageType: payload.damageType,
+      reportedDate: payload.reportedDate,
+      quality: payload.quality,
+      description: payload.description,
+      photos: payload.photos,
+    })
+
+    const newIncident = buildIncidentFromDamageReport(createdReport, products)
+    setIncidents((prev) => [newIncident, ...prev])
     setPage(1)
   }
 
@@ -457,7 +574,15 @@ export default function CashierIncidentsPage() {
     <div className="p-6 bg-slate-50 min-h-screen">
       {/* Modals */}
       {selectedIncident && <IncidentDetailModal incident={selectedIncident} onClose={() => setSelectedIncident(null)} />}
-      {showCreate && <CreateIncidentModal onClose={() => setShowCreate(false)} onCreate={handleCreate} />}
+      {showCreate && (
+        <CreateIncidentModal
+          onClose={() => setShowCreate(false)}
+          onCreate={handleCreate}
+          products={products}
+          locationType={locationType}
+          locationId={locationId}
+        />
+      )}
 
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
@@ -468,12 +593,22 @@ export default function CashierIncidentsPage() {
         </div>
         <button
           onClick={() => setShowCreate(true)}
+          disabled={!locationId}
           className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors"
         >
           <Plus size={16} />
           Tạo báo cáo mới
         </button>
       </div>
+
+      {loadError && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{loadError}</div>
+      )}
+      {!locationId && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          User hiện tại chưa có workplace_id nên không thể gửi báo cáo sự cố.
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
@@ -606,7 +741,7 @@ export default function CashierIncidentsPage() {
                       {PRIORITY_ICON[incident.priority]}
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-slate-800 leading-snug truncate max-w-[200px]">{incident.title}</p>
-                        <p className="text-xs text-slate-400 truncate max-w-[200px]">{incident.description.slice(0, 50)}...</p>
+                        <p className="text-xs text-slate-400 truncate max-w-[200px]">{(incident.description || '').slice(0, 50)}...</p>
                       </div>
                     </div>
                   </td>
