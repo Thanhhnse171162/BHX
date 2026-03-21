@@ -47,7 +47,24 @@ function writeDamageReportCache(rows: DamageReportFromAPI[]) {
 function mergeUniqueById(rows: DamageReportFromAPI[]): DamageReportFromAPI[] {
   const map = new Map<string, DamageReportFromAPI>()
   rows.forEach((row) => {
-    map.set(row.id, row)
+    const current = map.get(row.id)
+    if (!current) {
+      map.set(row.id, row)
+      return
+    }
+
+    const merged: DamageReportFromAPI = {
+      ...current,
+      ...row,
+    }
+
+    const nextHasPhotos = Array.isArray(row.photos) && row.photos.length > 0
+    const currentHasPhotos = Array.isArray(current.photos) && current.photos.length > 0
+    if (!nextHasPhotos && currentHasPhotos) {
+      merged.photos = current.photos
+    }
+
+    map.set(row.id, merged)
   })
   return Array.from(map.values())
 }

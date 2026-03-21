@@ -14,6 +14,23 @@ export interface UserInfoFromAPI {
   fullName?: string
   name?: string
   email?: string
+  status?: string
+  role?: {
+    id?: number
+    name?: string
+    description?: string
+  } | null
+  workplace?: {
+    type?: string
+    id?: string | number | null
+    name?: string | null
+    code?: string | null
+    address?: string | null
+  } | null
+  workplaceType?: string | null
+  workplaceId?: string | number | null
+  workplace_type?: string | null
+  workplace_id?: string | number | null
 }
 
 export class UserAPIService {
@@ -55,8 +72,25 @@ export class UserAPIService {
   }
 
   static async getIamUsersList(): Promise<UserInfoFromAPI[]> {
-    const res = await localApiClient.get('/users/list')
-    const payload = res.data
+    const headers: HeadersInit = {}
+    if (typeof window !== 'undefined') {
+      const token = useAuthStore.getState().token
+      if (token) headers.Authorization = `Bearer ${token}`
+    }
+
+    const res = await fetch('/api/users/list', {
+      method: 'GET',
+      headers,
+    })
+
+    const payload = await res.json().catch(() => null)
+    if (!res.ok) {
+      const message =
+        (payload && typeof payload === 'object' && ((payload as any).message || (payload as any).error)) ||
+        `Get users list failed with status ${res.status}`
+      throw new Error(String(message))
+    }
+
     if (Array.isArray(payload)) return payload as UserInfoFromAPI[]
     if (payload?.data && Array.isArray(payload.data)) return payload.data as UserInfoFromAPI[]
     return []
