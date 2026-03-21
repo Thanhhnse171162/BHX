@@ -192,11 +192,7 @@ export const getAdminNavigation = (): NavGroup[] => {
     {
       label: 'Báo cáo',
       items: [
-        {
-          label: 'Sales Reports',
-          href: '/admin/reports/sales',
-          icon: 'TrendingUp',
-        },
+        // Sales Reports entry removed
         {
           label: 'Inventory Reports',
           href: '/admin/reports/inventory',
