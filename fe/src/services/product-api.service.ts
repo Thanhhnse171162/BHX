@@ -123,6 +123,19 @@ export class ProductAPIService {
   }
 
   /**
+   * Alias for getProductById
+   */
+  static async getById(id: string): Promise<ProductFromAPI | null> {
+    if (!id) return null
+    try {
+      return await this.getProductById(id)
+    } catch (error) {
+      console.error(`Error fetching product ${id}:`, error)
+      return null
+    }
+  }
+
+  /**
    * Tạo product mới
    */
   static async createProduct(data: CreateProductDTO): Promise<ProductFromAPI> {

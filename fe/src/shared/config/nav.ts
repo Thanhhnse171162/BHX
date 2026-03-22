@@ -204,7 +204,7 @@ export const getAdminNavigation = (): NavGroup[] => {
           icon: 'DollarSign',
         },
         {
-          label: 'All Reports',
+          label: 'Báo cáo hư hại',
           href: '/admin/reports',
           icon: 'BarChart3',
         },

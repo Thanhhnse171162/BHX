@@ -418,18 +418,12 @@ export default function IncidentsPage() {
   return (
     <div className="p-6 space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <AlertTriangle size={20} className="text-orange-500" />
-            Quản lý sự cố
-          </h1>
-          <p className="text-[13px] text-gray-500 mt-0.5">Theo dõi và xử lý các sự cố tại cửa hàng</p>
-        </div>
-        <button className="flex items-center gap-2 text-[13px] font-semibold text-white bg-green-600 hover:bg-green-700 px-4 py-2 rounded-xl transition-colors">
-          <Plus size={15} />
-          Báo cáo sự cố
-        </button>
+      <div>
+        <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+          <AlertTriangle size={20} className="text-orange-500" />
+          Quản lý sự cố
+        </h1>
+        <p className="text-[13px] text-gray-500 mt-0.5">Theo dõi và xử lý các sự cố tại cửa hàng</p>
       </div>
 
       {/* Stats */}

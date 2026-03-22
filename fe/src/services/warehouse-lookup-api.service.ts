@@ -11,9 +11,14 @@ export interface InventoryWarehouseFromAPI {
 export class WarehouseLookupAPIService {
   static async getById(id: string): Promise<InventoryWarehouseFromAPI | null> {
     if (!id) return null
-    const res = await localApiClient.get(`/inventory-warehouse/${id}`)
-    const payload = res.data
-    if (payload?.data) return payload.data as InventoryWarehouseFromAPI
-    return payload as InventoryWarehouseFromAPI
+    try {
+      const res = await localApiClient.get(`/inventory-warehouse/${id}`)
+      const payload = res.data
+      if (payload?.data) return payload.data as InventoryWarehouseFromAPI
+      return payload as InventoryWarehouseFromAPI
+    } catch (error) {
+      console.error(`Error fetching warehouse ${id}:`, error)
+      return null
+    }
   }
 }
