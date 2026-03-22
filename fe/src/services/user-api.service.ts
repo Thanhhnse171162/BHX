@@ -44,10 +44,26 @@ export class UserAPIService {
 
   static async getById(id: string): Promise<UserInfoFromAPI | null> {
     if (!id) return null
-    const res = await localApiClient.get(`/users/${id}`)
-    const payload = res.data
-    if (payload?.data) return payload.data as UserInfoFromAPI
-    return payload as UserInfoFromAPI
+    
+    // Try local API route first
+    try {
+      const res = await localApiClient.get(`/users/${id}`)
+      const payload = res.data
+      if (payload?.data) return payload.data as UserInfoFromAPI
+      if (payload?.id) return payload as UserInfoFromAPI
+      // If we got here and payload exists, it's valid
+      if (payload && Object.keys(payload).length > 0) return payload as UserInfoFromAPI
+    } catch (error) {
+      console.warn(`Local user endpoint failed for ${id}, trying IAM:`, error)
+    }
+
+    // Fall back to IAM endpoint
+    try {
+      return await this.getIamDetailsById(id)
+    } catch (error) {
+      console.error(`Error fetching user ${id} from IAM:`, error)
+      return null
+    }
   }
 
   static async getIamDetailsById(id: string): Promise<UserInfoFromAPI | null> {
@@ -72,28 +88,38 @@ export class UserAPIService {
   }
 
   static async getIamUsersList(): Promise<UserInfoFromAPI[]> {
-    const headers: HeadersInit = {}
-    if (typeof window !== 'undefined') {
-      const token = useAuthStore.getState().token
-      if (token) headers.Authorization = `Bearer ${token}`
+    try {
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      }
+      
+      if (typeof window !== 'undefined') {
+        const token = useAuthStore.getState().token
+        if (token) headers.Authorization = `Bearer ${token}`
+      }
+
+      // Call backend directly with full URL
+      const iamBaseUrl = process.env.NEXT_PUBLIC_IAM_URL || 'http://localhost:5000'
+      const url = `${iamBaseUrl}/api/users/list`
+
+      const res = await fetch(url, {
+        method: 'GET',
+        headers,
+      })
+
+      const payload = await res.json().catch(() => null)
+      if (!res.ok) {
+        // Silently return empty array on error
+        return []
+      }
+
+      if (Array.isArray(payload)) return payload as UserInfoFromAPI[]
+      if (payload?.data && Array.isArray(payload.data)) return payload.data as UserInfoFromAPI[]
+      return []
+    } catch (error) {
+      // Silently return empty array on any error
+      return []
     }
-
-    const res = await fetch('/api/users/list', {
-      method: 'GET',
-      headers,
-    })
-
-    const payload = await res.json().catch(() => null)
-    if (!res.ok) {
-      const message =
-        (payload && typeof payload === 'object' && ((payload as any).message || (payload as any).error)) ||
-        `Get users list failed with status ${res.status}`
-      throw new Error(String(message))
-    }
-
-    if (Array.isArray(payload)) return payload as UserInfoFromAPI[]
-    if (payload?.data && Array.isArray(payload.data)) return payload.data as UserInfoFromAPI[]
-    return []
   }
 }
 

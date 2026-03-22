@@ -1,7 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
+import { DamageReportAPIService, DamageReportFromAPI } from '@/services/damage-report-api.service'
+import { WarehouseLookupAPIService } from '@/services/warehouse-lookup-api.service'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -15,6 +17,8 @@ export interface ReportItem {
   icon: string
   href: string
   updatedAt: string   // ISO date string
+  location?: string   // warehouse or store name
+  locationType?: 'WAREHOUSE' | 'STORE'  // location type
 }
 
 export interface CategoryRevenue {
@@ -289,30 +293,113 @@ export default function AllReportsPage({
 }: AllReportsPageProps) {
   const [period, setPeriod] = useState<Period>('30d')
   const [typeFilter, setTypeFilter] = useState('')
+  const [locationFilter, setLocationFilter] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [damageReports, setDamageReports] = useState<ReportItem[]>([])
+  const [isLoadingReports, setIsLoadingReports] = useState(false)
+  const [locationNames, setLocationNames] = useState<Record<string, string>>({})
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 10
 
-  const hasFilters = typeFilter !== '' || searchQuery !== ''
+  // Fetch damage reports on mount
+  useEffect(() => {
+    const fetchDamageReports = async () => {
+      setIsLoadingReports(true)
+      try {
+        const data = await DamageReportAPIService.getDamageReports()
+        
+        // Fetch location names for all reports in parallel
+        const locationNameMap: Record<string, string> = {}
+        const uniqueLocationIds = Array.from(new Set(data.filter((r) => r.locationId).map((r) => r.locationId!)))
+        
+        await Promise.all(
+          uniqueLocationIds.map(async (locationId) => {
+            try {
+              const warehouse = await WarehouseLookupAPIService.getById(locationId)
+              if (warehouse?.name) {
+                locationNameMap[locationId] = warehouse.name
+              }
+            } catch (error) {
+              console.error(`Failed to fetch location name for ${locationId}:`, error)
+            }
+          })
+        )
+
+        setLocationNames(locationNameMap)
+
+        const transformedReports: ReportItem[] = data.map((report: DamageReportFromAPI) => {
+          const locationName = locationNameMap[report.locationId!] || report.locationId || `${report.locationType}`
+          
+          return {
+            id: report.id,
+            title: report.reportNumber || `Báo cáo #${report.id.substring(0, 8)}`,
+            description: `Loại hư hại: ${report.damageType} | Vị trí: ${report.locationType} | Statut: ${report.status}`,
+            type: report.locationType === 'WAREHOUSE' ? 'Tồn kho' : 'Bán hàng',
+            icon: report.locationType === 'WAREHOUSE' ? '📦' : '🏪',
+            href: `/admin/reports/damage/${report.id}`,
+            updatedAt: report.createdAt || new Date().toISOString(),
+            location: locationName,
+            locationType: report.locationType,
+          }
+        })
+        setDamageReports(transformedReports)
+      } catch (error) {
+        console.error('Failed to fetch damage reports:', error)
+        setDamageReports([])
+      } finally {
+        setIsLoadingReports(false)
+      }
+    }
+
+    fetchDamageReports()
+  }, [])
+
+  const hasFilters = typeFilter !== '' || locationFilter !== '' || searchQuery !== ''
 
   function clearFilters() {
     setTypeFilter('')
+    setLocationFilter('')
     setSearchQuery('')
   }
 
+  // Merge reports from props and fetched damage reports
+  const allReports = useMemo(() => {
+    return [...reports, ...damageReports]
+  }, [reports, damageReports])
+
   const reportTypes = useMemo(
-    () => Array.from(new Set(reports.map((r) => r.type))).sort(),
-    [reports]
+    () => Array.from(new Set(allReports.map((r) => r.type))).sort(),
+    [allReports]
+  )
+
+  const reportLocations = useMemo(
+    () => Array.from(new Set(allReports.filter((r) => r.location).map((r) => r.location!))).sort(),
+    [allReports]
   )
 
   const filteredReports = useMemo(() => {
-    return reports.filter((r) => {
+    return allReports.filter((r) => {
       const matchType = !typeFilter || r.type === typeFilter
+      const matchLocation = !locationFilter || r.location === locationFilter
       const matchSearch =
         !searchQuery ||
         r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         r.description.toLowerCase().includes(searchQuery.toLowerCase())
-      return matchType && matchSearch
+      return matchType && matchLocation && matchSearch
     })
-  }, [reports, typeFilter, searchQuery])
+  }, [allReports, typeFilter, locationFilter, searchQuery])
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [typeFilter, locationFilter, searchQuery])
+
+  const totalPages = Math.ceil(filteredReports.length / ITEMS_PER_PAGE)
+  const paginatedReports = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+    const endIndex = startIndex + ITEMS_PER_PAGE
+    return filteredReports.slice(startIndex, endIndex)
+  }, [filteredReports, currentPage])
 
   const totalCatValue = categoryRevenue.reduce((s, d) => s + d.value, 0)
   const formattedUpdated = lastUpdatedAt
@@ -337,7 +424,7 @@ export default function AllReportsPage({
               <span>/</span>
               <span className="text-gray-600 font-medium">Reports</span>
             </nav>
-            <h1 className="text-xl font-semibold text-gray-900">Tổng quan báo cáo</h1>
+            <h1 className="text-xl font-semibold text-gray-900">Báo cáo thiệt hại</h1>
             {formattedUpdated && (
               <p className="text-sm text-gray-400 mt-0.5">
                 Cập nhật lần cuối: {formattedUpdated}
@@ -356,139 +443,6 @@ export default function AllReportsPage({
       </div>
 
       <div className="px-6 py-5 space-y-5">
-        {/* ── KPI Cards ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            {
-              label: 'Doanh thu TB/Ngày',
-              value: metrics ? formatVND(metrics.avgRevenuePerDay) : '—',
-              change: metrics?.revenueChange,
-              icon: '💹',
-              iconBg: 'bg-emerald-50',
-              valueColor: 'text-emerald-700',
-            },
-            {
-              label: 'Lợi nhuận TB/Ngày',
-              value: metrics ? formatVND(metrics.avgProfitPerDay) : '—',
-              change: metrics?.profitChange,
-              icon: '💰',
-              iconBg: 'bg-blue-50',
-              valueColor: 'text-blue-700',
-            },
-            {
-              label: 'Tổng đơn hàng',
-              value: metrics ? metrics.totalOrders.toLocaleString('vi-VN') : '—',
-              change: metrics?.ordersChange,
-              icon: '🛒',
-              iconBg: 'bg-purple-50',
-              valueColor: 'text-purple-700',
-            },
-            {
-              label: 'Biên lợi nhuận',
-              value: metrics ? `${metrics.profitMarginPct.toFixed(1)}%` : '—',
-              change: metrics?.marginChange,
-              icon: '📈',
-              iconBg: 'bg-amber-50',
-              valueColor: 'text-amber-700',
-            },
-          ].map((card, i) => (
-            <div
-              key={i}
-              className="bg-white rounded-xl border border-gray-100 p-4 flex flex-col gap-2 shadow-sm"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
-                  {card.label}
-                </span>
-                <span
-                  className={`w-8 h-8 rounded-lg ${card.iconBg} flex items-center justify-center text-base`}
-                >
-                  {card.icon}
-                </span>
-              </div>
-              <div className={`text-2xl font-bold tabular-nums ${card.valueColor}`}>
-                {isLoading ? '—' : card.value}
-              </div>
-              {card.change !== undefined && !isLoading && (
-                <div
-                  className={`text-xs font-medium ${
-                    card.change >= 0 ? 'text-emerald-600' : 'text-red-500'
-                  }`}
-                >
-                  {formatPct(card.change)} so với kỳ trước
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* ── Charts row ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {/* Donut chart */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-            <p className="text-sm font-semibold text-gray-800 mb-0.5">
-              Doanh thu theo danh mục
-            </p>
-            <p className="text-xs text-gray-400 mb-4">Phân bổ trong kỳ hiện tại</p>
-
-            {isLoading ? (
-              <div className="flex items-center justify-center h-48 text-gray-300 text-sm">
-                Đang tải...
-              </div>
-            ) : categoryRevenue.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-48 text-gray-300">
-                <span className="text-3xl mb-2">📊</span>
-                <span className="text-sm">Chưa có dữ liệu</span>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center">
-                <div className="w-52 h-52 mb-4">
-                  <DonutChart data={categoryRevenue} />
-                </div>
-                <div className="w-full space-y-2">
-                  {categoryRevenue.map((item, i) => {
-                    const pct = totalCatValue > 0
-                      ? ((item.value / totalCatValue) * 100).toFixed(1)
-                      : '0.0'
-                    return (
-                      <div key={i} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                            style={{ background: item.color }}
-                          />
-                          <span className="text-xs text-gray-600">{item.label}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-gray-800">
-                            {item.value}M ₫
-                          </span>
-                          <span className="text-[10px] text-gray-400">({pct}%)</span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Line chart */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-60 text-gray-300 text-sm">
-                Đang tải...
-              </div>
-            ) : (
-              <TrendChart
-                data={visibleTrend}
-                period={period}
-                onPeriodChange={setPeriod}
-              />
-            )}
-          </div>
-        </div>
-
         {/* ── Reports table ── */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           {/* Table header + filters */}
@@ -499,6 +453,11 @@ export default function AllReportsPage({
                 <span className="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-0.5 rounded-full">
                   {filteredReports.length}
                 </span>
+                {totalPages > 1 && (
+                  <span className="text-xs text-gray-500">
+                    Trang {currentPage}/{totalPages}
+                  </span>
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {/* Search */}
@@ -529,6 +488,20 @@ export default function AllReportsPage({
                   ))}
                 </select>
 
+                {/* Location filter */}
+                <select
+                  value={locationFilter}
+                  onChange={(e) => setLocationFilter(e.target.value)}
+                  className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="">Tất cả địa điểm</option>
+                  {reportLocations.map((loc) => (
+                    <option key={loc} value={loc}>
+                      {loc}
+                    </option>
+                  ))}
+                </select>
+
                 {/* Clear */}
                 {hasFilters && (
                   <button
@@ -543,7 +516,7 @@ export default function AllReportsPage({
           </div>
 
           {/* Table body */}
-          {isLoading ? (
+          {isLoading || isLoadingReports ? (
             <div className="py-14 text-center text-gray-400">
               <div className="text-3xl mb-2">⏳</div>
               <div className="text-sm">Đang tải dữ liệu...</div>
@@ -567,7 +540,7 @@ export default function AllReportsPage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {filteredReports.map((report) => (
+                  {paginatedReports.map((report) => (
                     <tr
                       key={report.id}
                       className="hover:bg-gray-50/60 transition-colors"
@@ -620,52 +593,62 @@ export default function AllReportsPage({
               </table>
             </div>
           )}
+
+          {/* Pagination controls */}
+          {filteredReports.length > 0 && totalPages > 1 && (
+            <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between">
+              <div className="text-xs text-gray-500">
+                Hiển thị {(currentPage - 1) * ITEMS_PER_PAGE + 1} đến{Math.min(currentPage * ITEMS_PER_PAGE, filteredReports.length)} trong {filteredReports.length} báo cáo
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="px-2 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Đầu
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-2 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  ← Trước
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                        currentPage === page
+                          ? 'bg-green-600 text-white'
+                          : 'text-gray-600 border border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-2 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Sau →
+                </button>
+                <button
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="px-2 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Cuối
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* ── Quick Stats ── */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <p className="text-sm font-semibold text-gray-800 mb-4">Thống kê nhanh</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
-              {
-                label: 'Sản phẩm đang bán',
-                value: quickStats?.activeProducts,
-                icon: '🏷️',
-                bg: 'bg-blue-50',
-              },
-              {
-                label: 'Khách hàng',
-                value: quickStats?.customers,
-                icon: '👤',
-                bg: 'bg-emerald-50',
-              },
-              {
-                label: 'Cửa hàng',
-                value: quickStats?.stores,
-                icon: '🏪',
-                bg: 'bg-purple-50',
-              },
-              {
-                label: 'Tồn kho',
-                value: quickStats?.totalInventory,
-                icon: '📦',
-                bg: 'bg-amber-50',
-              },
-            ].map((stat, i) => (
-              <div key={i} className={`${stat.bg} rounded-xl p-4`}>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-base">{stat.icon}</span>
-                  <span className="text-xs text-gray-500">{stat.label}</span>
-                </div>
-                <div className="text-xl font-bold text-gray-900 tabular-nums">
-                  {isLoading || stat.value === undefined
-                    ? '—'
-                    : stat.value.toLocaleString('vi-VN')}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   )
