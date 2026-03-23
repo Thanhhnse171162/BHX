@@ -34,7 +34,56 @@ export async function GET(request: Request) {
       },
     })
 
-    const data = await response.json()
+    let responseText = ''
+    try {
+      responseText = await response.text()
+    } catch (error) {
+      console.error('❌ Failed to read response body:', error)
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Failed to read backend response',
+          error: String(error)
+        },
+        { status: 500 }
+      )
+    }
+
+    let data: any = {}
+    if (responseText) {
+      try {
+        data = JSON.parse(responseText)
+      } catch (parseError) {
+        console.error('❌ Failed to parse response JSON:', parseError)
+        console.error('Response text:', responseText)
+      }
+    }
+
+    if (!response.ok) {
+      const errorMessage = data.message || data.error || responseText || 'Unknown error'
+      console.error('❌ Backend returned error:', { status: response.status, message: errorMessage })
+      
+      if (response.status === 401) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'Unauthorized - please login with admin/warehouse admin account',
+            error: errorMessage
+          },
+          { status: 401 }
+        )
+      }
+      
+      return NextResponse.json(
+        {
+          success: false,
+          message: errorMessage,
+          data
+        },
+        { status: response.status }
+      )
+    }
+
     return NextResponse.json(data, { status: response.status })
   } catch (error: any) {
     console.error('Error fetching warehouses:', error)
@@ -52,42 +101,100 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { name, location, capacity, status, created_by } = body
+    const { name, location, capacity, status, parentId } = body
 
     if (!name || !location || !capacity) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Name, location, and capacity are required'
+          message: 'name, location, and capacity are required'
         },
         { status: 400 }
       )
     }
 
-    const pool = await sql.connect(config)
-    
-    const result = await pool.request()
-      .input('name', sql.NVarChar, name)
-      .input('location', sql.NVarChar, location)
-      .input('capacity', sql.Int, capacity)
-      .input('status', sql.VarChar, status || 'ACTIVE')
-      .input('is_deleted', sql.Int, 0)
-      .input('created_by', sql.VarChar, created_by || '')
-      .query(`
-        INSERT INTO warehouses (name, location, capacity, status, is_deleted, created_at, created_by)
-        OUTPUT INSERTED.*
-        VALUES (@name, @location, @capacity, @status, @is_deleted, GETDATE(), @created_by)
-      `)
+    // Proxy to backend /api/Warehouse/warehouses endpoint
+    const url = `${INVENTORY_SERVICE_URL}/api/Warehouse/warehouses`
+    const authHeader = request.headers.get('authorization') || ''
 
-    await pool.close()
+    // Flat payload - backend auto-sets createdBy from JWT
+    const payload = {
+      name,
+      location,
+      capacity,
+      status: status || 'Active', // .NET API expects "Active"/"Inactive"
+      parentId: parentId || null,
+      // DO NOT include createdBy - backend auto-sets from JWT token
+    }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Warehouse created successfully',
-      data: result.recordset[0]
+    console.log('🔵 Creating warehouse:', { url, payload, hasAuth: !!authHeader })
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: authHeader,
+      },
+      body: JSON.stringify(payload),
     })
+
+    console.log('🟢 Backend response status:', response.status)
+
+    // Read response body only once to avoid "Body has already been read" error
+    let responseText = ''
+    try {
+      responseText = await response.text()
+    } catch (error) {
+      console.error('❌ Failed to read response body:', error)
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Failed to read backend response',
+          error: String(error)
+        },
+        { status: 500 }
+      )
+    }
+
+    let data: any = {}
+    if (responseText) {
+      try {
+        data = JSON.parse(responseText)
+      } catch (parseError) {
+        console.error('❌ Failed to parse response JSON:', parseError)
+        console.error('Response text:', responseText)
+      }
+    }
+    
+    if (!response.ok) {
+      const errorMessage = data.message || data.error || responseText || 'Unknown error'
+      console.error('❌ Backend returned error:', { status: response.status, message: errorMessage })
+      
+      if (response.status === 401) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'Unauthorized - please login with admin/warehouse admin account',
+            error: errorMessage
+          },
+          { status: 401 }
+        )
+      }
+      
+      return NextResponse.json(
+        {
+          success: false,
+          message: errorMessage,
+          data
+        },
+        { status: response.status }
+      )
+    }
+
+    console.log('✅ Warehouse created successfully')
+    return NextResponse.json({ success: true, message: 'Warehouse created successfully', data }, { status: 200 })
   } catch (error: any) {
-    console.error('Error creating warehouse:', error)
+    console.error('❌ Error creating warehouse:', error.message, error.stack)
     return NextResponse.json(
       {
         success: false,

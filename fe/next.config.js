@@ -27,10 +27,15 @@ const nextConfig = {
   // Proxy API calls to backend services to avoid CORS issues
   async rewrites() {
     const IAM_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://localhost:5003'
+    const WAREHOUSE_URL = process.env.NEXT_PUBLIC_WAREHOUSE_URL || 'http://localhost:5003'
     return [
       {
         source: '/iam/:path*',
         destination: `${IAM_URL}/:path*`,
+      },
+      {
+        source: '/api/Warehouse/:path*',
+        destination: `${WAREHOUSE_URL}/api/Warehouse/:path*`,
       },
     ]
   },
