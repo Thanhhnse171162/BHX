@@ -9,16 +9,58 @@ import {
 import { Button } from '@/shared/ui/Button';
 import {
   getInventoryChecks,
-  createInventoryCheck,
-  getInventoryCheckById,
   InventoryCheckListDto,
+  createInventoryCheck,
+  submitInventoryCheck,
+  CreateInventoryCheckDto,
+  SubmitInventoryCheckDto,
 } from '@/services/inventory-check-api';
+import { InventoryAPIService, InventoryItem } from '@/services/inventory-api.service';
+import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service';
+import { UserAPIService } from '@/services/user-api.service';
+import { useAuthStore } from '@/store/auth.store';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 // Remove unused CheckSession and InventoryCheckItem interfaces (use DTOs)
 
 const ITEMS_PER_PAGE = 6
+
+type InventoryCheckModalItem = {
+  id: string;
+  productId: string;
+  productName: string;
+  sku: string;
+  category: string;
+  systemQty: number;
+  unit: string;
+}
+
+function normalizeLocationType(locationType?: string | null): 'WAREHOUSE' | 'STORE' | null {
+  if (!locationType) return null
+  const upper = locationType.toUpperCase()
+  if (upper === 'WAREHOUSE' || upper === 'STORE') return upper
+  return null
+}
+
+function mapInventoryToModalItems(
+  inventoryData: InventoryItem[],
+  productMap: Map<string, ProductFromAPI>
+): InventoryCheckModalItem[] {
+  return inventoryData.map((item) => {
+    const product = productMap.get(item.productId)
+
+    return {
+      id: item.id,
+      productId: item.productId,
+      productName: item.product?.name || item.productName || item.name || product?.name || 'Unknown Product',
+      sku: item.product?.sku || item.sku || product?.sku || 'N/A',
+      category: item.product?.categoryName || item.categoryName || product?.categoryName || 'Uncategorized',
+      systemQty: item.quantity,
+      unit: item.product?.unit || item.unit || product?.unit || '',
+    }
+  })
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -81,6 +123,8 @@ function DiscrepancyBadge({ count }: { count: number }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Page() {
+  const { user, hydrated } = useAuthStore()
+
   // pagination
   const [currentPage, setCurrentPage] = useState(1)
 
@@ -97,21 +141,73 @@ export default function Page() {
   const [allSessions, setAllSessions] = useState<InventoryCheckListDto[]>([])
   // Removed loadingSessions and errorSessions (not used in UI)
 
-  // For inventory items in the modal (current check session)
-  const [inventoryItems, setInventoryItems] = useState<any[]>([]); // Sẽ set khi mở modal
-  const [currentCheckId, setCurrentCheckId] = useState<string | null>(null);
-  // You will need to fetch these from the API when opening the modal (not implemented here)
+  // For inventory items in the modal (current user's workplace)
+  const [inventoryItems, setInventoryItems] = useState<InventoryCheckModalItem[]>([])
+  const [modalLoading, setModalLoading] = useState(false)
+  const [modalError, setModalError] = useState<string | null>(null)
 
-  // Fetch inventory check sessions on mount
+  // Submission state
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [activeCheckId, setActiveCheckId] = useState<string | null>(null)
+
+  // Details view
+  const [showDetailsModal, setShowDetailsModal] = useState(false)
+  const [selectedCheckForDetails, setSelectedCheckForDetails] = useState<InventoryCheckListDto | null>(null)
+
+  // User name cache
+  const [userNameCache, setUserNameCache] = useState<Map<string, string>>(new Map())
+
+  // Fetch inventory check sessions on mount - filter by current user's location
   useEffect(() => {
+    if (!hydrated || !user?.workplaceId) {
+      setAllSessions([]);
+      return;
+    }
+
+    const currentLocationId = String(user.workplaceId).trim().toLowerCase();
+    
     getInventoryChecks()
       .then((data) => {
-        setAllSessions(data);
+        // Filter to only show checks for current warehouse/store
+        const filtered = data.filter((check) => {
+          const checkLocationId = String(check.locationId ?? '').trim().toLowerCase();
+          return checkLocationId === currentLocationId;
+        });
+        setAllSessions(filtered);
       })
       .catch(() => {
         // Optionally handle error
+        setAllSessions([]);
       });
-  }, []);
+  }, [hydrated, user?.workplaceId]);
+
+  // Fetch user names for checked_by field
+  useEffect(() => {
+    const userIds = Array.from(new Set(allSessions.map(s => s.checkedBy).filter(Boolean)))
+    const missingIds = userIds.filter(id => !userNameCache.has(id))
+
+    if (missingIds.length === 0) return
+
+    missingIds.forEach(userId => {
+      UserAPIService.getById(userId)
+        .then(user => {
+          if (user) {
+            const userName = user.fullName || user.full_name || user.name || 'Unknown'
+            setUserNameCache(prev => new Map(prev).set(userId, userName))
+          }
+        })
+        .catch(() => {
+          setUserNameCache(prev => new Map(prev).set(userId, 'Unknown'))
+        })
+    })
+  }, [allSessions, userNameCache])
+
+  // Helper to get user name from cache
+  const getUserName = (userId: string | undefined): string => {
+    if (!userId) return '?'
+    return userNameCache.get(userId) || userId.substring(0, 8)
+  }
 
   // ── pagination ──
   const totalPages    = Math.ceil(allSessions.length / ITEMS_PER_PAGE)
@@ -121,8 +217,8 @@ export default function Page() {
   )
 
   // ── summary stats ──
-  const completedCount     = allSessions.filter(s => s.status === 'completed').length
-  const inProgressCount    = allSessions.filter(s => s.status === 'in-progress').length
+  const completedCount     = allSessions.filter(s => s.status?.toLowerCase() === 'completed').length
+  const inProgressCount    = allSessions.filter(s => s.status?.toLowerCase() !== 'completed').length
   // If discrepancies is not present, fallback to 0
   const totalDiscrepancies = allSessions.reduce((sum, s) => sum + (s.totalDiscrepancies ?? 0), 0);
 
@@ -160,39 +256,173 @@ export default function Page() {
   const handleClearItem = (id: string) => {
     const m = new Map(checkItems); m.delete(id); setCheckItems(m)
   }
-  const handleOpenModal = async () => {
-    setShowCheckModal(true);
-    setModalSearch('');
-    setModalCategory('all');
-    setCheckItems(new Map());
-    setInventoryItems([]);
-    setCurrentCheckId(null);
-    try {
-      // Tạo phiếu kiểm kê mới (cần truyền đúng locationType/locationId/checkType)
-      const newCheck = await createInventoryCheck({
-        locationType: 'Store', // TODO: sửa lại cho đúng loại kho thực tế
-        locationId: 'store-1', // TODO: sửa lại cho đúng id kho thực tế
-        checkType: 'Periodic', // hoặc loại kiểm kê khác nếu cần
-      });
-      setCurrentCheckId(newCheck.id);
-      // Lấy chi tiết phiếu kiểm kê (lấy danh sách sản phẩm)
-      const detail = await getInventoryCheckById(newCheck.id);
-      setInventoryItems(detail.items);
-    } catch (err) {
-      alert('Không thể tạo phiếu kiểm kê mới hoặc lấy danh sách sản phẩm!');
+
+  // Handle opening a check from the table (for in-progress or viewing completed)
+  const handleOpenCheckFromTable = async (session: InventoryCheckListDto) => {
+    const isCompleted = session.status?.toLowerCase() === "completed"
+    
+    if (isCompleted) {
+      // Show details modal for completed checks
+      setSelectedCheckForDetails(session)
+      setShowDetailsModal(true)
+      return
     }
+
+    // For in-progress checks, directly load and open the modal
+    setActiveCheckId(session.id)
+    setShowCheckModal(true)
+    setModalSearch('')
+    setModalCategory('all')
+    setCheckItems(new Map())
+    setInventoryItems([])
+    setModalError(null)
+    setModalLoading(true)
+
+    try {
+      if (!hydrated) {
+        throw new Error('Đang tải thông tin tài khoản. Vui lòng thử lại sau vài giây.')
+      }
+
+      const locationType = normalizeLocationType(user?.workplaceType)
+      const locationId = user?.workplaceId?.trim()
+
+      if (!locationType || !locationId) {
+        throw new Error('Tài khoản chưa được gán kho/cửa hàng.')
+      }
+
+      const [inventoryData, productsData] = await Promise.all([
+        InventoryAPIService.getInventoryByLocation(locationType, locationId),
+        ProductAPIService.getAllProducts(),
+      ])
+
+      const productMap = new Map<string, ProductFromAPI>()
+      productsData.forEach((product) => {
+        productMap.set(product.id, product)
+      })
+
+      const modalItems = mapInventoryToModalItems(inventoryData, productMap)
+      setInventoryItems(modalItems)
+    } catch (err: any) {
+      const fallbackMessage = 'Không thể lấy danh sách tồn kho theo kho/cửa hàng hiện tại.'
+      const errorMessage = err?.response?.data?.message || err?.response?.data?.error?.message || err?.message || fallbackMessage
+      setModalError(errorMessage)
+      console.error('Error in handleOpenCheckFromTable:', { error: err })
+    }
+    setModalLoading(false)
+  }
+
+  const handleOpenModal = async () => {
+    setShowCheckModal(true)
+    setModalSearch('')
+    setModalCategory('all')
+    setCheckItems(new Map())
+    setInventoryItems([])
+    setModalError(null)
+    setModalLoading(true)
+
+    try {
+      if (!hydrated) {
+        throw new Error('Đang tải thông tin tài khoản. Vui lòng thử lại sau vài giây.')
+      }
+
+      const locationType = normalizeLocationType(user?.workplaceType)
+      const locationId = user?.workplaceId?.trim()
+
+      if (!locationType || !locationId) {
+        throw new Error('Tài khoản chưa được gán kho/cửa hàng. Không thể tải danh sách tồn kho để kiểm kê.')
+      }
+
+      const [inventoryData, productsData] = await Promise.all([
+        InventoryAPIService.getInventoryByLocation(locationType, locationId),
+        ProductAPIService.getAllProducts(),
+      ])
+
+      const productMap = new Map<string, ProductFromAPI>()
+      productsData.forEach((product) => {
+        productMap.set(product.id, product)
+      })
+
+      const modalItems = mapInventoryToModalItems(inventoryData, productMap)
+      setInventoryItems(modalItems)
+    } catch (err: any) {
+      const fallbackMessage = 'Không thể lấy danh sách tồn kho theo kho/cửa hàng hiện tại.'
+      const message = err?.response?.data?.message || err?.message || fallbackMessage
+      setModalError(message)
+    }
+    setModalLoading(false)
   }
   const handleCloseModal = () => {
-    setShowCheckModal(false); setModalSearch(''); setCheckItems(new Map()); setShowConfirm(false)
+    setShowCheckModal(false)
+    setModalSearch('')
+    setCheckItems(new Map())
+    setShowConfirm(false)
+    setActiveCheckId(null)
+    setSubmitError(null)
   }
   const handleCompleteClick = () => {
     if (checkItems.size === 0) { alert('Vui lòng nhập số lượng thực tế!'); return }
     if (discrepancyCount > 0) setShowConfirm(true)
     else handleFinalSubmit()
   }
-  const handleFinalSubmit = () => {
-    alert('Đã hoàn thành kiểm kê và cập nhật hệ thống!')
-    handleCloseModal()
+  
+  const handleFinalSubmit = async () => {
+    if (isSubmitting) return
+    setIsSubmitting(true)
+    setSubmitError(null)
+
+    try {
+      const locationType = normalizeLocationType(user?.workplaceType)
+      const locationId = user?.workplaceId?.trim()
+
+      if (!locationType || !locationId) {
+        throw new Error('Tài khoản chưa được gán kho/cửa hàng.')
+      }
+
+      // Create or use active check
+      let checkId = activeCheckId
+      if (!checkId) {
+        const createPayload: CreateInventoryCheckDto = {
+          locationType,
+          locationId,
+          checkType: 'FULL',
+          notes: 'Inventory check from store',
+        }
+        const createdCheck = await createInventoryCheck(createPayload)
+        checkId = createdCheck.id
+        setActiveCheckId(checkId)
+      }
+
+      // Submit the items
+      const submitPayload: SubmitInventoryCheckDto = {
+        items: Array.from(checkItems.entries()).map(([productId, actualQuantity]) => ({
+          productId,
+          actualQuantity,
+          note: '',
+        })),
+      }
+
+      await submitInventoryCheck(checkId, submitPayload)
+
+      // Refresh the list
+      const updatedChecks = await getInventoryChecks()
+      const currentLocationId = String(user.workplaceId).trim().toLowerCase()
+      const filtered = updatedChecks.filter((check) => {
+        const checkLocationId = String(check.locationId ?? '').trim().toLowerCase()
+        return checkLocationId === currentLocationId
+      })
+      setAllSessions(filtered)
+
+      // Success - close modal
+      alert('Đã hoàn thành kiểm kê và cập nhật hệ thống!')
+      handleCloseModal()
+    } catch (err: any) {
+      const fallbackMessage = 'Không thể hoàn thành kiểm kê. Vui lòng thử lại.'
+      const message = err?.response?.data?.message || err?.message || fallbackMessage
+      setSubmitError(message)
+      alert(`Lỗi: ${message}`)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   // ── table column widths ──
@@ -230,10 +460,6 @@ export default function Page() {
           <h1 className="text-2xl font-bold text-gray-900">Inventory Check</h1>
           <p className="text-sm text-gray-500 mt-0.5">Kiểm kê định kỳ cửa hàng</p>
         </div>
-        <Button variant="primary" onClick={handleOpenModal}>
-          <ClipboardCheck className="w-4 h-4 mr-2" />
-          Kiểm tra tồn kho
-        </Button>
       </div>
 
       {/* ── SUMMARY CARDS ── */}
@@ -308,7 +534,7 @@ export default function Page() {
                 <tr key={session.id} className="hover:bg-gray-50/80 transition-colors cursor-pointer">
                   <td className={`py-4 px-4 ${COL.phieu}`}>
                     <div className="flex items-center gap-2.5">
-                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${session.status === "completed" ? "bg-green-500" : "bg-blue-500 animate-pulse"}`} />
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${session.status?.toLowerCase() === "completed" ? "bg-green-500" : "bg-blue-500 animate-pulse"}`} />
                       <div className="min-w-0">
                         <p className="font-semibold text-gray-900 text-sm truncate">{session.checkNumber ?? session.id}</p>
                         <p className="text-xs text-gray-400 mt-0.5 truncate">Kiểm kê định kỳ</p>
@@ -323,23 +549,35 @@ export default function Page() {
                   </td>
                   <td className={`py-4 px-4 ${COL.nguoi}`}>
                     <div className="flex items-center gap-2 min-w-0">
-                      <Avatar name={session.checkedBy ?? "?"} />
-                      <span className="text-sm text-gray-700 truncate">{session.checkedBy ?? "?"}</span>
+                      <Avatar name={getUserName(session.checkedBy)} />
+                      <span className="text-sm text-gray-700 truncate">{getUserName(session.checkedBy)}</span>
                     </div>
                   </td>
                   <td className={`py-4 px-4 ${COL.tiendo}`}>
                     {/* No checkedItems/totalItems in DTO, so show N/A or 0/0 */}
-                    <ProgressBar value={0} max={0} done={session.status === "completed"} />
+                    <ProgressBar value={0} max={0} done={session.status?.toLowerCase() === "completed"} />
                   </td>
                   <td className={`py-4 px-4 text-center ${COL.chenhlech}`}>
                     <DiscrepancyBadge count={session.totalDiscrepancies ?? 0} />
                   </td>
                   <td className={`py-4 px-4 text-center ${COL.trangthai}`}>
-                    <StatusBadge status={session.status === "completed" ? "completed" : "in-progress"} />
+                    <StatusBadge status={session.status?.toLowerCase() === "completed" ? "completed" : "in-progress"} />
                   </td>
                   <td className={`py-4 px-4 text-right ${COL.action}`}>
-                    <Button variant="outline" size="sm">
-                      <Eye className="w-3.5 h-3.5 mr-1" />Chi tiết
+                    <Button 
+                      variant={session.status?.toLowerCase() === "completed" ? "outline" : "primary"} 
+                      size="sm"
+                      onClick={() => handleOpenCheckFromTable(session)}
+                    >
+                      {session.status?.toLowerCase() === "completed" ? (
+                        <>
+                          <Eye className="w-3.5 h-3.5 mr-1" />Chi tiết
+                        </>
+                      ) : (
+                        <>
+                          <ClipboardCheck className="w-3.5 h-3.5 mr-1" />Bắt đầu
+                        </>
+                      )}
                     </Button>
                   </td>
                 </tr>
@@ -440,6 +678,12 @@ export default function Page() {
               </p>
             </div>
 
+            {modalError && (
+              <div className="mx-5 mt-3 rounded-xl px-4 py-3 border bg-red-50 border-red-200">
+                <p className="text-sm text-red-700">{modalError}</p>
+              </div>
+            )}
+
             {/* search + filter */}
             <div className="mx-5 mt-3 flex items-center gap-2">
               <div className="relative flex-1">
@@ -492,15 +736,22 @@ export default function Page() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
+                  {modalLoading && (
+                    <tr>
+                      <td colSpan={6} className="py-14 text-center">
+                        <p className="text-sm text-gray-500">Đang tải danh sách tồn kho...</p>
+                      </td>
+                    </tr>
+                  )}
                   {filteredItems.map(item => {
-                    const actual = checkItems.get(item.id)
+                    const actual = checkItems.get(item.productId)
                     const checked = actual !== undefined
                     const diff    = checked ? actual - item.systemQty : null
                     const bad     = diff !== null && diff !== 0
                     const good    = diff !== null && diff === 0
                     return (
                       <tr
-                        key={item.id}
+                        key={item.productId}
                         className={`transition-colors ${
                           bad  ? 'bg-orange-50/60 hover:bg-orange-50'
                           : good ? 'bg-green-50/30 hover:bg-green-50/50'
@@ -523,7 +774,7 @@ export default function Page() {
                             type="number"
                             min="0"
                             value={actual === undefined ? '' : actual}
-                            onChange={e => handleQtyChange(item.id, e.target.value)}
+                            onChange={e => handleQtyChange(item.productId, e.target.value)}
                             placeholder="—"
                             className={`w-28 px-3 py-2 border rounded-lg text-center text-sm font-semibold outline-none transition tabular-nums ${
                               bad  ? 'border-orange-400 bg-orange-50 text-orange-900 focus:ring-2 focus:ring-orange-400'
@@ -553,7 +804,7 @@ export default function Page() {
                         <td className="py-3.5 px-2 text-center">
                           {checked ? (
                             <button
-                              onClick={() => handleClearItem(item.id)}
+                              onClick={() => handleClearItem(item.productId)}
                               className="w-6 h-6 rounded-md flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition mx-auto"
                             >
                               <X className="w-3.5 h-3.5" />
@@ -565,7 +816,7 @@ export default function Page() {
                       </tr>
                     )
                   })}
-                  {filteredItems.length === 0 && (
+                  {!modalLoading && filteredItems.length === 0 && (
                     <tr>
                       <td colSpan={6} className="py-14 text-center">
                         <Package className="w-10 h-10 mx-auto mb-3 text-gray-300" />
@@ -715,6 +966,71 @@ export default function Page() {
                 className="flex-1 border border-gray-200 text-gray-600 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm"
               >
                 Quay lại chỉnh sửa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          MODAL — Chi tiết kiểm kê (Details View)
+      ══════════════════════════════════════════════════════════════════ */}
+      {showDetailsModal && selectedCheckForDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowDetailsModal(false)} />
+          <div
+            className="relative z-10 bg-white rounded-2xl w-full max-w-2xl flex flex-col max-h-[92vh]"
+            style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.22)' }}
+          >
+            {/* header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <h2 className="text-base font-bold text-gray-900">Chi tiết kiểm kê</h2>
+                <p className="text-xs text-gray-400 mt-0.5">{selectedCheckForDetails.checkNumber}</p>
+              </div>
+              <button onClick={() => setShowDetailsModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition text-gray-400 hover:text-gray-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* content */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Phiếu</p>
+                  <p className="text-sm text-gray-900 font-semibold mt-1">{selectedCheckForDetails.checkNumber}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Ngày</p>
+                  <p className="text-sm text-gray-900 font-semibold mt-1">{selectedCheckForDetails.checkDate?.slice(0, 10)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Người kiểm</p>
+                  <p className="text-sm text-gray-900 font-semibold mt-1">{getUserName(selectedCheckForDetails.checkedBy)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Chênh lệch</p>
+                  <p className="text-sm text-gray-900 font-semibold mt-1">{selectedCheckForDetails.totalDiscrepancies ?? 0}</p>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Trạng thái</p>
+                <div className="mt-2">
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                    <CheckCircle className="w-3 h-3" /> Hoàn thành
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* footer */}
+            <div className="px-6 pb-5 flex gap-3">
+              <button
+                onClick={() => setShowDetailsModal(false)}
+                className="flex-1 border border-gray-200 text-gray-600 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm"
+              >
+                Đóng
               </button>
             </div>
           </div>
