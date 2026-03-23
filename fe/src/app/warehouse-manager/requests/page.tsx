@@ -25,11 +25,12 @@ import { ProductAPIService } from '@/services/product-api.service'
 import { ProductBatchAPIService, type ProductBatchFromAPI } from '@/services/product-batch-api.service'
 import { UserAPIService } from '@/services/user-api.service'
 import { TransferAPIService, TransferFromAPI } from '@/services/transfer-api.service'
+import { createInventoryCheck, getInventoryChecks, type CreateInventoryCheckDto, type InventoryCheckListDto } from '@/services/inventory-check-api'
 import { ToastContainer, type ToastItem } from '@/shared/ui/Toast'
 
 type RequestPriority = 'CAO' | 'TRUNG BÌNH' | 'THẤP'
 type RequestStatus = 'Chờ duyệt' | 'Đang xử lý' | 'Đã giao' | 'Đã duyệt' | 'Từ chối'
-type RequestType = 'store' | 'warehouse' | 'incoming-transfer'
+type RequestType = 'store' | 'warehouse' | 'incoming-transfer' | 'inventory-check'
 
 interface RequestItem {
   id: string
@@ -220,6 +221,24 @@ export default function WarehouseManagerRequestsPage() {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }, [])
 
+  // Inventory Check Modal State
+  const [isInventoryCheckModalOpen, setIsInventoryCheckModalOpen] = useState(false)
+  const [newInventoryCheck, setNewInventoryCheck] = useState({
+    locationType: 'STORE' as 'STORE' | 'WAREHOUSE',
+    locationId: '',
+    checkType: 'PARTIAL' as 'PARTIAL' | 'FULL',
+    notes: '',
+  })
+  const [isSubmittingInventoryCheck, setIsSubmittingInventoryCheck] = useState(false)
+  const [submitInventoryCheckError, setSubmitInventoryCheckError] = useState<string | null>(null)
+
+  // Inventory Check List State
+  const [inventoryChecks, setInventoryChecks] = useState<InventoryCheckListDto[]>([])
+  const [inventoryCheckLoading, setInventoryCheckLoading] = useState(false)
+  const [inventoryCheckError, setInventoryCheckError] = useState<string | null>(null)
+  const [inventoryCheckPage, setInventoryCheckPage] = useState(1)
+  const [inventoryCheckSearch, setInventoryCheckSearch] = useState('')
+
   const loadRequests = useCallback(async () => {
     try {
       const warehouseId = user?.warehouseId ?? user?.storeId ?? user?.workplaceId ?? ''
@@ -237,9 +256,22 @@ export default function WarehouseManagerRequestsPage() {
       } catch {}
 
       let userMap: Record<string, string> = {}
+      const managerWorkplaceId = String(user?.workplaceId ?? '').trim()
+      const managerWorkplaceKey = String(managerWorkplaceId ?? '').trim().toLowerCase()
+      
       try {
         const users = await UserAPIService.getAll()
-        for (const u of users) {
+        // Filter để chỉ hiển thị staff mà manager hiện tại quản lý
+        const managedStaff = users.filter((u) => {
+          const roleName = String(u.role?.name || '').trim().toLowerCase()
+          const userWorkplaceId = String(u.workplaceId ?? u.workplace_id ?? u.workplace?.id ?? '').trim().toLowerCase()
+          const isActive = String(u.status || 'ACTIVE').toUpperCase() === 'ACTIVE'
+          
+          // Chỉ lấy staff của kho này và đang ACTIVE
+          return roleName === 'warehouse staff' && userWorkplaceId === managerWorkplaceKey && isActive
+        })
+        
+        for (const u of managedStaff) {
           const userName = u.full_name || u.fullName || u.name || u.email || u.id
           userMap[u.id] = userName
         }
@@ -265,43 +297,47 @@ export default function WarehouseManagerRequestsPage() {
         warehouseRequests = []
       }
 
-      const storeItems: RequestItem[] = storeRequests.map((req) => {
-        const productNames = req.items?.map((item) => item.productName || productMap[item.productId] || '--').join(', ') || '--'
-        const userName = userMap[req.requestedBy] || req.requestedBy || '--'
-        const createdAtDate = req.requestedDate ? new Date(req.requestedDate).toLocaleDateString('vi-VN') : '--/--/----'
+      const storeItems: RequestItem[] = storeRequests
+        .filter((req) => String(req.toWarehouseId ?? '').trim().toLowerCase() === String(warehouseId ?? '').trim().toLowerCase())
+        .map((req) => {
+          const productNames = req.items?.map((item) => item.productName || productMap[item.productId] || '--').join(', ') || '--'
+          const userName = userMap[req.requestedBy] || req.requestedBy || '--'
+          const createdAtDate = req.requestedDate ? new Date(req.requestedDate).toLocaleDateString('vi-VN') : '--/--/----'
 
-        return {
-          uniqueId: req.id,
-          id: req.requestNumber || req.id,
-          source: userName,
-          sourceCode: req.toWarehouseId || '--',
-          productSummary: productNames,
-          priority: req.priority === 'URGENT' ? 'CAO' : req.priority === 'HIGH' ? 'TRUNG BÌNH' : 'THẤP',
-          status: mapStatus(req.status),
-          createdAt: createdAtDate,
-          actionLabel: req.status === 'APPROVED' ? 'Đã duyệt' : 'Duyệt',
-          type: 'store',
-        }
-      })
+          return {
+            uniqueId: req.id,
+            id: req.requestNumber || req.id,
+            source: userName,
+            sourceCode: req.toWarehouseId || '--',
+            productSummary: productNames,
+            priority: req.priority === 'URGENT' ? 'CAO' : req.priority === 'HIGH' ? 'TRUNG BÌNH' : 'THẤP',
+            status: mapStatus(req.status),
+            createdAt: createdAtDate,
+            actionLabel: req.status === 'APPROVED' ? 'Đã duyệt' : 'Duyệt',
+            type: 'store',
+          }
+        })
 
-      const warehouseItems: RequestItem[] = warehouseRequests.map((req) => {
-        const productNames = req.items?.map((item) => item.productName || productMap[item.productId] || '--').join(', ') || '--'
-        const userName = userMap[req.requestedBy] || req.requestedBy || '--'
-        const createdAtDate = req.requestedDate ? new Date(req.requestedDate).toLocaleDateString('vi-VN') : '--/--/----'
+      const warehouseItems: RequestItem[] = warehouseRequests
+        .filter((req) => String(req.toWarehouseId ?? '').trim().toLowerCase() === String(warehouseId ?? '').trim().toLowerCase())
+        .map((req) => {
+          const productNames = req.items?.map((item) => item.productName || productMap[item.productId] || '--').join(', ') || '--'
+          const userName = userMap[req.requestedBy] || req.requestedBy || '--'
+          const createdAtDate = req.requestedDate ? new Date(req.requestedDate).toLocaleDateString('vi-VN') : '--/--/----'
 
-        return {
-          uniqueId: `wh-${req.id}`,
-          id: req.requestNumber || req.id,
-          source: userName,
-          sourceCode: req.toWarehouseId || '--',
-          productSummary: productNames,
-          priority: req.priority === 'URGENT' ? 'CAO' : req.priority === 'HIGH' ? 'TRUNG BÌNH' : 'THẤP',
-          status: mapStatus(req.status),
-          createdAt: createdAtDate,
-          actionLabel: req.status === 'APPROVED' ? 'Đã duyệt' : 'Duyệt',
-          type: 'warehouse',
-        }
-      })
+          return {
+            uniqueId: `wh-${req.id}`,
+            id: req.requestNumber || req.id,
+            source: userName,
+            sourceCode: req.toWarehouseId || '--',
+            productSummary: productNames,
+            priority: req.priority === 'URGENT' ? 'CAO' : req.priority === 'HIGH' ? 'TRUNG BÌNH' : 'THẤP',
+            status: mapStatus(req.status),
+            createdAt: createdAtDate,
+            actionLabel: req.status === 'APPROVED' ? 'Đã duyệt' : 'Duyệt',
+            type: 'warehouse',
+          }
+        })
 
       setRequests([...storeItems, ...warehouseItems])
       setPage(1)
@@ -565,6 +601,85 @@ export default function WarehouseManagerRequestsPage() {
     [pushToast, loadRequests],
   )
 
+  const handleCreateInventoryCheck = useCallback(
+    async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault()
+      setSubmitInventoryCheckError(null)
+
+      if (!newInventoryCheck.locationId) {
+        setSubmitInventoryCheckError('Vui lòng chọn kho/cửa hàng')
+        return
+      }
+
+      const dto: CreateInventoryCheckDto = {
+        locationType: newInventoryCheck.locationType,
+        locationId: newInventoryCheck.locationId,
+        checkType: newInventoryCheck.checkType,
+        notes: newInventoryCheck.notes.trim() || undefined,
+      }
+
+      try {
+        setIsSubmittingInventoryCheck(true)
+        await createInventoryCheck(dto)
+
+        pushToast({
+          type: 'success',
+          message: 'Tạo phiếu kiểm kê thành công!',
+        })
+        setIsInventoryCheckModalOpen(false)
+        setNewInventoryCheck({
+          locationType: 'STORE',
+          locationId: '',
+          checkType: 'PARTIAL',
+          notes: '',
+        })
+      } catch (error: any) {
+        const msg =
+          error?.response?.data?.message ||
+          error?.response?.data?.error ||
+          error?.message ||
+          'Tạo phiếu kiểm kê thất bại. Vui lòng thử lại.'
+        setSubmitInventoryCheckError(msg)
+      } finally {
+        setIsSubmittingInventoryCheck(false)
+      }
+    },
+    [newInventoryCheck, pushToast],
+  )
+
+  const loadInventoryChecks = useCallback(async () => {
+    if (!normalizedCurrentWarehouseId) {
+      setInventoryChecks([])
+      return
+    }
+    
+    setInventoryCheckLoading(true)
+    setInventoryCheckError(null)
+    try {
+      const data = await getInventoryChecks()
+      const allChecks = Array.isArray(data) ? data : []
+      
+      // Chỉ hiển thị phiếu kiểm kê của kho hiện tại
+      const filteredChecks = allChecks.filter(
+        (check) => String(check.locationId ?? '').trim().toLowerCase() === normalizedCurrentWarehouseId
+      )
+      
+      setInventoryChecks(filteredChecks)
+      setInventoryCheckPage(1)
+    } catch (err: unknown) {
+      setInventoryCheckError(err instanceof Error ? err.message : 'Không thể tải danh sách phiếu kiểm kê.')
+      setInventoryChecks([])
+    } finally {
+      setInventoryCheckLoading(false)
+    }
+  }, [normalizedCurrentWarehouseId])
+
+  useEffect(() => {
+    if (activeTab === 'inventory-check') {
+      loadInventoryChecks()
+    }
+  }, [activeTab, loadInventoryChecks])
+
   const fromWarehouseIdForForm = user?.warehouseId ?? user?.workplaceId ?? ''
   const normalizedFromId = normalizeId(fromWarehouseIdForForm)
 
@@ -702,6 +817,15 @@ export default function WarehouseManagerRequestsPage() {
               Tạo yêu cầu mới
             </button>
           )}
+          {activeTab === 'inventory-check' && (
+            <button
+              onClick={() => setIsInventoryCheckModalOpen(true)}
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#059669] text-white font-semibold hover:bg-[#047857] transition-colors"
+            >
+              <ClipboardList className="w-4 h-4" />
+              Tạo phiếu kiểm kê
+            </button>
+          )}
         </div>
       </div>
 
@@ -746,37 +870,52 @@ export default function WarehouseManagerRequestsPage() {
               Kiểm tra giao hàng
             </span>
           </button>
+          <button
+            onClick={() => onChangeTab('inventory-check')}
+            className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${
+              activeTab === 'inventory-check'
+                ? 'text-[#ea580c] border-[#ea580c]'
+                : 'text-gray-500 border-transparent hover:text-gray-700'
+            }`}
+          >
+            <span className="inline-flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" />
+              Kiểm tra Inventory
+            </span>
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard
-          icon={<ClipboardList className="w-5 h-5 text-[#f97316]" />}
-          title="Tổng yêu cầu chờ"
-          value={waitingCount}
-          delta="+5%"
-          deltaClass="text-emerald-600"
-          iconBg="bg-orange-100"
-        />
-        <StatCard
-          icon={<AlertTriangle className="w-5 h-5 text-red-500" />}
-          title="Ưu tiên cao"
-          value={urgentCount}
-          delta="-2%"
-          deltaClass="text-red-500"
-          iconBg="bg-red-100"
-        />
-        <StatCard
-          icon={<CheckCircle2 className="w-5 h-5 text-emerald-600" />}
-          title="Đã duyệt hôm nay"
-          value={approvedToday}
-          delta="+10%"
-          deltaClass="text-emerald-600"
-          iconBg="bg-emerald-100"
-        />
-      </div>
+      {activeTab !== 'inventory-check' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <StatCard
+            icon={<ClipboardList className="w-5 h-5 text-[#f97316]" />}
+            title="Tổng yêu cầu chờ"
+            value={waitingCount}
+            delta="+5%"
+            deltaClass="text-emerald-600"
+            iconBg="bg-orange-100"
+          />
+          <StatCard
+            icon={<AlertTriangle className="w-5 h-5 text-red-500" />}
+            title="Ưu tiên cao"
+            value={urgentCount}
+            delta="-2%"
+            deltaClass="text-red-500"
+            iconBg="bg-red-100"
+          />
+          <StatCard
+            icon={<CheckCircle2 className="w-5 h-5 text-emerald-600" />}
+            title="Đã duyệt hôm nay"
+            value={approvedToday}
+            delta="+10%"
+            deltaClass="text-emerald-600"
+            iconBg="bg-emerald-100"
+          />
+        </div>
+      )}
 
-      {activeTab !== 'incoming-transfer' ? (
+      {(activeTab === 'store' || activeTab === 'warehouse') && (
         <section className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
             <h2 className="text-2xl font-bold text-gray-900">Danh sách yêu cầu gần đây</h2>
@@ -817,8 +956,7 @@ export default function WarehouseManagerRequestsPage() {
                     <tr key={row.uniqueId} className="border-t border-gray-100 hover:bg-gray-50/70 transition-colors">
                       <td className="px-5 py-4 font-bold text-[#ea580c]">#{row.id}</td>
                       <td className="px-5 py-4">
-                        <p className="font-semibold text-gray-800">{row.source}</p>
-                        <p className="text-xs text-gray-500">ID: {row.sourceCode}</p>
+                        <p className="font-semibold text-gray-800">{getLocationName(row.sourceCode)}</p>
                       </td>
                       <td className="px-5 py-4 text-gray-700">{row.productSummary}</td>
                       <td className="px-5 py-4">{renderPriority(row.priority)}</td>
@@ -891,7 +1029,9 @@ export default function WarehouseManagerRequestsPage() {
             </div>
           </div>
         </section>
-      ) : (
+      )}
+
+      {activeTab === 'incoming-transfer' && (
         <section className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
             <div>
@@ -1106,6 +1246,174 @@ export default function WarehouseManagerRequestsPage() {
               </button>
             </div>
           </div>
+        </section>
+      )}
+
+      {activeTab === 'inventory-check' && (
+        <section className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Danh sách phiếu kiểm kê</h2>
+              <p className="text-sm text-gray-500 mt-1">Quản lý các phiếu kiểm kê kho và cửa hàng</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={loadInventoryChecks}
+                className="px-4 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors inline-flex items-center gap-2 disabled:opacity-60"
+                disabled={inventoryCheckLoading}
+              >
+                {inventoryCheckLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Filter className="w-4 h-4" />}
+                Làm mới
+              </button>
+              <button className="px-4 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors inline-flex items-center gap-2">
+                <Download className="w-4 h-4" />
+                Xuất Excel
+              </button>
+            </div>
+          </div>
+
+          {inventoryCheckError && (
+            <div className="px-5 py-4 bg-red-50 border-b border-red-200">
+              <div className="text-sm text-red-700 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                {inventoryCheckError}
+              </div>
+            </div>
+          )}
+
+          <div className="px-5 py-4 border-b border-gray-100 bg-white">
+            <div className="flex items-center gap-2.5">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={inventoryCheckSearch}
+                  onChange={(e) => {
+                    setInventoryCheckSearch(e.target.value)
+                    setInventoryCheckPage(1)
+                  }}
+                  placeholder="Tìm mã kiểm kê hoặc vị trí..."
+                  className="pl-9 pr-3 h-10 w-full rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 text-gray-500 uppercase text-xs tracking-wider">
+                <tr>
+                  <th className="px-5 py-3 text-left">Mã Kiểm Kê</th>
+                  <th className="px-5 py-3 text-left">Vị Trí</th>
+                  <th className="px-5 py-3 text-left">Loại Kiểm Kê</th>
+                  <th className="px-5 py-3 text-left">Trạng Thái</th>
+                  <th className="px-5 py-3 text-left">Chênh lệch</th>
+                  <th className="px-5 py-3 text-left">Ngày tạo</th>
+                  <th className="px-5 py-3 text-left">Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inventoryCheckLoading ? (
+                  <tr>
+                    <td className="px-5 py-12 text-center text-gray-500" colSpan={7}>
+                      <Loader2 className="w-5 h-5 animate-spin inline-block mr-2" />
+                      Đang tải danh sách...
+                    </td>
+                  </tr>
+                ) : inventoryChecks.length === 0 ? (
+                  <tr>
+                    <td className="px-5 py-12 text-center text-gray-500" colSpan={7}>
+                      Chưa có phiếu kiểm kê nào
+                    </td>
+                  </tr>
+                ) : (
+                  inventoryChecks
+                    .filter((check) =>
+                      inventoryCheckSearch.toLowerCase() === '' ||
+                      (check.checkNumber && check.checkNumber.toLowerCase().includes(inventoryCheckSearch.toLowerCase())) ||
+                      (check.locationId && check.locationId.toLowerCase().includes(inventoryCheckSearch.toLowerCase()))
+                    )
+                    .slice((inventoryCheckPage - 1) * 10, inventoryCheckPage * 10)
+                    .map((check) => (
+                      <tr key={check.id} className="border-t border-gray-100 hover:bg-gray-50/70 transition-colors">
+                        <td className="px-5 py-4">
+                          <p className="font-bold text-[#059669]">#{check.checkNumber || check.id}</p>
+                          <p className="text-xs text-gray-500">{check.id.slice(0, 8)}…</p>
+                        </td>
+                        <td className="px-5 py-4 text-gray-700">
+                          <p className="font-semibold">{getLocationName(check.locationId)}</p>
+                          <p className="text-xs text-gray-500">{check.locationType}</p>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            check.checkType === 'FULL'
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            {check.checkType === 'FULL' ? 'Toàn bộ' : 'Cục bộ'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            check.status === 'COMPLETED' || check.status === 'APPROVED'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : check.status === 'PENDING'
+                              ? 'bg-amber-100 text-amber-700'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            {check.status === 'COMPLETED' || check.status === 'APPROVED' ? 'Hoàn thành' : check.status === 'PENDING' ? 'Chờ xử lý' : check.status}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 text-gray-700 font-semibold">{check.totalDiscrepancies || 0}</td>
+                        <td className="px-5 py-4 text-gray-500 whitespace-nowrap">{formatDateVI(check.createdAt)}</td>
+                        <td className="px-5 py-4">
+                          <button className="text-gray-400 hover:text-gray-700 p-1.5 rounded-lg hover:bg-gray-100 transition-colors" title="Xem chi tiết">
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {inventoryChecks.length > 0 && (
+            <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
+              <p className="text-sm text-gray-500">
+                Hiển thị {inventoryChecks.length === 0 ? 0 : (inventoryCheckPage - 1) * 10 + 1}-
+                {Math.min(inventoryCheckPage * 10, inventoryChecks.length)} trên {inventoryChecks.length} phiếu
+              </p>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setInventoryCheckPage((p) => Math.max(1, p - 1))}
+                  className="w-8 h-8 rounded-md border border-gray-200 text-gray-500 disabled:opacity-40"
+                  disabled={inventoryCheckPage === 1}
+                >
+                  {'<'}
+                </button>
+                {Array.from({ length: Math.ceil(inventoryChecks.length / 10) }, (_, i) => i + 1)
+                  .slice(0, 7)
+                  .map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => setInventoryCheckPage(num)}
+                      className={`w-8 h-8 rounded-md text-sm font-semibold ${
+                        inventoryCheckPage === num ? 'bg-[#059669] text-white' : 'border border-gray-200 text-gray-600'
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                <button
+                  onClick={() => setInventoryCheckPage((p) => Math.min(Math.ceil(inventoryChecks.length / 10), p + 1))}
+                  className="w-8 h-8 rounded-md border border-gray-200 text-gray-500 disabled:opacity-40"
+                  disabled={inventoryCheckPage === Math.ceil(inventoryChecks.length / 10)}
+                >
+                  {'>'}
+                </button>
+              </div>
+            </div>
+          )}
         </section>
       )}
 
@@ -1443,6 +1751,118 @@ export default function WarehouseManagerRequestsPage() {
 
               {/* Manager chỉ xem chi tiết, không xác nhận nhận hàng. */}
             </div>
+          </section>
+        </div>
+      )}
+
+      {isInventoryCheckModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/25 p-4 pt-20">
+          <section className="w-full max-w-2xl bg-white rounded-2xl border border-gray-200 p-5 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Tạo Phiếu Kiểm Kê</h3>
+              <button
+                onClick={() => setIsInventoryCheckModalOpen(false)}
+                className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateInventoryCheck} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="text-sm text-gray-600">
+                  Loại vị trí
+                  <div className="relative mt-1">
+                    <select
+                      value={newInventoryCheck.locationType}
+                      onChange={(e) =>
+                        setNewInventoryCheck((prev) => ({ ...prev, locationType: e.target.value as 'STORE' | 'WAREHOUSE' }))
+                      }
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-200 text-sm"
+                    >
+                      <option value="STORE">Cửa hàng (STORE)</option>
+                      <option value="WAREHOUSE">Kho (WAREHOUSE)</option>
+                    </select>
+                    <ChevronDown className="w-3 h-3 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
+                </label>
+                <label className="text-sm text-gray-600">
+                  Chọn vị trí <span className="text-red-500">*</span>
+                  <div className="relative mt-1">
+                    <Search className="w-3 h-3 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <select
+                      value={newInventoryCheck.locationId}
+                      onChange={(e) =>
+                        setNewInventoryCheck((prev) => ({ ...prev, locationId: e.target.value }))
+                      }
+                      className="w-full pl-8 pr-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-200 text-sm"
+                    >
+                      <option value="">-- Chọn kho/cửa hàng --</option>
+                      {locations
+                        .filter((loc) => {
+                          if (newInventoryCheck.locationType === 'STORE') {
+                            return normalizeId(loc.parentId ?? loc.parent_id) === normalizedCurrentWarehouseId
+                          }
+                          return normalizeId(loc.id) === normalizedCurrentWarehouseId
+                        })
+                        .map((loc) => (
+                          <option key={loc.id} value={loc.id}>
+                            {loc.name} ({loc.id})
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </label>
+                <label className="text-sm text-gray-600">
+                  Loại kiểm kê
+                  <div className="relative mt-1">
+                    <select
+                      value={newInventoryCheck.checkType}
+                      onChange={(e) =>
+                        setNewInventoryCheck((prev) => ({ ...prev, checkType: e.target.value as 'PARTIAL' | 'FULL' }))
+                      }
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-200 text-sm"
+                    >
+                      <option value="PARTIAL">Kiểm kê cục bộ (PARTIAL)</option>
+                      <option value="FULL">Kiểm kê toàn bộ (FULL)</option>
+                    </select>
+                    <ChevronDown className="w-3 h-3 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
+                </label>
+                <label className="text-sm text-gray-600">
+                  Ghi chú
+                  <textarea
+                    value={newInventoryCheck.notes}
+                    onChange={(e) =>
+                      setNewInventoryCheck((prev) => ({ ...prev, notes: e.target.value }))
+                    }
+                    rows={2}
+                    placeholder="Ghi chú thêm cho phiếu kiểm kê..."
+                    className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-200 resize-y text-sm"
+                  />
+                </label>
+              </div>
+
+              {submitInventoryCheckError && (
+                <p className="text-sm text-red-600">{submitInventoryCheckError}</p>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsInventoryCheckModalOpen(false)}
+                  className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingInventoryCheck}
+                  className="px-4 py-2 rounded-lg bg-[#059669] text-white font-semibold hover:bg-[#047857] disabled:opacity-60"
+                >
+                  {isSubmittingInventoryCheck ? 'Đang tạo...' : 'Tạo phiếu kiểm kê'}
+                </button>
+              </div>
+            </form>
           </section>
         </div>
       )}

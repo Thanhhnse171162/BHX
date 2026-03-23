@@ -2,29 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  ArrowRight,
   CirclePlus,
   Eye,
   Loader2,
   Search,
-  Truck,
   Warehouse,
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
   X,
-  ClipboardCheck,
-  CheckCircle2,
-  AlertCircle,
-  CheckSquare,
-  ListTodo,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 import { TransferAPIService, type TransferFromAPI } from '@/services/transfer-api.service'
-import { RestockAPIService, type RestockRequestFromAPI, type RestockRequestItem } from '@/services/restock-api.service'
+import { RestockAPIService, type RestockRequestFromAPI } from '@/services/restock-api.service'
 import { ProductBatchAPIService, type ProductBatchFromAPI } from '@/services/product-batch-api.service'
 import { ProductAPIService } from '@/services/product-api.service'
-import { useRouter } from 'next/navigation'
 
 type TransferStatus = 'PENDING' | 'IN_TRANSIT' | 'DELIVERED' | 'COMPLETED'
 
@@ -324,9 +316,6 @@ function CreateTransferModal({
   locationsById: Record<string, string>
   userId: string
 }) {
-  const [loadingStores, setLoadingStores] = useState(false)
-  const [storesError, setStoresError] = useState<string | null>(null)
-
   const [batches, setBatches] = useState<ProductBatchFromAPI[]>([])
   const [batchesLoading, setBatchesLoading] = useState(false)
   const [productNameById, setProductNameById] = useState<Record<string, string>>({})
@@ -534,9 +523,9 @@ function CreateTransferModal({
       const msg =
         (err as any)?.response?.data?.message ||
         (err as any)?.response?.data?.error ||
-        err instanceof Error
+        (err instanceof Error
           ? err.message
-          : 'Tạo phiếu vận chuyển thất bại.'
+          : 'Tạo phiếu vận chuyển thất bại.')
       setSubmitError(msg)
     } finally {
       setSubmitLoading(false)
@@ -783,7 +772,6 @@ function CreateTransferModal({
 export default function WarehouseManagerTransfersPage() {
   const user = useAuthStore((s) => s.user)
   const token = useAuthStore((s) => s.token)
-  const router = useRouter()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -838,8 +826,8 @@ export default function WarehouseManagerTransfersPage() {
     }))
 
     // Heuristic: store IDs likely start with 'b' (warehouse IDs start with 'a')
-    const storeCandidates = candidates.filter((c) => normalizeId(c.id).startsWith('b'))
-    const finalOptions = (storeCandidates.length > 0 ? storeCandidates : candidates).sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+    const storeCandidates = candidates.filter((c: { id: string; name: string }) => normalizeId(c.id).startsWith('b'))
+    const finalOptions = (storeCandidates.length > 0 ? storeCandidates : candidates).sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, 'vi'))
     setStoreOptions(finalOptions)
   }, [token, normalizedCurrentWarehouseId, currentWarehouseId])
 
