@@ -40,7 +40,7 @@ function DataTableInner<T extends Record<string, unknown>>(
               <th
                 key={String(col.key)}
                 style={{ width: col.width }}
-                className="px-6 py-3 text-left text-sm font-semibold text-gray-700"
+                className="px-6 py-3 text-left text-base font-semibold text-gray-800 tracking-wide uppercase"
               >
                 {col.label}
               </th>

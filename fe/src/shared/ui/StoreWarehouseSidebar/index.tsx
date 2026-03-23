@@ -9,7 +9,8 @@ import {
   ArrowLeftRight,
   BarChart3,
   Archive,
-  Boxes
+  Boxes,
+  ClipboardCheck
 } from 'lucide-react'
 
 interface SidebarItem {
@@ -34,6 +35,11 @@ const sidebarItems: SidebarItem[] = [
     href: '/warehouse-store/receive-goods',
     
     icon: <Archive size={20} />
+  },
+  {
+    label: 'Kiểm tra kho',
+    href: '/warehouse-store/inventory-check',
+    icon: <ClipboardCheck size={20} />
   },
   {
     label: 'Xuất hàng',
@@ -68,7 +74,12 @@ export function StoreWarehouseSidebar() {
       <nav className="flex-1 px-3 py-5">
         <ul className="space-y-1.5">
           {sidebarItems.map((item) => {
-            const isActive = pathname === item.href || (item.href !== '/warehouse-store' && pathname.startsWith(item.href))
+            let isActive = false;
+            if (item.href === '/warehouse-store') {
+              isActive = pathname === '/warehouse-store';
+            } else {
+              isActive = pathname === item.href;
+            }
             // Highlight đặc biệt cho Nhập hàng
             const isNhapHang = item.label === 'Nhập hàng'
             return (
