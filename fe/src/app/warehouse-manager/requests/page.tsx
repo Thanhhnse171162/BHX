@@ -298,7 +298,7 @@ export default function WarehouseManagerRequestsPage() {
       }
 
       const storeItems: RequestItem[] = storeRequests
-        .filter((req) => String(req.toWarehouseId ?? '').trim().toLowerCase() === String(warehouseId ?? '').trim().toLowerCase())
+        .filter((req) => String(req.fromWarehouseId ?? '').trim().toLowerCase() === String(warehouseId ?? '').trim().toLowerCase())
         .map((req) => {
           const productNames = req.items?.map((item) => item.productName || productMap[item.productId] || '--').join(', ') || '--'
           const userName = userMap[req.requestedBy] || req.requestedBy || '--'
@@ -319,7 +319,7 @@ export default function WarehouseManagerRequestsPage() {
         })
 
       const warehouseItems: RequestItem[] = warehouseRequests
-        .filter((req) => String(req.toWarehouseId ?? '').trim().toLowerCase() === String(warehouseId ?? '').trim().toLowerCase())
+        .filter((req) => String(req.fromWarehouseId ?? '').trim().toLowerCase() === String(warehouseId ?? '').trim().toLowerCase())
         .map((req) => {
           const productNames = req.items?.map((item) => item.productName || productMap[item.productId] || '--').join(', ') || '--'
           const userName = userMap[req.requestedBy] || req.requestedBy || '--'
