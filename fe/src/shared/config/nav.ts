@@ -110,6 +110,16 @@ export const getAdminNavigation = (): NavGroup[] => {
       ],
     },
     {
+      label: 'Nhà cung cấp',
+      items: [
+        {
+          label: 'Quản lý nhà cung cấp',
+          href: '/admin/suppliers',
+          icon: 'Truck',
+        },
+      ],
+    },
+    {
       label: 'Kho & Tồn kho',
       items: [
         {
@@ -159,36 +169,7 @@ export const getAdminNavigation = (): NavGroup[] => {
         },
       ],
     },
-    {
-      label: 'Khách hàng & Loyalty',
-      items: [
-        {
-          label: 'Customers',
-          href: '/admin/customers',
-          icon: 'UserCircle',
-        },
-        {
-          label: 'Loyalty & Points',
-          href: '/admin/loyalty',
-          icon: 'Award',
-        },
-      ],
-    },
-    {
-      label: 'Khuyến mãi',
-      items: [
-        {
-          label: 'Promotions',
-          href: '/admin/promotions',
-          icon: 'Tag',
-        },
-        {
-          label: 'Coupons',
-          href: '/admin/promotions/coupons',
-          icon: 'Ticket',
-        },
-      ],
-    },
+
     {
       label: 'Báo cáo',
       items: [
