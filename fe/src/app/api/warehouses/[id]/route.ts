@@ -1,16 +1,10 @@
 import { NextResponse } from 'next/server'
-import sql from 'mssql'
 
-const config = {
-  user: process.env.DB_USER || '',
-  password: process.env.DB_PASSWORD || '',
-  server: process.env.DB_SERVER || '',
-  database: process.env.DB_NAME || '',
-  options: {
-    encrypt: true,
-    trustServerCertificate: true,
-  },
-}
+const INVENTORY_SERVICE_URL =
+  process.env.INVENTORY_URL ||
+  process.env.NEXT_PUBLIC_INVENTORY_URL ||
+  process.env.NEXT_PUBLIC_INVENTORY_API_URL ||
+  'http://localhost:5003'
 
 export async function PUT(
   request: Request,
@@ -18,47 +12,99 @@ export async function PUT(
 ) {
   try {
     const body = await request.json()
-    const { name, location, capacity, status } = body
+    const { name, location, capacity, status, parentId } = body
     const { id } = params
 
-    const pool = await sql.connect(config)
-    
-    const result = await pool.request()
-      .input('id', sql.VarChar, id)
-      .input('name', sql.NVarChar, name)
-      .input('location', sql.NVarChar, location)
-      .input('capacity', sql.Int, capacity)
-      .input('status', sql.VarChar, status)
-      .query(`
-        UPDATE warehouses
-        SET 
-          name = @name,
-          location = @location,
-          capacity = @capacity,
-          status = @status
-        OUTPUT INSERTED.*
-        WHERE id = @id AND is_deleted = 0
-      `)
-
-    await pool.close()
-
-    if (result.recordset.length === 0) {
+    if (!name || !location || !capacity) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Warehouse not found'
+          message: 'name, location, and capacity are required'
         },
-        { status: 404 }
+        { status: 400 }
       )
     }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Warehouse updated successfully',
-      data: result.recordset[0]
+    // Proxy to backend /api/Warehouse/warehouses/{id} endpoint
+    const url = `${INVENTORY_SERVICE_URL}/api/Warehouse/warehouses/${id}`
+    const authHeader = request.headers.get('authorization') || ''
+
+    // Flat payload
+    const payload = {
+      name,
+      location,
+      capacity,
+      status: status || 'Active',
+      parentId: parentId || null,
+    }
+
+    console.log('🔵 Updating warehouse:', { url, id, payload })
+
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: authHeader,
+      },
+      body: JSON.stringify(payload),
     })
+
+    console.log('🟢 Backend response status:', response.status)
+
+    let responseText = ''
+    try {
+      responseText = await response.text()
+    } catch (error) {
+      console.error('❌ Failed to read response body:', error)
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Failed to read backend response',
+          error: String(error)
+        },
+        { status: 500 }
+      )
+    }
+
+    let data: any = {}
+    if (responseText) {
+      try {
+        data = JSON.parse(responseText)
+      } catch (parseError) {
+        console.error('❌ Failed to parse response JSON:', parseError)
+        console.error('Response text:', responseText)
+      }
+    }
+
+    if (!response.ok) {
+      const errorMessage = data.message || data.error || responseText || 'Unknown error'
+      console.error('❌ Backend returned error:', { status: response.status, message: errorMessage })
+      
+      if (response.status === 401) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'Unauthorized - please login with admin/warehouse admin account',
+            error: errorMessage
+          },
+          { status: 401 }
+        )
+      }
+      
+      return NextResponse.json(
+        {
+          success: false,
+          message: errorMessage,
+          data
+        },
+        { status: response.status }
+      )
+    }
+
+    console.log('✅ Warehouse updated successfully')
+    return NextResponse.json({ success: true, message: 'Warehouse updated successfully', data }, { status: 200 })
   } catch (error: any) {
-    console.error('Error updating warehouse:', error)
+    console.error('❌ Error updating warehouse:', error.message)
     return NextResponse.json(
       {
         success: false,
@@ -77,33 +123,73 @@ export async function DELETE(
   try {
     const { id } = params
 
-    const pool = await sql.connect(config)
-    
-    // Soft delete - set is_deleted = 1
-    const result = await pool.request()
-      .input('id', sql.VarChar, id)
-      .query(`
-        UPDATE warehouses
-        SET is_deleted = 1
-        WHERE id = @id AND is_deleted = 0
-      `)
+    // Proxy to backend /api/Warehouse/warehouses/{id} endpoint
+    const url = `${INVENTORY_SERVICE_URL}/api/Warehouse/warehouses/${id}`
+    const authHeader = request.headers.get('authorization') || ''
 
-    await pool.close()
+    console.log('🔵 Deleting warehouse:', { url, id })
 
-    if (result.rowsAffected[0] === 0) {
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        Authorization: authHeader,
+      },
+    })
+
+    console.log('🟢 Backend response status:', response.status)
+
+    let responseText = ''
+    try {
+      responseText = await response.text()
+    } catch (error) {
+      console.error('❌ Failed to read response body:', error)
       return NextResponse.json(
         {
           success: false,
-          message: 'Warehouse not found or already deleted'
+          message: 'Failed to read backend response',
+          error: String(error)
         },
-        { status: 404 }
+        { status: 500 }
       )
     }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Warehouse deleted successfully (soft delete)'
-    })
+    let data: any = {}
+    if (responseText) {
+      try {
+        data = JSON.parse(responseText)
+      } catch (parseError) {
+        console.error('❌ Failed to parse response JSON:', parseError)
+        console.error('Response text:', responseText)
+      }
+    }
+
+    if (!response.ok) {
+      const errorMessage = data.message || data.error || responseText || 'Unknown error'
+      console.error('❌ Backend returned error:', { status: response.status, message: errorMessage })
+      
+      if (response.status === 401) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'Unauthorized - please login with admin/warehouse admin account',
+            error: errorMessage
+          },
+          { status: 401 }
+        )
+      }
+      
+      return NextResponse.json(
+        {
+          success: false,
+          message: errorMessage,
+          data
+        },
+        { status: response.status }
+      )
+    }
+
+    console.log('✅ Warehouse deleted successfully')
+    return NextResponse.json({ success: true, message: 'Warehouse deleted successfully', data }, { status: response.status })
   } catch (error: any) {
     console.error('Error deleting warehouse:', error)
     return NextResponse.json(

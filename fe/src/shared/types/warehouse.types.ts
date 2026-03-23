@@ -982,9 +982,10 @@ export interface AdminWarehouse extends Record<string, unknown> {
   location: string;
   capacity: number;
   status: 'ACTIVE' | 'INACTIVE';
-  is_deleted: number;
-  created_at: string;
-  created_by: string;
+  parentId?: string;
+  isDeleted: boolean;
+  createdAt: string;
+  createdBy?: string;
 }
 
 export interface AdminWarehouseFilters {
@@ -1005,6 +1006,7 @@ export interface AdminWarehouseFormData {
   location: string;
   capacity: number;
   status: 'ACTIVE' | 'INACTIVE';
+  parentId?: string;
 }
 
 export interface AdminWarehouseApiResponse {
