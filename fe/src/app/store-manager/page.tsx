@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import {
   DollarSign,
   ShoppingCart,
@@ -195,6 +196,16 @@ export default function StoreManagerDashboard() {
 
   return (
     <div className="p-6 space-y-5 min-h-full">
+
+      <div className="flex items-center justify-end">
+        <Link
+          href="/store-manager/inventory-check"
+          className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors"
+        >
+          <ClipboardList size={16} />
+          Tạo đơn kiểm kê
+        </Link>
+      </div>
 
       {/* KPI cards */}
       <div className="grid grid-cols-5 gap-4">

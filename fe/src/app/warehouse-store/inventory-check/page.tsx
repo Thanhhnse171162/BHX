@@ -148,7 +148,6 @@ export default function Page() {
 
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
   const [activeCheckId, setActiveCheckId] = useState<string | null>(null)
 
   // Details view
@@ -311,53 +310,12 @@ export default function Page() {
     setModalLoading(false)
   }
 
-  const handleOpenModal = async () => {
-    setShowCheckModal(true)
-    setModalSearch('')
-    setModalCategory('all')
-    setCheckItems(new Map())
-    setInventoryItems([])
-    setModalError(null)
-    setModalLoading(true)
-
-    try {
-      if (!hydrated) {
-        throw new Error('Đang tải thông tin tài khoản. Vui lòng thử lại sau vài giây.')
-      }
-
-      const locationType = normalizeLocationType(user?.workplaceType)
-      const locationId = user?.workplaceId?.trim()
-
-      if (!locationType || !locationId) {
-        throw new Error('Tài khoản chưa được gán kho/cửa hàng. Không thể tải danh sách tồn kho để kiểm kê.')
-      }
-
-      const [inventoryData, productsData] = await Promise.all([
-        InventoryAPIService.getInventoryByLocation(locationType, locationId),
-        ProductAPIService.getAllProducts(),
-      ])
-
-      const productMap = new Map<string, ProductFromAPI>()
-      productsData.forEach((product) => {
-        productMap.set(product.id, product)
-      })
-
-      const modalItems = mapInventoryToModalItems(inventoryData, productMap)
-      setInventoryItems(modalItems)
-    } catch (err: any) {
-      const fallbackMessage = 'Không thể lấy danh sách tồn kho theo kho/cửa hàng hiện tại.'
-      const message = err?.response?.data?.message || err?.message || fallbackMessage
-      setModalError(message)
-    }
-    setModalLoading(false)
-  }
   const handleCloseModal = () => {
     setShowCheckModal(false)
     setModalSearch('')
     setCheckItems(new Map())
     setShowConfirm(false)
     setActiveCheckId(null)
-    setSubmitError(null)
   }
   const handleCompleteClick = () => {
     if (checkItems.size === 0) { alert('Vui lòng nhập số lượng thực tế!'); return }
@@ -368,7 +326,6 @@ export default function Page() {
   const handleFinalSubmit = async () => {
     if (isSubmitting) return
     setIsSubmitting(true)
-    setSubmitError(null)
 
     try {
       const locationType = normalizeLocationType(user?.workplaceType)
@@ -405,7 +362,7 @@ export default function Page() {
 
       // Refresh the list
       const updatedChecks = await getInventoryChecks()
-      const currentLocationId = String(user.workplaceId).trim().toLowerCase()
+      const currentLocationId = String(locationId).trim().toLowerCase()
       const filtered = updatedChecks.filter((check) => {
         const checkLocationId = String(check.locationId ?? '').trim().toLowerCase()
         return checkLocationId === currentLocationId
@@ -418,7 +375,6 @@ export default function Page() {
     } catch (err: any) {
       const fallbackMessage = 'Không thể hoàn thành kiểm kê. Vui lòng thử lại.'
       const message = err?.response?.data?.message || err?.message || fallbackMessage
-      setSubmitError(message)
       alert(`Lỗi: ${message}`)
     } finally {
       setIsSubmitting(false)
