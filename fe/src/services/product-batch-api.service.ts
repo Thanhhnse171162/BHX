@@ -1,19 +1,4 @@
-import axios, { AxiosInstance } from 'axios'
-import { useAuthStore } from '@/store/auth.store'
-
-const localApiClient: AxiosInstance = axios.create({
-  baseURL: '/api',
-  timeout: 30000,
-  headers: { 'Content-Type': 'application/json' },
-})
-
-localApiClient.interceptors.request.use((config) => {
-  if (typeof window !== 'undefined') {
-    const token = useAuthStore.getState().token
-    if (token) config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
-})
+import { localApiClient } from '@/shared/api/http'
 
 export interface ProductBatchFromAPI {
   id: string
@@ -28,6 +13,34 @@ export interface ProductBatchFromAPI {
   status: string
 }
 
+export interface ProductBatchDetailFromAPI extends ProductBatchFromAPI {
+  transactionHistory?: Array<{
+    id?: string
+    action?: string
+    quantity?: number
+    note?: string
+    createdAt?: string
+  }>
+}
+
+export interface AllocateBatchDTO {
+  batchId: string
+  quantity: number
+  destinationWarehouseId: string
+  shippingDate: string
+}
+
+export interface ReceiveFromSupplierDTO {
+  supplierId: string
+  batchId: string
+  quantity: number
+}
+
+export interface ExpiredOutboundDTO {
+  batchId: string
+  quantity: number
+}
+
 export class ProductBatchAPIService {
   static async getByWarehouse(warehouseId: string): Promise<ProductBatchFromAPI[]> {
     try {
@@ -39,6 +52,49 @@ export class ProductBatchAPIService {
     } catch (error) {
       console.error('Error fetching batches:', error)
       return []
+    }
+  }
+
+  static async getById(batchId: string): Promise<ProductBatchDetailFromAPI | null> {
+    try {
+      const response = await localApiClient.get(`/product-batch/batch/${batchId}`)
+      const payload = response.data
+      if (payload?.data && typeof payload.data === 'object') return payload.data
+      if (payload && typeof payload === 'object') return payload
+      return null
+    } catch (error) {
+      console.error('Error fetching batch detail:', error)
+      return null
+    }
+  }
+
+  static async allocateBatch(body: AllocateBatchDTO): Promise<boolean> {
+    try {
+      const response = await localApiClient.post('/product-batch/batch/allocate', body)
+      return response.status >= 200 && response.status < 300
+    } catch (error) {
+      console.error('Error allocating batch:', error)
+      return false
+    }
+  }
+
+  static async receiveFromSupplier(body: ReceiveFromSupplierDTO): Promise<boolean> {
+    try {
+      const response = await localApiClient.post('/product-batch/receive-from-supplier', body)
+      return response.status >= 200 && response.status < 300
+    } catch (error) {
+      console.error('Error receiving from supplier:', error)
+      return false
+    }
+  }
+
+  static async createOutboundForExpiredBatches(body: ExpiredOutboundDTO): Promise<boolean> {
+    try {
+      const response = await localApiClient.post('/product-batch/expired-batches/create-outbound', body)
+      return response.status >= 200 && response.status < 300
+    } catch (error) {
+      console.error('Error creating outbound for expired batch:', error)
+      return false
     }
   }
 }
