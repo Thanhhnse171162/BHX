@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { Search, ArrowUpDown, Package, AlertTriangle, RefreshCw } from 'lucide-react'
 import { Input } from '@/shared/ui/Input'
 import { Button } from '@/shared/ui/Button'
@@ -29,6 +29,12 @@ export default function BackroomStockPage() {
 
   const [productMap, setProductMap] = useState<Record<string, ProductFromAPI>>({})
   const [warehouseName, setWarehouseName] = useState('')
+  const [splitOpen, setSplitOpen] = useState(false)
+  const [splitLoading, setSplitLoading] = useState(false)
+  const [splitBatch, setSplitBatch] = useState<ProductBatchFromAPI | null>(null)
+  const [allocatedQuantity, setAllocatedQuantity] = useState<number>(0)
+  const [splitNotes, setSplitNotes] = useState('')
+  const [toast, setToast] = useState('')
 
   const workplaceId =
     user?.workplaceId ||
@@ -180,6 +186,50 @@ export default function BackroomStockPage() {
     }
   }
 
+  const showToast = (message: string) => {
+    setToast(message)
+    setTimeout(() => setToast(''), 3000)
+  }
+
+  const openSplitModal = (batch: ProductBatchFromAPI) => {
+    setSplitBatch(batch)
+    setAllocatedQuantity(0)
+    setSplitNotes('')
+    setSplitOpen(true)
+  }
+
+  const onSplitBatch = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!splitBatch || !workplaceId || allocatedQuantity <= 0) {
+      showToast('Vui lòng nhập đủ thông tin tách lô.')
+      return
+    }
+
+    const availableQty = Math.max(0, Number(splitBatch.quantity || 0))
+    if (allocatedQuantity > availableQty) {
+      showToast('Số lượng tách vượt quá số lượng hiện có.')
+      return
+    }
+
+    setSplitLoading(true)
+    const ok = await ProductBatchAPIService.allocateBatch({
+      sourceBatchId: splitBatch.id,
+      allocatedQuantity,
+      targetWarehouseId: workplaceId,
+      notes: splitNotes.trim(),
+    })
+    setSplitLoading(false)
+
+    if (!ok) {
+      showToast('Tách lô thất bại.')
+      return
+    }
+
+    setSplitOpen(false)
+    showToast('Tách lô thành công.')
+    await fetchData()
+  }
+
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -313,18 +363,19 @@ export default function BackroomStockPage() {
                     <ArrowUpDown size={14} />
                   </div>
                 </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                     Đang tải dữ liệu...
                   </td>
                 </tr>
               ) : paginatedData.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                     Không có dữ liệu lô cho kho/cửa hàng hiện tại
                   </td>
                 </tr>
@@ -377,6 +428,16 @@ export default function BackroomStockPage() {
                           {item.receivedAt ? new Date(item.receivedAt).toLocaleTimeString('vi-VN') : '—'}
                         </div>
                       </td>
+                      <td className="px-4 py-3">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openSplitModal(item)}
+                          className="border-green-200 text-green-700 hover:bg-green-50"
+                        >
+                          Tách lô
+                        </Button>
+                      </td>
                     </tr>
                   )
                 })
@@ -426,6 +487,62 @@ export default function BackroomStockPage() {
           </div>
         </div>
       </div>
+
+      {splitOpen && splitBatch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <form onSubmit={onSplitBatch} className="w-full max-w-xl rounded-xl border border-gray-200 bg-white p-5 space-y-4">
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">Tách lô hàng</h3>
+              <p className="text-sm text-gray-500 mt-1">Tạo lô mới từ lô hiện tại trong cùng kho.</p>
+            </div>
+
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm space-y-1">
+              <p><span className="text-gray-500">Mã lô gốc:</span> {splitBatch.batchNumber || splitBatch.id}</p>
+              <p><span className="text-gray-500">Sản phẩm:</span> {productMap[normalizeId(splitBatch.productId)]?.name || splitBatch.productId}</p>
+              <p><span className="text-gray-500">Kho đích:</span> {warehouseName || workplaceId}</p>
+              <p><span className="text-gray-500">Số lượng hiện có:</span> {Math.max(0, Number(splitBatch.quantity || 0))}</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Số lượng tách</label>
+              <Input
+                type="number"
+                min={1}
+                value={allocatedQuantity || ''}
+                onChange={(e) => setAllocatedQuantity(Number(e.target.value) || 0)}
+                placeholder="Nhập allocatedQuantity"
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Lý do / Ghi chú</label>
+              <textarea
+                value={splitNotes}
+                onChange={(e) => setSplitNotes(e.target.value)}
+                placeholder="Nhập notes"
+                rows={3}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-green-500"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setSplitOpen(false)}>
+                Hủy
+              </Button>
+              <Button type="submit" className="bg-[#2d6e3e] hover:bg-[#245a31]" disabled={splitLoading}>
+                {splitLoading ? 'Đang gửi...' : 'Xác nhận tách lô'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 right-6 rounded-xl bg-green-700 px-4 py-2 text-sm text-white shadow-lg">
+          {toast}
+        </div>
+      )}
     </div>
   )
 }
