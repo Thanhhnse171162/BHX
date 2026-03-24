@@ -23,6 +23,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { RestockAPIService, RestockRequestFromAPI, CreateRestockRequestDTO } from '@/services/restock-api.service'
 import { ProductAPIService } from '@/services/product-api.service'
 import { ProductBatchAPIService, type ProductBatchFromAPI } from '@/services/product-batch-api.service'
+import { InventoryAPIService } from '@/services/inventory-api.service'
 import { UserAPIService } from '@/services/user-api.service'
 import { TransferAPIService, TransferFromAPI } from '@/services/transfer-api.service'
 import { createInventoryCheck, getInventoryChecks, type CreateInventoryCheckDto, type InventoryCheckListDto } from '@/services/inventory-check-api'
@@ -64,7 +65,7 @@ interface FormItem {
   productName: string
   productSku: string
   productUnit: string
-  requestedQuantity: number
+  requestedQuantity: string
   currentQuantity: number
   reason: string
 }
@@ -73,6 +74,12 @@ const ITEM_REASONS = ['Hết hàng', 'Sắp hết', 'Điều phối', 'Khác']
 
 function normalizeId(value?: string | null): string {
   return String(value ?? '').trim().toLowerCase()
+}
+
+function toValidRequestedQuantity(value: string): number {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed < 1) return 1
+  return Math.floor(parsed)
 }
 
 const PAGE_SIZE = 4
@@ -193,6 +200,7 @@ export default function WarehouseManagerRequestsPage() {
   const [loadingProducts, setLoadingProducts] = useState(false)
   const [batchesById, setBatchesById] = useState<Record<string, ProductBatchFromAPI>>({})
   const [batchesLoading, setBatchesLoading] = useState(false)
+  const [availableQtyByProductId, setAvailableQtyByProductId] = useState<Record<string, number>>({})
 
   // Dùng chung logic với loadRequests() để tránh lệch id "kho" theo dữ liệu user.
   const currentWarehouseId = String(user?.warehouseId ?? user?.storeId ?? user?.workplaceId ?? '').trim()
@@ -446,6 +454,71 @@ export default function WarehouseManagerRequestsPage() {
       .finally(() => setBatchesLoading(false))
   }, [currentWarehouseId])
 
+  const fromWarehouseIdForForm = user?.warehouseId ?? user?.workplaceId ?? ''
+  const normalizedFromId = normalizeId(fromWarehouseIdForForm)
+
+  const currentWarehouseRecord = locations.find(
+    (loc) => normalizeId(loc.id) === normalizedFromId,
+  )
+
+  const managedChildren = locations.filter(
+    (loc) => normalizeId(loc.parentId ?? loc.parent_id) === normalizedFromId,
+  )
+  const parentWarehouse =
+    currentWarehouseRecord &&
+    locations.find(
+      (loc) => normalizeId(loc.id) === normalizeId(currentWarehouseRecord.parentId ?? currentWarehouseRecord.parent_id),
+    )
+
+  // Display parent warehouse as source, not current warehouse
+  const fromWarehouseDisplayName =
+    parentWarehouse?.name ??
+    currentWarehouseRecord?.name ??
+    fromWarehouseIdForForm
+
+  // "Số lượng hiện tại" trong form cần phản ánh tồn của kho/cửa hàng đích hiện tại
+  // (kho mà manager đang quản lý), không phải kho tổng.
+  const destinationWarehouseIdForStock =
+    currentWarehouseRecord?.id ?? fromWarehouseIdForForm
+
+  useEffect(() => {
+    if (!isCreateOpen || !destinationWarehouseIdForStock) {
+      setAvailableQtyByProductId({})
+      return
+    }
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const rows = await InventoryAPIService.getInventoryByWarehouse(destinationWarehouseIdForStock)
+        if (cancelled) return
+        const nextMap: Record<string, number> = {}
+        for (const row of rows ?? []) {
+          const productKey = normalizeId(row.productId)
+          if (!productKey) continue
+          const available = Number(row.availableQuantity ?? row.quantity ?? 0)
+          nextMap[productKey] = Math.max(0, available)
+        }
+        setAvailableQtyByProductId(nextMap)
+      } catch {
+        if (!cancelled) setAvailableQtyByProductId({})
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isCreateOpen, destinationWarehouseIdForStock])
+
+  useEffect(() => {
+    setItems((prev) =>
+      prev.map((it) => ({
+        ...it,
+        currentQuantity: availableQtyByProductId[normalizeId(it.productId)] ?? 0,
+      })),
+    )
+  }, [availableQtyByProductId])
+
   function mapStatus(status: string): RequestStatus {
     if (status === 'APPROVED') return 'Đã duyệt'
     if (status === 'COMPLETED') return 'Đã giao'
@@ -680,28 +753,6 @@ export default function WarehouseManagerRequestsPage() {
     }
   }, [activeTab, loadInventoryChecks])
 
-  const fromWarehouseIdForForm = user?.warehouseId ?? user?.workplaceId ?? ''
-  const normalizedFromId = normalizeId(fromWarehouseIdForForm)
-
-  const currentWarehouseRecord = locations.find(
-    (loc) => normalizeId(loc.id) === normalizedFromId,
-  )
-
-  const managedChildren = locations.filter(
-    (loc) => normalizeId(loc.parentId ?? loc.parent_id) === normalizedFromId,
-  )
-  const parentWarehouse =
-    currentWarehouseRecord &&
-    locations.find(
-      (loc) => normalizeId(loc.id) === normalizeId(currentWarehouseRecord.parentId ?? currentWarehouseRecord.parent_id),
-    )
-
-  // Display parent warehouse as source, not current warehouse
-  const fromWarehouseDisplayName =
-    parentWarehouse?.name ??
-    currentWarehouseRecord?.name ??
-    fromWarehouseIdForForm
-
   const addItemByProductId = (productId: string) => {
     if (!productId) return
     if (items.some((i) => i.productId === productId)) return
@@ -714,8 +765,8 @@ export default function WarehouseManagerRequestsPage() {
         productName: p.name,
         productSku: p.sku,
         productUnit: p.unit,
-        requestedQuantity: 1,
-        currentQuantity: 0,
+        requestedQuantity: '',
+        currentQuantity: availableQtyByProductId[normalizeId(p.id)] ?? 0,
         reason: '',
       },
     ])
@@ -746,7 +797,8 @@ export default function WarehouseManagerRequestsPage() {
     }
 
     for (const it of items) {
-      if (it.requestedQuantity <= 0) {
+      const qty = toValidRequestedQuantity(it.requestedQuantity)
+      if (qty <= 0) {
         setSubmitError(`Số lượng yêu cầu của "${it.productName}" phải lớn hơn 0.`)
         return
       }
@@ -767,7 +819,7 @@ export default function WarehouseManagerRequestsPage() {
       notes: newRequest.notes.trim() || undefined,
       items: items.map((it) => ({
         productId: it.productId,
-        requestedQuantity: it.requestedQuantity,
+        requestedQuantity: toValidRequestedQuantity(it.requestedQuantity),
         currentQuantity: it.currentQuantity,
         reason: it.reason.trim() || undefined,
       })),
@@ -786,6 +838,19 @@ export default function WarehouseManagerRequestsPage() {
         priority: 'TRUNG BÌNH',
       })
       setItems([])
+      if (destinationWarehouseIdForStock) {
+        try {
+          const rows = await InventoryAPIService.getInventoryByWarehouse(destinationWarehouseIdForStock)
+          const nextMap: Record<string, number> = {}
+          for (const row of rows ?? []) {
+            const productKey = normalizeId(row.productId)
+            if (!productKey) continue
+            const available = Number(row.availableQuantity ?? row.quantity ?? 0)
+            nextMap[productKey] = Math.max(0, available)
+          }
+          setAvailableQtyByProductId(nextMap)
+        } catch {}
+      }
     } catch (error: any) {
       const msg =
         error?.response?.data?.message ||
@@ -1544,13 +1609,17 @@ export default function WarehouseManagerRequestsPage() {
                               type="number"
                               min={1}
                               value={item.requestedQuantity}
-                              onChange={(e) =>
-                                updateItem(
-                                  idx,
-                                  'requestedQuantity',
-                                  Math.max(1, Number(e.target.value) || 1),
-                                )
-                              }
+                              onChange={(e) => {
+                                const nextValue = e.target.value
+                                if (/^\d*$/.test(nextValue)) {
+                                  updateItem(idx, 'requestedQuantity', nextValue)
+                                }
+                              }}
+                              onBlur={() => {
+                                if (item.requestedQuantity === '' || Number(item.requestedQuantity) < 1) {
+                                  updateItem(idx, 'requestedQuantity', '1')
+                                }
+                              }}
                               className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg text-center"
                             />
                           </div>
@@ -1562,13 +1631,7 @@ export default function WarehouseManagerRequestsPage() {
                               type="number"
                               min={0}
                               value={item.currentQuantity}
-                              onChange={(e) =>
-                                updateItem(
-                                  idx,
-                                  'currentQuantity',
-                                  Math.max(0, Number(e.target.value) || 0),
-                                )
-                              }
+                              readOnly
                               className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg text-center"
                             />
                           </div>
