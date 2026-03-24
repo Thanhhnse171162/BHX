@@ -10,6 +10,7 @@ import {
   TrendingUp,
   Archive,
   Warehouse,
+  ClipboardCheck,
   ClipboardList,
   AlertTriangle,
   Users,
@@ -30,6 +31,7 @@ const PRIMARY_NAV = [
   { href: '/store-manager/discounts',                label: 'Giảm giá',             icon: BadgePercent,    exact: false },
   // { href: '/store-manager/inventory',                label: 'Tồn kho kệ hàng',     icon: Archive,         exact: false },
   { href: '/store-manager/inventory-aux',            label: 'Tồn kho kho phụ',     icon: Warehouse,       exact: false },
+  { href: '/store-manager/inventory-check',          label: 'Kiểm kê',             icon: ClipboardCheck,  exact: false },
   { href: '/store-manager/purchase-requests',        label: 'Yêu cầu nhập hàng',   icon: PackagePlus,     exact: false },
   { href: '/store-manager/incidents',                label: 'Báo cáo sự cố',       icon: AlertTriangle,   exact: false, badge: 'incident' },
 ]
@@ -44,6 +46,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith('/store-manager/reports'))           return 'Doanh Thu'
   if (pathname.startsWith('/store-manager/discounts'))         return 'Giảm Giá'
   if (pathname.startsWith('/store-manager/inventory-aux'))     return 'Tồn Kho Phụ'
+  if (pathname.startsWith('/store-manager/inventory-check'))   return 'Kiểm Kê'
   // if (pathname.startsWith('/store-manager/inventory'))         return 'Tồn Kho Kệ Hàng'
   if (pathname.startsWith('/store-manager/purchase-requests')) return 'Yêu Cầu Nhập Hàng'
   if (pathname.startsWith('/store-manager/incidents'))         return 'Báo Cáo Sự Cố'

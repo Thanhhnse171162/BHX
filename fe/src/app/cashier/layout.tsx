@@ -10,6 +10,7 @@ import {
   Monitor,
   Users,
   Package,
+  ClipboardCheck,
   ClipboardList,
   AlertTriangle,
   LogOut,
@@ -42,6 +43,12 @@ const navItems = [
     href: '/cashier/products',
     label: 'Sản phẩm',
     icon: Package,
+    badge: null,
+  },
+  {
+    href: '/cashier/inventory-check',
+    label: 'Kiểm kê',
+    icon: ClipboardCheck,
     badge: null,
   },
   {
