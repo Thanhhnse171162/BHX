@@ -7,6 +7,8 @@ import {
   ProductBatchFromAPI,
   ProductBatchDetailFromAPI,
 } from '@/services/product-batch-api.service'
+import { ProductAPIService } from '@/services/product-api.service'
+import { WarehouseLookupAPIService } from '@/services/warehouse-lookup-api.service'
 
 type BatchStatus = 'all' | 'AVAILABLE' | 'NEAR_EXPIRY' | 'EXPIRED' | 'OUT_OF_STOCK'
 
@@ -39,6 +41,8 @@ export default function ShipmentsApiPage() {
   const [status, setStatus] = useState<BatchStatus>('all')
   const [selectedBatchId, setSelectedBatchId] = useState<string>('')
   const [toast, setToast] = useState('')
+  const [productNameMap, setProductNameMap] = useState<Record<string, string>>({})
+  const [warehouseNameMap, setWarehouseNameMap] = useState<Record<string, string>>({})
 
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -46,9 +50,8 @@ export default function ShipmentsApiPage() {
 
   const [allocateOpen, setAllocateOpen] = useState(false)
   const [allocateLoading, setAllocateLoading] = useState(false)
-  const [destinationWarehouseId, setDestinationWarehouseId] = useState('')
-  const [allocateQuantity, setAllocateQuantity] = useState<number>(0)
-  const [shippingDate, setShippingDate] = useState('')
+  const [allocatedQuantity, setAllocatedQuantity] = useState<number>(0)
+  const [allocateNotes, setAllocateNotes] = useState('')
 
   const [receiveOpen, setReceiveOpen] = useState(false)
   const [receiveLoading, setReceiveLoading] = useState(false)
@@ -100,6 +103,56 @@ export default function ShipmentsApiPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, workplaceId])
 
+  useEffect(() => {
+    const ids = Array.from(new Set(batches.map((b) => normalizeId(b.productId)).filter(Boolean)))
+    if (ids.length === 0) return
+    let cancelled = false
+
+    ;(async () => {
+      const entries = await Promise.all(
+        ids.map(async (id) => {
+          const product = await ProductAPIService.getById(id)
+          return [id, product?.name || id] as const
+        })
+      )
+      if (cancelled) return
+      setProductNameMap((prev) => ({ ...prev, ...Object.fromEntries(entries) }))
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [batches])
+
+  useEffect(() => {
+    const ids = Array.from(
+      new Set(
+        [
+          workplaceId,
+          ...batches.map((b) => normalizeId(b.warehouseId)),
+          normalizeId(detail?.warehouseId),
+        ].filter(Boolean)
+      )
+    )
+    if (ids.length === 0) return
+    let cancelled = false
+
+    ;(async () => {
+      const entries = await Promise.all(
+        ids.map(async (id) => {
+          const warehouse = await WarehouseLookupAPIService.getById(id)
+          return [id, warehouse?.name || id] as const
+        })
+      )
+      if (cancelled) return
+      setWarehouseNameMap((prev) => ({ ...prev, ...Object.fromEntries(entries) }))
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [batches, detail?.warehouseId, workplaceId])
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return batches.filter((b) => {
@@ -115,11 +168,6 @@ export default function ShipmentsApiPage() {
     })
   }, [batches, search, status])
 
-  const selectedBatch = useMemo(
-    () => filtered.find((b) => b.id === selectedBatchId) ?? null,
-    [filtered, selectedBatchId]
-  )
-
   const openDetail = async (batchId: string) => {
     setDetailOpen(true)
     setDetailLoading(true)
@@ -132,26 +180,40 @@ export default function ShipmentsApiPage() {
     }
   }
 
+  const openAllocate = (batch: ProductBatchFromAPI) => {
+    setSelectedBatchId(batch.id)
+    setAllocatedQuantity(0)
+    setAllocateNotes('')
+    setAllocateOpen(true)
+  }
+
   const onAllocate = async (e: FormEvent) => {
     e.preventDefault()
-    if (!selectedBatchId || !destinationWarehouseId || !shippingDate || allocateQuantity <= 0) {
-      showToast('Vui lòng nhập đủ thông tin phân bổ.')
+    if (!selectedBatchId || !workplaceId || allocatedQuantity <= 0) {
+      showToast('Vui lòng nhập đủ thông tin tách lô.')
       return
     }
+
+    const sourceBatch = batches.find((b) => b.id === selectedBatchId)
+    if (sourceBatch && allocatedQuantity > Number(sourceBatch.quantity || 0)) {
+      showToast('Số lượng tách vượt quá số lượng hiện có của lô gốc.')
+      return
+    }
+
     setAllocateLoading(true)
     const ok = await ProductBatchAPIService.allocateBatch({
-      batchId: selectedBatchId,
-      quantity: allocateQuantity,
-      destinationWarehouseId,
-      shippingDate,
+      sourceBatchId: selectedBatchId,
+      allocatedQuantity,
+      targetWarehouseId: workplaceId,
+      notes: allocateNotes.trim(),
     })
     setAllocateLoading(false)
     if (!ok) {
-      showToast('Allocate batch thất bại.')
+      showToast('Tách lô thất bại.')
       return
     }
     setAllocateOpen(false)
-    showToast('Tạo phiếu xuất/chuyển thành công.')
+    showToast('Tách lô thành công.')
     await fetchBatches()
   }
 
@@ -190,13 +252,25 @@ export default function ShipmentsApiPage() {
     await fetchBatches()
   }
 
+  const productNameOf = (productId?: string) => {
+    const id = normalizeId(productId)
+    if (!id) return '—'
+    return productNameMap[id] || id
+  }
+
+  const warehouseNameOf = (warehouseId?: string) => {
+    const id = normalizeId(warehouseId)
+    if (!id) return '—'
+    return warehouseNameMap[id] || id
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 p-6 space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Lô hàng</h1>
           <p className="text-sm text-slate-500 mt-1">Quản lý lô và tạo phiếu xuất/chuyển theo kho hiện tại</p>
-          <p className="text-xs text-slate-500 mt-1">warehouseId: {workplaceId || '—'}</p>
+          <p className="text-xs text-slate-500 mt-1">Kho hiện tại: {warehouseNameOf(workplaceId)}</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -204,13 +278,6 @@ export default function ShipmentsApiPage() {
             className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-sm hover:bg-slate-100"
           >
             Nhận hàng từ NCC
-          </button>
-          <button
-            onClick={() => setAllocateOpen(true)}
-            disabled={!selectedBatchId}
-            className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700 disabled:opacity-60"
-          >
-            Tạo phiếu xuất/chuyển
           </button>
         </div>
       </div>
@@ -244,7 +311,6 @@ export default function ShipmentsApiPage() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50">
             <tr className="text-left">
-              <th className="p-3">Chọn</th>
               <th className="p-3">Mã lô</th>
               <th className="p-3">Product</th>
               <th className="p-3">Số lượng</th>
@@ -256,22 +322,17 @@ export default function ShipmentsApiPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td className="p-6 text-center text-slate-500" colSpan={8}>Đang tải...</td></tr>
+              <tr><td className="p-6 text-center text-slate-500" colSpan={7}>Đang tải...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td className="p-6 text-center text-slate-500" colSpan={8}>Không có lô hàng</td></tr>
+              <tr><td className="p-6 text-center text-slate-500" colSpan={7}>Không có lô hàng</td></tr>
             ) : (
               filtered.map((b) => (
                 <tr key={b.id} className="border-t border-slate-100">
-                  <td className="p-3">
-                    <input
-                      type="radio"
-                      name="selected-batch"
-                      checked={selectedBatchId === b.id}
-                      onChange={() => setSelectedBatchId(b.id)}
-                    />
-                  </td>
                   <td className="p-3 font-mono text-xs text-emerald-700">{b.batchNumber || b.id}</td>
-                  <td className="p-3">{b.productId}</td>
+                  <td className="p-3">
+                    <div className="font-medium text-slate-800">{productNameOf(b.productId)}</div>
+                    <div className="text-xs text-slate-400">{b.productId}</div>
+                  </td>
                   <td className="p-3 font-semibold">{Number(b.quantity || 0).toLocaleString()}</td>
                   <td className="p-3">{b.supplier || '—'}</td>
                   <td className="p-3">{b.expiryDate ? new Date(b.expiryDate).toLocaleDateString('vi-VN') : '—'}</td>
@@ -283,6 +344,12 @@ export default function ShipmentsApiPage() {
                         className="px-2.5 py-1 border border-slate-200 rounded-md text-xs hover:bg-slate-50"
                       >
                         Chi tiết
+                      </button>
+                      <button
+                        onClick={() => openAllocate(b)}
+                        className="px-2.5 py-1 border border-emerald-300 text-emerald-700 rounded-md text-xs hover:bg-emerald-50"
+                      >
+                        Tách lô
                       </button>
                       {mapStatus(b.status) === 'EXPIRED' && (
                         <button
@@ -316,8 +383,8 @@ export default function ShipmentsApiPage() {
               ) : (
                 <div className="space-y-2">
                   <p><span className="text-slate-500">Batch:</span> {detail.batchNumber || detail.id}</p>
-                  <p><span className="text-slate-500">Product:</span> {detail.productId}</p>
-                  <p><span className="text-slate-500">Warehouse:</span> {detail.warehouseId}</p>
+                  <p><span className="text-slate-500">Product:</span> {productNameOf(detail.productId)}</p>
+                  <p><span className="text-slate-500">Warehouse:</span> {warehouseNameOf(detail.warehouseId)}</p>
                   <p><span className="text-slate-500">Số lượng:</span> {Number(detail.quantity || 0).toLocaleString()}</p>
                   <p><span className="text-slate-500">HSD:</span> {detail.expiryDate || '—'}</p>
                   <p><span className="text-slate-500">Trạng thái:</span> {statusLabel(detail.status)}</p>
@@ -331,43 +398,37 @@ export default function ShipmentsApiPage() {
       {allocateOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
           <form onSubmit={onAllocate} className="w-full max-w-lg bg-white rounded-xl border border-slate-200 p-4 space-y-3">
-            <h3 className="font-semibold text-slate-800">Tạo phiếu xuất/chuyển</h3>
-            <select
-              value={selectedBatchId}
-              onChange={(e) => setSelectedBatchId(e.target.value)}
-              className="w-full h-10 border border-slate-200 rounded-lg px-3 text-sm"
-            >
-              <option value="">Chọn lô hàng</option>
-              {filtered.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.batchNumber || b.id} - Ton: {Number(b.quantity || 0)}
-                </option>
-              ))}
-            </select>
-            <input
-              value={destinationWarehouseId}
-              onChange={(e) => setDestinationWarehouseId(e.target.value)}
-              placeholder="destinationWarehouseId"
-              className="w-full h-10 border border-slate-200 rounded-lg px-3 text-sm"
-            />
+            <h3 className="font-semibold text-slate-800">Tách lô hàng</h3>
+            {(() => {
+              const sourceBatch = batches.find((b) => b.id === selectedBatchId)
+              return (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+                  <p><span className="text-slate-500">Lô gốc:</span> {sourceBatch?.batchNumber || selectedBatchId || '—'}</p>
+                  <p><span className="text-slate-500">Sản phẩm:</span> {productNameOf(sourceBatch?.productId)}</p>
+                  <p><span className="text-slate-500">Kho đích:</span> {warehouseNameOf(workplaceId)}</p>
+                  <p><span className="text-slate-500">Số lượng hiện có:</span> {Number(sourceBatch?.quantity || 0).toLocaleString()}</p>
+                </div>
+              )
+            })()}
             <input
               type="number"
               min={1}
-              value={allocateQuantity || ''}
-              onChange={(e) => setAllocateQuantity(Number(e.target.value) || 0)}
-              placeholder="Số lượng phân bổ"
+              value={allocatedQuantity || ''}
+              onChange={(e) => setAllocatedQuantity(Number(e.target.value) || 0)}
+              placeholder="allocatedQuantity"
               className="w-full h-10 border border-slate-200 rounded-lg px-3 text-sm"
             />
-            <input
-              type="date"
-              value={shippingDate}
-              onChange={(e) => setShippingDate(e.target.value)}
-              className="w-full h-10 border border-slate-200 rounded-lg px-3 text-sm"
+            <textarea
+              value={allocateNotes}
+              onChange={(e) => setAllocateNotes(e.target.value)}
+              placeholder="Ghi chú tách lô"
+              rows={3}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none"
             />
             <div className="flex justify-end gap-2 pt-1">
               <button type="button" onClick={() => setAllocateOpen(false)} className="px-4 py-2 border rounded-lg text-sm">Hủy</button>
               <button disabled={allocateLoading} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm">
-                {allocateLoading ? 'Đang gửi...' : 'Phân bổ'}
+                {allocateLoading ? 'Đang gửi...' : 'Xác nhận tách lô'}
               </button>
             </div>
           </form>
@@ -411,12 +472,6 @@ export default function ShipmentsApiPage() {
       {toast && (
         <div className="fixed right-6 bottom-6 bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm shadow-lg">
           {toast}
-        </div>
-      )}
-
-      {selectedBatch && (
-        <div className="text-xs text-slate-500">
-          Dang chon: {selectedBatch.batchNumber || selectedBatch.id} - Ton {Number(selectedBatch.quantity || 0).toLocaleString()}
         </div>
       )}
     </div>

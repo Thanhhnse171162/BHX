@@ -24,10 +24,10 @@ export interface ProductBatchDetailFromAPI extends ProductBatchFromAPI {
 }
 
 export interface AllocateBatchDTO {
-  batchId: string
-  quantity: number
-  destinationWarehouseId: string
-  shippingDate: string
+  sourceBatchId: string
+  allocatedQuantity: number
+  targetWarehouseId: string
+  notes: string
 }
 
 export interface ReceiveFromSupplierDTO {
