@@ -41,7 +41,8 @@ interface FormItem {
   productName: string
   productSku: string
   productUnit: string
-  requestedQuantity: number
+  // Use string so the input can be empty while the user types ('' allowed).
+  requestedQuantity: string
   /** SL hiện có tại cửa hàng (STORE + storeLocationId), lấy từ API */
   currentQuantity: number
   reason: string
@@ -51,6 +52,12 @@ interface FormItem {
 
 function normalizeId(value?: string | null): string {
   return String(value || '').trim().toLowerCase()
+}
+
+function toValidRequestedQuantity(value: string): number {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed < 1) return 1
+  return Math.floor(parsed)
 }
 
 /** Khớp BE: storeLocationId hoặc workplaceId/storeId đã gán cho store manager */
@@ -258,7 +265,7 @@ export default function CreateRestockRequestForm({ onClose, onCreated }: CreateF
         productName: p.name,
         productSku: p.sku,
         productUnit: p.unit,
-        requestedQuantity: 1,
+        requestedQuantity: '',
         currentQuantity: 0,
         reason: '',
         inventoryStatus: 'loading',
@@ -341,7 +348,8 @@ export default function CreateRestockRequestForm({ onClose, onCreated }: CreateF
     if (!toWarehouseId)   { setError('Không xác định được kho đích (chưa gán kho cho tài khoản).'); return }
     if (items.length === 0) { setError('Vui lòng thêm ít nhất 1 sản phẩm.'); return }
     for (const item of items) {
-      if (item.requestedQuantity <= 0) { setError(`Số lượng yêu cầu cho "${item.productName}" phải lớn hơn 0.`); return }
+      const qty = toValidRequestedQuantity(item.requestedQuantity)
+      if (qty < 1) { setError(`Số lượng yêu cầu cho "${item.productName}" phải lớn hơn 0.`); return }
     }
 
     const dto: CreateRestockRequestDTO = {
@@ -353,7 +361,7 @@ export default function CreateRestockRequestForm({ onClose, onCreated }: CreateF
       notes: notes.trim() || undefined,
       items: items.map((i) => ({
         productId:         i.productId,
-        requestedQuantity: i.requestedQuantity,
+        requestedQuantity: toValidRequestedQuantity(i.requestedQuantity),
         currentQuantity:   i.currentQuantity,
         reason:            i.reason.trim() || undefined,
       })),
@@ -551,10 +559,26 @@ export default function CreateRestockRequestForm({ onClose, onCreated }: CreateF
                             type="number"
                             min={1}
                             value={item.requestedQuantity}
-                            onChange={(e) => updateItem(idx, 'requestedQuantity', Math.max(1, Number(e.target.value)))}
+                            onChange={(e) => {
+                              const nextValue = e.target.value
+                              // Allow '' (user cleared) and digits while typing.
+                              if (/^\d*$/.test(nextValue)) {
+                                updateItem(idx, 'requestedQuantity', nextValue)
+                              }
+                            }}
+                            onBlur={() => {
+                              if (item.requestedQuantity === '') {
+                                updateItem(idx, 'requestedQuantity', '1')
+                                return
+                              }
+                              const qty = toValidRequestedQuantity(item.requestedQuantity)
+                              updateItem(idx, 'requestedQuantity', String(qty))
+                            }}
                             className="w-full px-2.5 py-1.5 text-[13px] border border-gray-200 rounded-lg outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-100 bg-white text-center font-semibold"
                           />
-                          {item.inventoryStatus === 'ready' && item.requestedQuantity > item.currentQuantity && (
+                          {item.inventoryStatus === 'ready' &&
+                            item.requestedQuantity !== '' &&
+                            toValidRequestedQuantity(item.requestedQuantity) > item.currentQuantity && (
                             <p className="text-[11px] text-amber-600 font-semibold mt-1">SL vượt tồn kho</p>
                           )}
                         </div>
