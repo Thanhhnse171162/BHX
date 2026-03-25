@@ -10,6 +10,7 @@ import {
   TrendingUp,
   Archive,
   Warehouse,
+  ArrowLeftRight,
   ClipboardCheck,
   ClipboardList,
   AlertTriangle,
@@ -33,6 +34,7 @@ const PRIMARY_NAV = [
   { href: '/store-manager/inventory-aux',            label: 'Tồn kho kho phụ',     icon: Warehouse,       exact: false },
   { href: '/store-manager/inventory-check',          label: 'Kiểm kê',             icon: ClipboardCheck,  exact: false },
   { href: '/store-manager/purchase-requests',        label: 'Yêu cầu nhập hàng',   icon: PackagePlus,     exact: false },
+  { href: '/store-manager/transfers',                label: 'Di chuyển hàng',      icon: ArrowLeftRight,  exact: false },
   { href: '/store-manager/incidents',                label: 'Báo cáo sự cố',       icon: AlertTriangle,   exact: false, badge: 'incident' },
 ]
 
@@ -49,6 +51,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith('/store-manager/inventory-check'))   return 'Kiểm Kê'
   // if (pathname.startsWith('/store-manager/inventory'))         return 'Tồn Kho Kệ Hàng'
   if (pathname.startsWith('/store-manager/purchase-requests')) return 'Yêu Cầu Nhập Hàng'
+  if (pathname.startsWith('/store-manager/transfers'))         return 'Di Chuyển Hàng'
   if (pathname.startsWith('/store-manager/incidents'))         return 'Báo Cáo Sự Cố'
   if (pathname.startsWith('/store-manager/orders'))            return 'Quản Lý Đơn Hàng'
   if (pathname.startsWith('/store-manager/customers'))         return 'Quản Lý Khách Hàng'

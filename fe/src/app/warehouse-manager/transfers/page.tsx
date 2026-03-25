@@ -172,17 +172,64 @@ function TransferDetailModal({
   const [loading, setLoading] = useState(false)
   const [transfer, setTransfer] = useState<TransferFromAPI | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [productNameById, setProductNameById] = useState<Record<string, string>>({})
+  const [batchNumberById, setBatchNumberById] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (!open || !transferId) return
     setLoading(true)
     setError(null)
     setTransfer(null)
+    setProductNameById({})
+    setBatchNumberById({})
 
     void (async () => {
       try {
         const detail = await TransferAPIService.getById(transferId)
         setTransfer(detail)
+
+        const [products, batches] = await Promise.all([
+          ProductAPIService.getAllProducts().catch(() => []),
+          ProductBatchAPIService.getByWarehouse(String(detail?.fromLocationId ?? '')).catch(() => []),
+        ])
+
+        const nextProductNameById: Record<string, string> = {}
+        for (const p of products ?? []) {
+          const id = normalizeId((p as any)?.id)
+          const name = String((p as any)?.name ?? '').trim()
+          if (id && name) nextProductNameById[id] = name
+        }
+        setProductNameById(nextProductNameById)
+
+        const nextBatchNumberById: Record<string, string> = {}
+        for (const b of batches ?? []) {
+          const id = normalizeId((b as any)?.id)
+          const batchNumber = String((b as any)?.batchNumber ?? '').trim()
+          if (id && batchNumber) nextBatchNumberById[id] = batchNumber
+        }
+
+        // Fallback: some transfer items may reference batches not returned by by-warehouse API.
+        const unresolvedBatchIds = Array.from(
+          new Set(
+            (detail?.items ?? [])
+              .map((it) => normalizeId(it.batchId))
+              .filter((id) => id && !nextBatchNumberById[id])
+          )
+        )
+
+        if (unresolvedBatchIds.length > 0) {
+          const fetchedBatchDetails = await Promise.all(
+            unresolvedBatchIds.map((id) => ProductBatchAPIService.getById(id).catch(() => null))
+          )
+
+          for (const batchDetail of fetchedBatchDetails) {
+            const id = normalizeId((batchDetail as any)?.id)
+            const batchNumber = String((batchDetail as any)?.batchNumber ?? '').trim()
+            if (id && batchNumber) nextBatchNumberById[id] = batchNumber
+          }
+        }
+
+        setBatchNumberById(nextBatchNumberById)
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Không thể tải chi tiết transfer.')
       } finally {
@@ -271,17 +318,28 @@ function TransferDetailModal({
                   </tr>
                 </thead>
                 <tbody>
-                  {(transfer.items ?? []).map((it) => (
+                  {(transfer.items ?? []).map((it) => {
+                    const productName =
+                      String((it as any).productName ?? '').trim() ||
+                      productNameById[normalizeId(it.productId)] ||
+                      it.productId
+
+                    const batchName = it.batchId
+                      ? batchNumberById[normalizeId(it.batchId)] || it.batchId
+                      : '—'
+
+                    return (
                     <tr key={it.id} className="border-t border-gray-100 hover:bg-gray-50/70 transition-colors">
-                      <td className="px-5 py-3 text-gray-700">{(it as any).productName ?? it.productId}</td>
-                      <td className="px-5 py-3 text-gray-500 font-mono">{it.batchId ?? '—'}</td>
+                      <td className="px-5 py-3 text-gray-700">{productName}</td>
+                      <td className="px-5 py-3 text-gray-500">{batchName}</td>
                       <td className="px-5 py-3 text-gray-700 font-semibold">{Number(it.requestedQuantity ?? 0).toLocaleString()}</td>
                       <td className="px-5 py-3 text-gray-700 font-semibold">
                         {Number((it as any).shippedQuantity ?? (it as any).receivedQuantity ?? 0).toLocaleString()}
                       </td>
                       <td className="px-5 py-3 text-gray-600 break-all">{it.notes ?? '—'}</td>
                     </tr>
-                  ))}
+                    )
+                  })}
                   {(transfer.items ?? []).length === 0 && (
                     <tr>
                       <td colSpan={5} className="py-10 text-center text-gray-400 text-sm">

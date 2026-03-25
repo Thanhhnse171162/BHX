@@ -34,6 +34,8 @@ interface ProductRow {
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<ProductRow[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 10
   const [categories, setCategories] = useState<CategoryFromAPI[]>([])
   const [categoryIdByName, setCategoryIdByName] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(true)
@@ -98,6 +100,16 @@ export default function ProductsPage() {
       resolvedId: getCategoryId(cat) || categoryIdByName[normalizeCategoryName(cat.name)] || '',
     }))
     .filter((cat) => !!cat.resolvedId)
+
+  const totalPages = Math.max(1, Math.ceil(products.length / ITEMS_PER_PAGE))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedProducts = products.slice(startIndex, endIndex)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [products.length])
 
   // Fetch products từ API backend
   useEffect(() => {
@@ -489,133 +501,162 @@ export default function ProductsPage() {
 
         {/* Data table */}
         {!isLoading && !error && products.length > 0 && (
-          <DataTable
-            data={products}
-            columns={[
-              { key: 'sku', label: 'SKU' },
-              { key: 'name', label: 'Name' },
-              { key: 'category', label: 'Category' },
-              {
-                key: 'price',
-                label: 'Price',
-                render: (value) =>
-                  new Intl.NumberFormat('vi-VN', {
-                    style: 'currency',
-                    currency: 'VND',
-                  }).format(value as number),
-              },
-              { key: 'unit', label: 'Unit' },
-              {
-                key: 'totalQuantity',
-                label: 'Total Stock',
-                render: (value) => (
-                  <span className="font-medium">
-                    {value !== undefined && value !== null ? String(value) : 'N/A'}
-                  </span>
-                ),
-              },
-              {
-                key: 'availableQuantity',
-                label: 'Available',
-                render: (value) => (
-                  <span className="font-medium text-green-600">
-                    {value !== undefined && value !== null ? String(value) : 'N/A'}
-                  </span>
-                ),
-              },
-              {
-                key: 'reservedQuantity',
-                label: 'Reserved',
-                render: (value) => (
-                  <span className="font-medium text-orange-600">
-                    {value !== undefined && value !== null ? String(value) : 'N/A'}
-                  </span>
-                ),
-              },
-              {
-                key: 'inventoryStatus',
-                label: 'Stock Status',
-                render: (value) => {
-                  const statusColors = {
-                    IN_STOCK: 'bg-green-100 text-green-800',
-                    LOW_STOCK: 'bg-yellow-100 text-yellow-800',
-                    OUT_OF_STOCK: 'bg-red-100 text-red-800',
-                  }
-                  const statusLabels = {
-                    IN_STOCK: 'In Stock',
-                    LOW_STOCK: 'Low Stock',
-                    OUT_OF_STOCK: 'Out of Stock',
-                  }
-                  const status = value as 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'
-                  return (
+          <>
+            <DataTable
+              data={paginatedProducts}
+              columns={[
+                { key: 'sku', label: 'SKU' },
+                { key: 'name', label: 'Name' },
+                { key: 'category', label: 'Category' },
+                {
+                  key: 'price',
+                  label: 'Price',
+                  render: (value) =>
+                    new Intl.NumberFormat('vi-VN', {
+                      style: 'currency',
+                      currency: 'VND',
+                    }).format(value as number),
+                },
+                { key: 'unit', label: 'Unit' },
+                {
+                  key: 'totalQuantity',
+                  label: 'Total Stock',
+                  render: (value) => (
+                    <span className="font-medium">
+                      {value !== undefined && value !== null ? String(value) : 'N/A'}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'availableQuantity',
+                  label: 'Available',
+                  render: (value) => (
+                    <span className="font-medium text-green-600">
+                      {value !== undefined && value !== null ? String(value) : 'N/A'}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'reservedQuantity',
+                  label: 'Reserved',
+                  render: (value) => (
+                    <span className="font-medium text-orange-600">
+                      {value !== undefined && value !== null ? String(value) : 'N/A'}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'inventoryStatus',
+                  label: 'Stock Status',
+                  render: (value) => {
+                    const statusColors = {
+                      IN_STOCK: 'bg-green-100 text-green-800',
+                      LOW_STOCK: 'bg-yellow-100 text-yellow-800',
+                      OUT_OF_STOCK: 'bg-red-100 text-red-800',
+                    }
+                    const statusLabels = {
+                      IN_STOCK: 'In Stock',
+                      LOW_STOCK: 'Low Stock',
+                      OUT_OF_STOCK: 'Out of Stock',
+                    }
+                    const status = value as 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'
+                    return (
+                      <span
+                        className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          statusColors[status] || 'bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        {statusLabels[status] || 'Unknown'}
+                      </span>
+                    )
+                  },
+                },
+                {
+                  key: 'status',
+                  label: 'Status',
+                  render: (value) => (
                     <span
                       className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        statusColors[status] || 'bg-gray-100 text-gray-700'
+                        value === 'ACTIVE'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-700'
                       }`}
                     >
-                      {statusLabels[status] || 'Unknown'}
+                      {value === 'ACTIVE' ? 'Active' : 'Inactive'}
                     </span>
-                  )
+                  ),
                 },
-              },
-              {
-                key: 'status',
-                label: 'Status',
-                render: (value) => (
-                  <span
-                    className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      value === 'ACTIVE'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-700'
-                    }`}
-                  >
-                    {value === 'ACTIVE' ? 'Active' : 'Inactive'}
-                  </span>
-                ),
-              },
-              {
-                key: 'createdAt',
-                label: 'Created At',
-                render: (value) =>
-                  new Date(value as string).toLocaleDateString('vi-VN', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                  }),
-              },
-              {
-                key: 'id',
-                label: 'Actions',
-                render: (_value, item) => {
-                  const row = item as unknown as ProductRow
-                  return (
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleEdit(row)
-                        }}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDelete(row.id)
-                        }}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  )
+                {
+                  key: 'createdAt',
+                  label: 'Created At',
+                  render: (value) =>
+                    new Date(value as string).toLocaleDateString('vi-VN', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                    }),
                 },
-              },
-            ]}
-          />
+                {
+                  key: 'id',
+                  label: 'Actions',
+                  render: (_value, item) => {
+                    const row = item as unknown as ProductRow
+                    return (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleEdit(row)
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDelete(row.id)
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    )
+                  },
+                },
+              ]}
+            />
+
+            <div className="flex items-center justify-between mt-4 px-1">
+              <p className="text-sm text-gray-600">
+                Hiển thị {products.length === 0 ? 0 : startIndex + 1}-{Math.min(endIndex, products.length)} trên {products.length} sản phẩm
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={safeCurrentPage === 1}
+                >
+                  Trước
+                </Button>
+                <span className="text-sm text-gray-700 min-w-[72px] text-center">
+                  Trang {safeCurrentPage}/{totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={safeCurrentPage === totalPages}
+                >
+                  Sau
+                </Button>
+              </div>
+            </div>
+          </>
         )}
       </div>
 
