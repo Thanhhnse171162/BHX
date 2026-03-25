@@ -10,6 +10,7 @@ import {
   Package,
   Truck,
   ArrowLeftRight,
+  ArrowUpDown,
   BarChart3,
   ClipboardList,
   Bell,
@@ -86,6 +87,7 @@ export default function WarehouseManagerLayout({
     { name: 'Quản lý yêu cầu', href: '/warehouse-manager/requests', icon: ClipboardList },
     { name: 'Tồn kho', href: '/warehouse-manager/inventory', icon: Package },
     { name: 'Lô hàng', href: '/warehouse-manager/shipments', icon: Truck },
+    { name: 'Di chuyển hàng', href: '/warehouse-manager/movements', icon: ArrowUpDown },
     { name: 'Lịch sử xuất kho', href: '/warehouse-manager/transfers', icon: ArrowLeftRight },
     { name: 'Báo cáo', href: '/warehouse-manager/reports', icon: BarChart3 },
   ]

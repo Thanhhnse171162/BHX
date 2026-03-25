@@ -15,7 +15,18 @@ export interface StockMovementFromAPI {
   notes: string | null
   createdAt: string
   totalItems: number
-  items: unknown[]
+  items: StockMovementItemFromAPI[]
+}
+
+export interface StockMovementItemFromAPI {
+  id: string
+  movementId: string
+  productId: string
+  productName: string | null
+  unit: string | null
+  batchId: string | null
+  quantity: number
+  unitPrice: number
 }
 
 export class StockMovementAPIService {
