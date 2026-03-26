@@ -7,6 +7,40 @@ const INVENTORY_SERVICE_URL =
   'http://localhost:5003'
 
 /**
+ * GET /api/restock-requests/[id]
+ * Proxy to backend: GET /api/restock-requests/:id
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const url = `${INVENTORY_SERVICE_URL}/api/restock-requests/${params.id}`
+
+    const authHeader = request.headers.get('authorization')
+    const cookieToken = request.cookies.get('auth_token')?.value
+    const authorization = authHeader || (cookieToken ? `Bearer ${cookieToken}` : '')
+
+    const response = await axios.get(url, {
+      headers: {
+        Authorization: authorization,
+        Accept: '*/*',
+      },
+    })
+
+    return NextResponse.json(response.data, { status: response.status })
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error)) {
+      return NextResponse.json(
+        { message: error.response?.data?.message || 'Error fetching restock request detail' },
+        { status: error.response?.status || 500 }
+      )
+    }
+    return NextResponse.json({ message: 'Internal server error' }, { status: 500 })
+  }
+}
+
+/**
  * PATCH /api/restock-requests/[id]
  * Proxy to backend: PATCH /api/restock-requests/:id
  */

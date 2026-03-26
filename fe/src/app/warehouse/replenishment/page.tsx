@@ -101,6 +101,28 @@ function sumRequestedQty(req: RestockRequestFromAPI) {
   return items.reduce((sum, it) => sum + Number(it.requestedQuantity ?? 0), 0)
 }
 
+function extractRejectReason(req: RestockRequestFromAPI | null): string {
+  if (!req) return ''
+  const anyReq = req as any
+  const candidates = [
+    anyReq?.rejectReason,
+    anyReq?.rejectionReason,
+    anyReq?.reason,
+    anyReq?.rejectNote,
+    anyReq?.notes,
+  ]
+  for (const val of candidates) {
+    const text = String(val ?? '').trim()
+    if (text) {
+      return text
+        .replace(/^rejection\s*reason\s*:\s*/i, '')
+        .replace(/^reject\s*reason\s*:\s*/i, '')
+        .trim()
+    }
+  }
+  return ''
+}
+
 // ─── Add Product Dropdown ─────────────────────────────────────────────────────
 
 function AddProductDropdown({
@@ -398,10 +420,11 @@ function CreateRequestModal({
         ? 'STORE'
         : 'WAREHOUSE'
 
+    const normalizedFromWarehouseId = String(fromWarehouseId ?? '').trim()
+    const normalizedToWarehouseId = String(inventoryLocationId ?? '').trim()
+
     const dto: CreateRestockRequestDTO = {
-      fromWarehouseId,
-      fromLocationType: 'WAREHOUSE',
-      toWarehouseId: inventoryLocationId,
+      toWarehouseId: normalizedToWarehouseId,
       toLocationType: toRestockLocationType,
       priority,
       notes: notes.trim() || undefined,
@@ -413,13 +436,27 @@ function CreateRequestModal({
       })),
     }
 
+    // Backend accepts omitted source fields and defaults source routing to parent/admin flow.
+    if (
+      normalizedFromWarehouseId &&
+      normalizedFromWarehouseId.toLowerCase() !== normalizedToWarehouseId.toLowerCase()
+    ) {
+      dto.fromWarehouseId = normalizedFromWarehouseId
+      dto.fromLocationType = 'WAREHOUSE'
+    }
+
     try {
       setSubmitting(true)
       await RestockAPIService.create(dto)
       onCreated()
       onClose()
     } catch (e: any) {
-      setSubmitError(e?.message || 'Tạo yêu cầu thất bại. Vui lòng thử lại.')
+      const message =
+        e?.response?.data?.message ||
+        e?.response?.data?.error ||
+        e?.message ||
+        'Tạo yêu cầu thất bại. Vui lòng thử lại.'
+      setSubmitError(message)
     } finally {
       setSubmitting(false)
     }
@@ -437,11 +474,7 @@ function CreateRequestModal({
             <h2 className="text-xl font-bold text-gray-900">Tạo phiếu yêu cầu nhập hàng</h2>
             <p className="text-xs text-gray-400 mt-1">Tạo phiếu theo đúng flow duyệt/từ chối (Restock Requests)</p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Mã phiếu</p>
-              <p className="text-base font-bold text-blue-600">Tự sinh</p>
-            </div>
+          <div className="flex items-center gap-4"> 
             <button onClick={onClose} className="text-gray-300 hover:text-gray-500 transition-colors p-1 rounded-lg hover:bg-gray-100">
               <X size={18} />
             </button>
@@ -478,7 +511,7 @@ function CreateRequestModal({
               </label>
               <input
                 readOnly
-                value="(Ẩn theo nghiệp vụ hiện tại)"
+                value="Admin"
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-600 bg-gray-50 cursor-not-allowed"
               />
             </div>
@@ -711,6 +744,10 @@ export default function ReplenishmentPage() {
   const [error, setError] = useState<string | null>(null)
   const [requests, setRequests] = useState<RestockRequestFromAPI[]>([])
   const [warehouseName, setWarehouseName] = useState<string>('')
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
+  const [detailRequest, setDetailRequest] = useState<RestockRequestFromAPI | null>(null)
 
   const warehouseId = String(user?.warehouseId ?? user?.workplaceId ?? '').trim()
 
@@ -759,6 +796,27 @@ export default function ReplenishmentPage() {
     setPage(1)
   }, [activeTab, search])
 
+  const openDetail = async (id: string) => {
+    if (!id) return
+    setDetailOpen(true)
+    setDetailLoading(true)
+    setDetailError(null)
+    try {
+      const detail = await RestockAPIService.getById(id)
+      if (!detail) {
+        setDetailRequest(null)
+        setDetailError('Không tìm thấy chi tiết phiếu yêu cầu.')
+        return
+      }
+      setDetailRequest(detail)
+    } catch {
+      setDetailRequest(null)
+      setDetailError('Không thể tải chi tiết phiếu yêu cầu.')
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(Math.max(1, page), totalPages)
   const paged = useMemo(() => {
@@ -784,6 +842,89 @@ export default function ReplenishmentPage() {
             reload()
           }}
         />
+      )}
+
+      {detailOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm p-4 flex items-center justify-center" onClick={() => setDetailOpen(false)}>
+          <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Chi tiết yêu cầu nhập hàng</h3>
+                <p className="text-xs text-gray-400 mt-1">
+                  {detailRequest?.requestNumber || detailRequest?.id || '—'}
+                </p>
+              </div>
+              <button
+                onClick={() => setDetailOpen(false)}
+                className="text-gray-300 hover:text-gray-500 transition-colors p-1 rounded-lg hover:bg-gray-100"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              {detailLoading ? (
+                <div className="py-10 text-center text-sm text-gray-400">Đang tải chi tiết...</div>
+              ) : detailError ? (
+                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">{detailError}</div>
+              ) : detailRequest ? (
+                <>
+                  {statusFromApiToUi(detailRequest.status) === 'Đã từ chối' && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                      <p className="text-[10px] text-red-500 uppercase tracking-wider font-bold">Lý do từ chối</p>
+                      <p className="text-sm text-red-700 mt-1">{extractRejectReason(detailRequest) || 'Không có lý do từ chối.'}</p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Trạng thái</p>
+                      <p className="text-sm font-semibold text-gray-800 mt-1">{statusFromApiToUi(detailRequest.status)}</p>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Ưu tiên</p>
+                      <p className="text-sm font-semibold text-gray-800 mt-1">{toUiPriority(detailRequest.priority)}</p>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Ngày tạo</p>
+                      <p className="text-sm font-semibold text-gray-800 mt-1">{formatDateVI(detailRequest.requestedDate)}</p>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Tổng SL</p>
+                      <p className="text-sm font-semibold text-gray-800 mt-1">{sumRequestedQty(detailRequest).toLocaleString()}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 overflow-hidden">
+                    <div className="bg-gray-50 border-b border-gray-200 grid grid-cols-[1fr_100px_120px_1fr] gap-2 px-4 py-2">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Sản phẩm</span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">SL YC</span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tồn hiện có</span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Lý do</span>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {(Array.isArray(detailRequest.items) ? detailRequest.items : []).length === 0 ? (
+                        <div className="px-4 py-8 text-center text-sm text-gray-400">Không có dòng sản phẩm</div>
+                      ) : (
+                        (detailRequest.items || []).map((it) => (
+                          <div key={it.id} className="grid grid-cols-[1fr_100px_120px_1fr] gap-2 px-4 py-3 items-center">
+                            <div>
+                              <p className="text-sm font-semibold text-gray-800">{it.productName || it.productId}</p>
+                              <p className="text-[11px] text-gray-400">{it.unit || '—'}</p>
+                            </div>
+                            <p className="text-sm font-bold text-gray-800">{Number(it.requestedQuantity || 0).toLocaleString()}</p>
+                            <p className="text-sm text-gray-600">{Number(it.currentQuantity || 0).toLocaleString()}</p>
+                            <p className="text-sm text-gray-600">{it.reason || '—'}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="max-w-6xl mx-auto space-y-5">
@@ -929,7 +1070,7 @@ export default function ReplenishmentPage() {
                   {uiStatus}
                 </span>
                 <button
-                  onClick={() => pushToast({ type: 'info', message: 'Màn chi tiết role 7 chưa được triển khai trong phạm vi prompt.' })}
+                  onClick={() => openDetail(String(r.id))}
                   className="flex items-center justify-center text-gray-300 hover:text-blue-500 transition-colors w-8 h-8 rounded-lg hover:bg-blue-50"
                   title="Xem chi tiết"
                 >
