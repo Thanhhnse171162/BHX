@@ -2,10 +2,13 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import {
-  Search, Scan, Plus, Minus, Trash2, Tag, CreditCard,
-  Banknote, QrCode, Wallet, X, ChevronRight, Package,
-  ShoppingCart, RotateCcw, User, Receipt,
+  Search, Scan, Plus, Minus, Trash2, CreditCard,
+  Banknote, Wallet, X, ChevronRight, Package,
+  ShoppingCart, RotateCcw, Receipt,
 } from 'lucide-react'
+import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
+import { InventoryAPIService, InventoryItem } from '@/services/inventory-api.service'
+import { useAuthStore } from '@/store/auth.store'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Product {
@@ -21,65 +24,205 @@ interface CartItem extends Product {
   qty: number
 }
 
-// ─── Mock product catalogue ───────────────────────────────────────────────────
-const PRODUCTS: Product[] = [
-  { id: '001', sku: '#001', name: 'Nước suối Lavie 500ml',   price: 6000,  category: 'Nước uống', emoji: '🍶' },
-  { id: '002', sku: '#002', name: 'Coca-Cola 330ml',          price: 12000, category: 'Nước uống', emoji: '🥤' },
-  { id: '003', sku: '#003', name: 'Trà Xanh 0 độ',            price: 10000, category: 'Nước uống', emoji: '🍵' },
-  { id: '004', sku: '#004', name: 'Sữa Vinamilk 180ml',       price: 8000,  category: 'Sữa',       emoji: '🥛' },
-  { id: '005', sku: '#005', name: 'Nước cam Vfresh',          price: 15000, category: 'Nước uống', emoji: '🍊' },
-  { id: '006', sku: '#006', name: 'Mì Hảo Hảo tôm chua',     price: 5000,  category: 'Thực phẩm', emoji: '🍜' },
-  { id: '007', sku: '#007', name: 'Bánh Kinh Đô',             price: 25000, category: 'Bánh kẹo',  emoji: '🍪' },
-  { id: '008', sku: '#008', name: 'Kẹo dẻo Trolli',           price: 18000, category: 'Bánh kẹo',  emoji: '🍬' },
-  { id: '009', sku: '#009', name: "Snack Lay's vị phô mai",   price: 22000, category: 'Snack',     emoji: '🍟' },
-  { id: '010', sku: '#010', name: 'Bim bim Oishi',            price: 10000, category: 'Snack',     emoji: '🟡' },
-  { id: '011', sku: '#011', name: 'Xúc xích Đức Việt',       price: 35000, category: 'Thực phẩm', emoji: '🌭' },
-  { id: '012', sku: '#012', name: 'Trứng gà ta (vỉ 10)',     price: 48000, category: 'Thực phẩm', emoji: '🥚' },
-  { id: '013', sku: '#013', name: 'Bánh mì sandwich',         price: 18000, category: 'Bánh kẹo',  emoji: '🍞' },
-  { id: '014', sku: '#014', name: 'Sữa chua Vinamilk',        price: 8500,  category: 'Sữa',       emoji: '🥣' },
-  { id: '015', sku: '#015', name: 'Phô mai Laughing Cow',     price: 42000, category: 'Sữa',       emoji: '🧀' },
-  { id: '016', sku: '#016', name: 'Dầu ăn Tường An 1L',      price: 62000, category: 'Gia dụng',  emoji: '🫙' },
-  { id: '017', sku: '#017', name: 'Nước mắm Phú Quốc',       price: 38000, category: 'Gia dụng',  emoji: '🍶' },
-  { id: '018', sku: '#018', name: 'Bột ngọt Ajinomoto',      price: 15000, category: 'Gia dụng',  emoji: '🧂' },
-  { id: '019', sku: '#019', name: 'Kem đánh răng P/S',        price: 32000, category: 'Vệ sinh',   emoji: '🪥' },
-  { id: '020', sku: '#020', name: 'Dầu gội Sunsilk',          price: 55000, category: 'Vệ sinh',   emoji: '🧴' },
-  { id: '021', sku: '#021', name: 'Xà phòng Lifebuoy',        price: 22000, category: 'Vệ sinh',   emoji: '🧼' },
-  { id: '022', sku: '#022', name: 'Túi nylon đen 1kg',        price: 18000, category: 'Gia dụng',  emoji: '🛍️' },
-  { id: '023', sku: '#023', name: 'Khăn giấy Kleenex',        price: 28000, category: 'Vệ sinh',   emoji: '🧻' },
-  { id: '024', sku: '#024', name: 'Nước rửa chén Sunlight',   price: 35000, category: 'Gia dụng',  emoji: '🫧' },
-  { id: '025', sku: '#025', name: 'Bột giặt OMO 450g',        price: 62000, category: 'Gia dụng',  emoji: '🧺' },
-]
+interface SimpleSaleResponse {
+  saleId: string
+  saleNumber: string
+  subtotal: number
+  totalAmount: number
+  paymentMethod: 'CASH' | 'MOMO' | string
+  status: string
+  paymentStatus: string
+  saleDate: string
+  momoPayUrl?: string
+  momoQrUrl?: string
+  paymentId?: string
+}
 
-const CATEGORIES = ['Tất cả', 'Nước uống', 'Thực phẩm', 'Bánh kẹo', 'Snack', 'Sữa', 'Gia dụng', 'Vệ sinh']
+const DEFAULT_POS_STORE_ID = 'B0000001-0001-0001-0001-000000000001'
+const DEFAULT_POS_CASHIER_ID = '33333333-3333-3333-3333-333333333331'
+
+const GUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const isGuid = (value: unknown): value is string => {
+  return typeof value === 'string' && GUID_REGEX.test(value.trim())
+}
+
+const extractApiErrorMessage = (result: any): string => {
+  if (!result) return 'Không thể tạo đơn thanh toán POS'
+
+  const directMessage =
+    result?.error?.message ||
+    result?.error ||
+    result?.message ||
+    result?.title
+  if (typeof directMessage === 'string' && directMessage.trim()) return directMessage
+
+  const errors = result?.errors
+  if (errors && typeof errors === 'object') {
+    const firstKey = Object.keys(errors)[0]
+    const firstVal = firstKey ? errors[firstKey] : null
+    if (Array.isArray(firstVal) && firstVal.length > 0) return String(firstVal[0])
+    if (typeof firstVal === 'string' && firstVal.trim()) return firstVal
+  }
+
+  return 'Không thể tạo đơn thanh toán POS'
+}
+
+const normalizeSalePayload = (payload: any): any => {
+  if (!payload || typeof payload !== 'object') return null
+  if (payload.data && typeof payload.data === 'object') return payload.data
+  return payload
+}
+
+const normalizePaymentStatus = (payload: any): string => {
+  const sale = normalizeSalePayload(payload)
+  const raw = String(sale?.paymentStatus || sale?.status || '').trim().toUpperCase()
+  return raw
+}
+
+const isPaymentCompleted = (payload: any): boolean => {
+  const status = normalizePaymentStatus(payload)
+  return ['PAID', 'COMPLETED', 'COMPLETE', 'SUCCESS', 'SUCCEEDED', 'SUCCESSFUL'].includes(status)
+}
+
+const EMOJI_BY_CATEGORY: Record<string, string> = {
+  'Nước uống': '🥤',
+  'Thực phẩm': '🍜',
+  'Bánh kẹo': '🍪',
+  Snack: '🍟',
+  Sữa: '🥛',
+  'Gia dụng': '🧴',
+  'Vệ sinh': '🧼',
+}
+
+const emojiFromText = (name: string, category: string): string => {
+  const text = `${name} ${category}`.toLowerCase()
+  if (text.includes('nước') || text.includes('soda') || text.includes('coca')) return '🥤'
+  if (text.includes('sữa') || text.includes('yogurt')) return '🥛'
+  if (text.includes('bánh') || text.includes('kẹo')) return '🍪'
+  if (text.includes('snack') || text.includes('chips')) return '🍟'
+  if (text.includes('mì')) return '🍜'
+  if (text.includes('trứng')) return '🥚'
+  if (text.includes('xúc xích')) return '🌭'
+  if (text.includes('xà phòng') || text.includes('rửa')) return '🧼'
+  return EMOJI_BY_CATEGORY[category] ?? '📦'
+}
+
+function mapApiProductToPOS(p: ProductFromAPI & Record<string, any>): Product {
+  const sku = p.barcode ?? p.sku ?? p.id
+  const category = p.categoryName ?? 'Khác'
+  return {
+    id: p.id,
+    sku,
+    name: p.name,
+    price: p.price ?? 0,
+    category,
+    emoji: emojiFromText(p.name, category),
+  }
+}
+
+function mapInventoryToPOS(item: InventoryItem): Product {
+  const product = item.product
+  const id = item.productId || item.id
+  const name = product?.name || item.productName || item.name || item.sku || item.barcode || `Product ${id.substring(0, 8)}`
+  const sku = product?.barcode || product?.sku || item.barcode || item.sku || id
+  const category = product?.categoryName || item.categoryName || 'Khác'
+  const price = product?.price || item.price || 0
+
+  return {
+    id,
+    sku,
+    name,
+    price,
+    category,
+    emoji: emojiFromText(name, category),
+  }
+}
 
 const PAYMENT_METHODS = [
   { id: 'cash',    label: 'Tiền mặt',      icon: Banknote    },
-  { id: 'card',    label: 'Thẻ ngân hàng', icon: CreditCard  },
-  { id: 'qr',      label: 'QR Code',        icon: QrCode      },
-  { id: 'ewallet', label: 'Ví điện tử',    icon: Wallet      },
-]
-
-const PROMOS = [
-  { id: 'p1', label: 'Giảm 5% đơn hàng',     discount: 0.05,  type: 'percent' as const },
-  { id: 'p2', label: 'Tặng 1 chai nước',      discount: 0,     type: 'gift'    as const },
-  { id: 'p3', label: 'Giảm 10.000đ',          discount: 10000, type: 'fixed'   as const },
+  { id: 'momo',    label: 'MoMo',          icon: Wallet      },
 ]
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n)
 
 export default function POSPage() {
+  const { user, hydrated } = useAuthStore()
+
+  const [products, setProducts]             = useState<Product[]>([])
+  const [loadingProducts, setLoadingProducts] = useState(true)
+  const [productError, setProductError]     = useState<string | null>(null)
   const [query, setQuery]                   = useState('')
   const [category, setCategory]             = useState('Tất cả')
   const [cart, setCart]                     = useState<CartItem[]>([])
-  const [voucher, setVoucher]               = useState('')
-  const [voucherApplied, setVoucherApplied] = useState(false)
   const [payMethod, setPayMethod]           = useState('cash')
-  const [selectedPromo, setSelectedPromo]   = useState<string | null>(null)
+  const [submittingPayment, setSubmittingPayment] = useState(false)
+  const [paymentError, setPaymentError]     = useState<string | null>(null)
+  const [paymentResult, setPaymentResult]   = useState<SimpleSaleResponse | null>(null)
+  const [paymentDisplayStatus, setPaymentDisplayStatus] = useState<'PENDING' | 'COMPLETE' | 'PAID' | null>(null)
+  const [isPollingPayment, setIsPollingPayment] = useState(false)
   const [scanning, setScanning]             = useState(false)
   const [scanValue, setScanValue]           = useState('')
   const scanRef                             = useRef<HTMLInputElement>(null)
   const orderNumber                         = useRef(`#${Math.floor(10000 + Math.random() * 90000)}`)
+
+  useEffect(() => {
+    if (!hydrated) return
+
+    let cancelled = false
+    setLoadingProducts(true)
+    setProductError(null)
+
+    const fetchProducts = async () => {
+      if (!user?.workplaceType || !user?.workplaceId) {
+        throw new Error('Tài khoản chưa có thông tin cửa hàng (workplace). Vui lòng đăng xuất và đăng nhập lại.')
+      }
+      if (user.workplaceType !== 'STORE') {
+        throw new Error('Tài khoản này không thuộc cửa hàng (STORE), không thể xem danh sách sản phẩm POS.')
+      }
+
+      const inventoryData = await InventoryAPIService.getInventoryByLocation('STORE', user.workplaceId)
+
+      let productsData: ProductFromAPI[] = []
+      try {
+        productsData = await ProductAPIService.getAllProducts()
+      } catch {
+        productsData = []
+      }
+
+      const productMap = new Map<string, ProductFromAPI>()
+      productsData.forEach((p) => productMap.set(p.id, p))
+
+      return inventoryData.map((item) => {
+        const product = productMap.get(item.productId)
+        if (product) {
+          return mapApiProductToPOS(product)
+        }
+        return mapInventoryToPOS(item)
+      })
+    }
+
+    fetchProducts()
+      .then((data) => {
+        if (!cancelled) {
+          setProducts(data)
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setProducts([])
+          setProductError(err?.response?.data?.error || err?.message || 'Không thể tải danh sách sản phẩm')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingProducts(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [hydrated, user?.workplaceId, user?.workplaceType])
 
   useEffect(() => { if (scanning) scanRef.current?.focus() }, [scanning])
 
@@ -104,35 +247,181 @@ export default function POSPage() {
     setCart(prev => prev.map(x => x.id === id ? { ...x, qty: x.qty + delta } : x).filter(x => x.qty > 0))
 
   const removeItem  = (id: string) => setCart(prev => prev.filter(x => x.id !== id))
-  const clearOrder  = () => { setCart([]); setVoucher(''); setVoucherApplied(false); setSelectedPromo(null) }
+  const clearOrder  = () => {
+    setCart([])
+    setPaymentError(null)
+    setPaymentResult(null)
+    setPaymentDisplayStatus(null)
+  }
 
   const handleBarcodeScan = (e: React.FormEvent) => {
     e.preventDefault()
-    const found = PRODUCTS.find(p => p.sku === scanValue || p.id === scanValue || p.sku === `#${scanValue}`)
+    const normalized = scanValue.trim().replace(/^#/, '')
+    const found = products.find(p => {
+      const skuNormalized = p.sku.replace(/^#/, '')
+      return p.sku === scanValue || p.id === scanValue || skuNormalized === normalized
+    })
     if (found) addToCart(found)
     setScanValue('')
     setScanning(false)
   }
 
   const subTotal      = cart.reduce((s, x) => s + x.price * x.qty, 0)
-  const promoDiscount = (() => {
-    const promo = PROMOS.find(p => p.id === selectedPromo)
-    if (!promo) return 0
-    if (promo.type === 'percent') return subTotal * (promo.discount as number)
-    if (promo.type === 'fixed')   return promo.discount as number
-    return 0
-  })()
-  const voucherDiscount = voucherApplied ? 20000 : 0
-  const totalDiscount   = promoDiscount + voucherDiscount
-  const tax             = Math.round((subTotal - totalDiscount) * 0.08)
-  const total           = subTotal - totalDiscount + tax
+  const total           = subTotal
   const cartCount       = cart.reduce((s, x) => s + x.qty, 0)
 
-  const filtered = PRODUCTS.filter(p => {
+  const categories = ['Tất cả', ...Array.from(new Set(products.map((p) => p.category).filter(Boolean)))]
+
+  const filtered = products.filter(p => {
     const matchCat = category === 'Tất cả' || p.category === category
     const matchQ   = p.name.toLowerCase().includes(query.toLowerCase()) || p.sku.includes(query)
     return matchCat && matchQ
   })
+
+  useEffect(() => {
+    if (!paymentResult?.saleId) return
+    if (paymentResult.paymentMethod !== 'MOMO') return
+    if (paymentDisplayStatus !== 'PENDING') return
+
+    let cancelled = false
+    setIsPollingPayment(true)
+
+    const poll = async () => {
+      try {
+        const token = useAuthStore.getState().token
+        const response = await fetch(`/api/sales/${paymentResult.saleId}?_ts=${Date.now()}`, {
+          method: 'GET',
+          cache: 'no-store',
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        })
+
+        if (!response.ok) return
+
+        const latest = await response.json().catch(() => null)
+        if (!latest || cancelled) return
+
+        const latestSale = normalizeSalePayload(latest)
+        const isComplete = isPaymentCompleted(latest)
+
+        setPaymentResult((prev) => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            status: latestSale?.status ?? prev.status,
+            paymentStatus: latestSale?.paymentStatus ?? prev.paymentStatus,
+          }
+        })
+
+        if (isComplete) {
+          setPaymentDisplayStatus('COMPLETE')
+          setIsPollingPayment(false)
+        }
+      } catch {
+        // Keep polling silently; temporary network issues should not break POS flow.
+      }
+    }
+
+    poll()
+    const timer = window.setInterval(poll, 3000)
+
+    return () => {
+      cancelled = true
+      setIsPollingPayment(false)
+      window.clearInterval(timer)
+    }
+  }, [paymentDisplayStatus, paymentResult?.paymentMethod, paymentResult?.saleId])
+
+  const getCashierId = () => {
+    const candidates = [
+      user?.id,
+      (user as any)?.userId,
+      (user as any)?.cashierId,
+      (user as any)?.staffId,
+      process.env.NEXT_PUBLIC_POS_CASHIER_ID,
+      DEFAULT_POS_CASHIER_ID,
+    ]
+
+    const found = candidates.find((value) => isGuid(value))
+    return found || ''
+  }
+
+  const getStoreId = () => {
+    const candidates = [
+      user?.workplaceType === 'STORE' ? user?.workplaceId : null,
+      user?.storeId,
+      (user as any)?.storeLocationId,
+      process.env.NEXT_PUBLIC_POS_STORE_ID,
+      DEFAULT_POS_STORE_ID,
+    ]
+
+    const found = candidates.find((value) => isGuid(value))
+    return found || ''
+  }
+
+  const handleCheckout = async () => {
+    if (cart.length === 0 || submittingPayment) return
+
+    const storeId = getStoreId()
+    const cashierId = getCashierId()
+
+    if (!storeId || !cashierId) {
+      setPaymentError('Thiếu thông tin cửa hàng hoặc thu ngân. Vui lòng đăng nhập lại.')
+      return
+    }
+
+    setSubmittingPayment(true)
+    setPaymentError(null)
+    setPaymentResult(null)
+    setPaymentDisplayStatus(null)
+
+    try {
+      const paymentMethod = payMethod === 'momo' ? 'MOMO' : 'CASH'
+      const payload = {
+        storeId,
+        cashierId,
+        paymentMethod,
+        items: cart.map((item) => ({
+          productId: item.id,
+          quantity: item.qty,
+        })),
+        notes: `POS payment via ${paymentMethod}`,
+      }
+
+      const token = useAuthStore.getState().token
+      const response = await fetch('/api/sales/simple', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      })
+
+      const result = await response.json().catch(() => null)
+
+      if (!response.ok) throw new Error(extractApiErrorMessage(result))
+
+      const sale = result as SimpleSaleResponse
+      setPaymentResult(sale)
+
+      if (paymentMethod === 'MOMO') {
+        const mappedStatus = isPaymentCompleted(sale)
+          ? 'COMPLETE'
+          : 'PENDING'
+        setPaymentDisplayStatus(mappedStatus)
+      } else {
+        setPaymentDisplayStatus('PAID')
+      }
+
+      setCart([])
+    } catch (err: any) {
+      setPaymentError(err?.message || 'Không thể thanh toán. Vui lòng thử lại.')
+    } finally {
+      setSubmittingPayment(false)
+    }
+  }
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden font-sans">
@@ -180,7 +469,7 @@ export default function POSPage() {
 
         {/* Category tabs */}
         <div className="bg-white border-b border-gray-200 px-6 flex items-center gap-0 overflow-x-auto">
-          {CATEGORIES.map(cat => (
+          {categories.map(cat => (
             <button
               key={cat}
               onClick={() => setCategory(cat)}
@@ -211,7 +500,22 @@ export default function POSPage() {
               <span className="text-[10px] text-green-500 font-mono">F2</span>
             </button>
 
-            {filtered.map(p => {
+            {loadingProducts && (
+              <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-400">
+                <Package className="w-12 h-12 mb-3 opacity-30 animate-pulse" />
+                <p className="text-base">Đang tải sản phẩm...</p>
+              </div>
+            )}
+
+            {!loadingProducts && productError && (
+              <div className="col-span-full flex flex-col items-center justify-center py-20 text-red-500">
+                <Package className="w-12 h-12 mb-3 opacity-50" />
+                <p className="text-base font-semibold">Không thể tải sản phẩm</p>
+                <p className="text-xs mt-1 text-red-400">{productError}</p>
+              </div>
+            )}
+
+            {!loadingProducts && !productError && filtered.map(p => {
               const inCart = cart.find(x => x.id === p.id)
               return (
                 <div
@@ -235,7 +539,7 @@ export default function POSPage() {
               )
             })}
 
-            {filtered.length === 0 && (
+            {!loadingProducts && !productError && filtered.length === 0 && (
               <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-400">
                 <Package className="w-12 h-12 mb-3 opacity-30" />
                 <p className="text-base">Không tìm thấy sản phẩm</p>
@@ -315,79 +619,58 @@ export default function POSPage() {
         {/* Payment panel */}
         <div className="border-t border-gray-100 px-5 pt-3 pb-5 space-y-3 bg-gray-50/50">
 
-          {/* Voucher */}
-          <div>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                <input
-                  value={voucher}
-                  onChange={e => { setVoucher(e.target.value); setVoucherApplied(false) }}
-                  placeholder="Nhập mã giảm giá..."
-                  className="w-full pl-8 pr-3 py-2 text-xs bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-              <button
-                onClick={() => { if (voucher.trim()) setVoucherApplied(true) }}
-                className="px-3 py-2 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 transition-colors"
-              >
-                Áp dụng
-              </button>
-            </div>
-            {voucherApplied && (
-              <p className="text-xs text-green-600 font-medium mt-1.5 flex items-center gap-1">
-                <span className="w-4 h-4 bg-green-600 rounded-full flex items-center justify-center text-white text-[9px]">✓</span>
-                Mã hợp lệ — giảm {fmt(20000)}
-              </p>
-            )}
-          </div>
-
-          {/* Promos */}
-          <div>
-            <p className="text-[11px] font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Chọn khuyến mãi</p>
-            <div className="flex gap-1.5 flex-wrap">
-              {PROMOS.map(promo => (
-                <button
-                  key={promo.id}
-                  onClick={() => setSelectedPromo(prev => prev === promo.id ? null : promo.id)}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all ${
-                    selectedPromo === promo.id
-                      ? 'bg-green-600 border-green-600 text-white shadow-sm'
-                      : 'bg-white border-gray-200 text-gray-600 hover:border-green-400 hover:text-green-600'
-                  }`}
-                >
-                  {promo.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Summary */}
           <div className="bg-white rounded-xl p-3 space-y-1.5 text-xs border border-gray-100 shadow-sm">
             <div className="flex justify-between text-gray-600">
               <span>Tạm tính</span>
               <span className="font-medium">{fmt(subTotal)}</span>
             </div>
-            {totalDiscount > 0 && (
-              <div className="flex justify-between text-green-600">
-                <span>Giảm giá</span>
-                <span className="font-semibold">− {fmt(totalDiscount)}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-gray-500">
-              <span>Thuế VAT (8%)</span>
-              <span>{fmt(tax)}</span>
-            </div>
             <div className="border-t border-gray-100 pt-1.5 flex justify-between text-sm font-bold text-gray-900">
               <span>Tổng cộng</span>
               <span className="text-green-700 text-base">{fmt(total)}</span>
             </div>
+
+            {paymentDisplayStatus && (
+              <div className="pt-1.5 border-t border-gray-100 flex justify-between items-center">
+                <span className="text-[11px] text-gray-500">Trạng thái thanh toán</span>
+                <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${
+                  paymentDisplayStatus === 'PENDING'
+                    ? 'bg-yellow-100 text-yellow-700'
+                    : 'bg-green-100 text-green-700'
+                }`}>
+                  {paymentDisplayStatus}
+                </span>
+              </div>
+            )}
+
+            {paymentDisplayStatus === 'PENDING' && isPollingPayment && (
+              <p className="text-[11px] text-yellow-700 font-medium">Đang kiểm tra thanh toán MoMo...</p>
+            )}
+
+            {paymentResult?.saleNumber && (
+              <div className="text-[11px] text-gray-500">Mã đơn: {paymentResult.saleNumber}</div>
+            )}
+
+            {paymentResult?.paymentMethod === 'MOMO' && paymentResult?.momoPayUrl && paymentDisplayStatus === 'PENDING' && (
+              <a
+                href={paymentResult.momoPayUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center w-full mt-1 px-3 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition-colors"
+              >
+                Mở MoMo để thanh toán
+              </a>
+            )}
+
+            {paymentError && (
+              <p className="text-[11px] text-red-600 font-medium">{paymentError}</p>
+            )}
           </div>
 
           {/* Payment methods */}
           <div>
             <p className="text-[11px] font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Phương thức thanh toán</p>
-            <div className="grid grid-cols-4 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
               {PAYMENT_METHODS.map(pm => {
                 const Icon = pm.icon
                 return (
@@ -408,13 +691,9 @@ export default function POSPage() {
             </div>
           </div>
 
-          {/* Customer + Print row */}
-          <div className="flex gap-2">
-            <button className="flex-1 flex items-center gap-2 px-3 py-2 border border-gray-200 bg-white rounded-xl text-xs text-gray-500 hover:border-green-400 hover:text-green-600 transition-colors">
-              <User className="w-3.5 h-3.5 flex-shrink-0" />
-              Thêm khách hàng
-            </button>
-            <button className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 bg-white rounded-xl text-xs text-gray-500 hover:border-green-400 hover:text-green-600 transition-colors">
+          {/* Print row */}
+          <div>
+            <button className="w-full flex items-center justify-center gap-1.5 px-3 py-2 border border-gray-200 bg-white rounded-xl text-xs text-gray-500 hover:border-green-400 hover:text-green-600 transition-colors">
               <Receipt className="w-3.5 h-3.5" />
               In hóa đơn
             </button>
@@ -423,10 +702,11 @@ export default function POSPage() {
           {/* Pay button */}
           <button
             disabled={cart.length === 0}
+            onClick={handleCheckout}
             className="w-full py-4 bg-green-600 hover:bg-green-700 active:bg-green-800 disabled:bg-gray-200 disabled:cursor-not-allowed text-white font-bold text-base rounded-2xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-green-200 disabled:shadow-none"
           >
             <CreditCard className="w-5 h-5" />
-            {cart.length === 0 ? 'Thanh toán ngay' : `Thanh toán — ${fmt(total)}`}
+            {submittingPayment ? 'Đang xử lý...' : cart.length === 0 ? 'Thanh toán ngay' : `Thanh toán — ${fmt(total)}`}
           </button>
         </div>
       </div>
