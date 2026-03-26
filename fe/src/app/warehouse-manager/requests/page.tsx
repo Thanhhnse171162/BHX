@@ -652,10 +652,19 @@ export default function WarehouseManagerRequestsPage() {
 
   const handleRejectRequest = useCallback(
     async (requestId: string) => {
+      const reason = String(window.prompt('Nhập lý do từ chối:') ?? '').trim()
+      if (!reason) {
+        pushToast({
+          type: 'error',
+          message: 'Vui lòng nhập lý do từ chối.',
+        })
+        return
+      }
+
       setActionLoadingId(requestId)
       setActionType('reject')
       try {
-        await RestockAPIService.reject(requestId)
+        await RestockAPIService.reject(requestId, reason)
         pushToast({
           type: 'success',
           message: 'Từ chối yêu cầu thành công!',

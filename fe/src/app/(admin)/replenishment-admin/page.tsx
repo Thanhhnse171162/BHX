@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   Search,
   SlidersHorizontal,
@@ -15,6 +14,7 @@ import {
 import { RestockAPIService, type RestockRequestFromAPI, type RestockRequestItem } from '@/services/restock-api.service'
 import { useAuthStore } from '@/store/auth.store'
 import { WarehouseAPIService } from '@/services/warehouse-api.service'
+import { UserAPIService } from '@/services/user-api.service'
 import { ToastContainer, type ToastItem } from '@/shared/ui/Toast'
 
 type UiStatus = 'Tất cả' | 'Chờ duyệt' | 'Đã duyệt' | 'Đã từ chối' | 'Đang xử lý' | 'Hoàn tất'
@@ -49,6 +49,13 @@ function statusFromApiToUi(status?: string | null): Exclude<UiStatus, 'Tất c�
   if (s === 'PROCESSING') return 'Đang xử lý'
   if (s === 'COMPLETED') return 'Hoàn tất'
   return 'Chờ duyệt'
+}
+
+function isFromCentralWarehouse(request: RestockRequestFromAPI, parentWarehouseId?: string) {
+  const fromId = String(request.fromWarehouseId ?? '').trim()
+  if (!fromId) return true
+  if (!parentWarehouseId) return false
+  return fromId.toLowerCase() === String(parentWarehouseId).trim().toLowerCase()
 }
 
 function statusBadgeClass(ui: Exclude<UiStatus, 'Tất cả'>) {
@@ -112,7 +119,6 @@ function StatusBadge({ ui }: { ui: Exclude<UiStatus, 'Tất cả'> }) {
 }
 
 export default function ReplenishmentAdminRequestsPage() {
-  const router = useRouter()
   const { token, user } = useAuthStore()
 
   const [loading, setLoading] = useState(true)
@@ -120,6 +126,7 @@ export default function ReplenishmentAdminRequestsPage() {
   const [requests, setRequests] = useState<RestockRequestFromAPI[]>([])
 
   const [warehouseNameMap, setWarehouseNameMap] = useState<Record<string, string>>({})
+  const [userNameMap, setUserNameMap] = useState<Record<string, string>>({})
   const [resolvedParentWarehouseId, setResolvedParentWarehouseId] = useState<string>('')
   const [parentWarehouseName, setParentWarehouseName] = useState<string>('Kho tổng')
 
@@ -135,6 +142,12 @@ export default function ReplenishmentAdminRequestsPage() {
   const [page, setPage] = useState(1)
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
+  const [detailRequest, setDetailRequest] = useState<RestockRequestFromAPI | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [rejectReasonError, setRejectReasonError] = useState<string | null>(null)
 
   const pushToast = (t: Omit<ToastItem, 'id' | 'onClose'>) => {
     setToasts((prev) => [{ ...t, id: `${Date.now()}-${Math.random()}`, onClose: () => {} }, ...prev].slice(0, 3))
@@ -147,10 +160,42 @@ export default function ReplenishmentAdminRequestsPage() {
     setError(null)
     setActionLoadingId(null)
     try {
+      const isSystemAdmin = Number(user?.roleId) === 1
       const currentWarehouseId = String(user?.warehouseId ?? user?.workplaceId ?? '').trim()
-      if (!currentWarehouseId) {
+      if (!currentWarehouseId && !isSystemAdmin) {
         setError('Tài khoản chưa được gán kho hợp lệ.')
         setRequests([])
+        return
+      }
+
+      // System admin may not be bound to a warehouse. In that case, use global scope.
+      if (!currentWarehouseId && isSystemAdmin) {
+        setResolvedParentWarehouseId('')
+        setParentWarehouseName('Kho tổng')
+
+        const all = await RestockAPIService.getAll().catch(() => [])
+        const scoped = Array.isArray(all)
+          ? all.filter((r) => isFromCentralWarehouse(r))
+          : []
+
+        setRequests(scoped)
+
+        const visibleWarehouseIds = Array.from(
+          new Set(
+            scoped
+              .map((r) => String(r.toWarehouseId ?? '').trim())
+              .filter(Boolean)
+              .slice(0, 100),
+          ),
+        )
+
+        const warehouses = await WarehouseAPIService.getAll().catch(() => [])
+        const wMap: Record<string, string> = {}
+        for (const id of visibleWarehouseIds) {
+          const w = Array.isArray(warehouses) ? warehouses.find((x) => String(x.id) === id) : null
+          wMap[id] = String(w?.name ?? w?.id ?? id)
+        }
+        setWarehouseNameMap(wMap)
         return
       }
 
@@ -178,8 +223,7 @@ export default function ReplenishmentAdminRequestsPage() {
 
       const normalized = Array.isArray(reqs) ? reqs : []
       const fromNullOnly = normalized.filter((r) => {
-        const isFromNull = r.fromWarehouseId == null
-        if (!isFromNull) return false
+        if (!isFromCentralWarehouse(r, parentWarehouseId)) return false
         // Limit to destination scope if BE did not already.
         const toId = r.toWarehouseId != null ? String(r.toWarehouseId) : ''
         return managedIds.size === 0 ? true : (toId ? managedIds.has(toId) : true)
@@ -193,8 +237,7 @@ export default function ReplenishmentAdminRequestsPage() {
         const all = await RestockAPIService.getAll()
         reqs = Array.isArray(all)
           ? all.filter((r) => {
-              const isFromNull = r.fromWarehouseId == null
-              if (!isFromNull) return false
+              if (!isFromCentralWarehouse(r, parentWarehouseId)) return false
               const toId = r.toWarehouseId != null ? String(r.toWarehouseId) : ''
               return managedIds.size === 0 ? true : (toId ? managedIds.has(toId) : true)
             })
@@ -235,6 +278,47 @@ export default function ReplenishmentAdminRequestsPage() {
     refreshRequests()
   }, [token, refreshRequests])
 
+  useEffect(() => {
+    if (!token || requests.length === 0) return
+    const unresolvedUserIds = Array.from(
+      new Set(
+        requests
+          .map((r) => String(r.requestedBy ?? '').trim())
+          .filter(Boolean),
+      ),
+    ).filter((id) => !userNameMap[id])
+
+    if (!unresolvedUserIds.length) return
+
+    let cancelled = false
+    ;(async () => {
+      const entries = await Promise.all(
+        unresolvedUserIds.map(async (id) => {
+          try {
+            const info = await UserAPIService.getIamDetailsById(id)
+            const name = String(info?.fullName ?? info?.full_name ?? info?.name ?? info?.email ?? '').trim()
+            return [id, name] as const
+          } catch {
+            return [id, ''] as const
+          }
+        }),
+      )
+
+      if (cancelled) return
+      setUserNameMap((prev) => {
+        const next = { ...prev }
+        for (const [id, name] of entries) {
+          if (name) next[id] = name
+        }
+        return next
+      })
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [token, requests, userNameMap])
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     const from = filterDateFrom ? new Date(filterDateFrom) : null
@@ -260,7 +344,8 @@ export default function ReplenishmentAdminRequestsPage() {
       const requestCode = String(r.requestNumber || r.id)
       const warehouseName =
         r.fromWarehouseId != null ? warehouseNameMap[String(r.fromWarehouseId)] || String(r.fromWarehouseId || '') : parentWarehouseName
-      const creatorName = String(r.requestedBy || '')
+      const creatorId = String(r.requestedBy ?? '').trim()
+      const creatorName = userNameMap[creatorId] || creatorId
       const reasonTotal = String(r.notes || '')
 
       const inHeader =
@@ -280,8 +365,15 @@ export default function ReplenishmentAdminRequestsPage() {
     filterDateTo,
     filterPriority,
     warehouseNameMap,
+    userNameMap,
     resolvedParentWarehouseId,
   ])
+
+  const getCreatorLabel = (id?: string | null) => {
+    const creatorId = String(id ?? '').trim()
+    if (!creatorId) return '—'
+    return userNameMap[creatorId] || creatorId
+  }
 
   useEffect(() => {
     setPage(1)
@@ -308,8 +400,27 @@ export default function ReplenishmentAdminRequestsPage() {
     })
   }
 
-  const goDetail = (id: string) => {
-    router.push(`/replenishment-admin/${encodeURIComponent(id)}`)
+  const openDetail = async (id: string) => {
+    if (!id) return
+    setDetailOpen(true)
+    setDetailLoading(true)
+    setDetailError(null)
+    setRejectReason('')
+    setRejectReasonError(null)
+    try {
+      const detail = await RestockAPIService.getById(id)
+      if (!detail) {
+        setDetailRequest(null)
+        setDetailError('Không tìm thấy chi tiết yêu cầu.')
+        return
+      }
+      setDetailRequest(detail)
+    } catch {
+      setDetailRequest(null)
+      setDetailError('Không thể tải chi tiết yêu cầu.')
+    } finally {
+      setDetailLoading(false)
+    }
   }
 
   const onApprove = async (requestId: string) => {
@@ -320,8 +431,34 @@ export default function ReplenishmentAdminRequestsPage() {
       await RestockAPIService.approve(requestId)
       pushToast({ type: 'success', message: 'Duyệt yêu cầu thành công!' })
       await refreshRequests()
+      setDetailOpen(false)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Không thể duyệt yêu cầu.'
+      pushToast({ type: 'error', message: msg })
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
+
+  const onReject = async (requestId: string, reason: string) => {
+    if (!requestId) return
+    if (actionLoadingId) return
+
+    const normalizedReason = String(reason ?? '').trim()
+    if (!normalizedReason) {
+      setRejectReasonError('Vui lòng nhập lý do từ chối.')
+      return
+    }
+    setRejectReasonError(null)
+
+    setActionLoadingId(requestId)
+    try {
+      await RestockAPIService.reject(requestId, normalizedReason)
+      pushToast({ type: 'success', message: 'Từ chối yêu cầu thành công!' })
+      await refreshRequests()
+      setDetailOpen(false)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Không thể từ chối yêu cầu.'
       pushToast({ type: 'error', message: msg })
     } finally {
       setActionLoadingId(null)
@@ -331,6 +468,117 @@ export default function ReplenishmentAdminRequestsPage() {
   return (
     <div className="min-h-screen bg-gray-50/80 p-6">
       {toasts.length > 0 && <ToastContainer toasts={toasts} onRemove={removeToast} />}
+
+      {detailOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm p-4 flex items-center justify-center" onClick={() => setDetailOpen(false)}>
+          <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Chi tiết yêu cầu nhập hàng</h3>
+                <p className="text-xs text-gray-400 mt-1">{detailRequest?.requestNumber || detailRequest?.id || '—'}</p>
+              </div>
+              <button
+                onClick={() => setDetailOpen(false)}
+                className="text-gray-300 hover:text-gray-500 transition-colors p-1 rounded-lg hover:bg-gray-100"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              {detailLoading ? (
+                <div className="py-10 text-center text-sm text-gray-400">Đang tải chi tiết...</div>
+              ) : detailError ? (
+                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">{detailError}</div>
+              ) : detailRequest ? (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Trạng thái</p>
+                      <p className="text-sm font-semibold text-gray-800 mt-1">{statusFromApiToUi(detailRequest.status)}</p>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Kho gửi</p>
+                      <p className="text-sm font-semibold text-gray-800 mt-1">
+                        {detailRequest.fromWarehouseId != null
+                          ? warehouseNameMap[String(detailRequest.fromWarehouseId)] || String(detailRequest.fromWarehouseId)
+                          : parentWarehouseName}
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Người tạo</p>
+                      <p className="text-sm font-semibold text-gray-800 mt-1">{getCreatorLabel(detailRequest.requestedBy)}</p>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Ngày tạo</p>
+                      <p className="text-sm font-semibold text-gray-800 mt-1">{formatDateVI(detailRequest.requestedDate)}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 overflow-hidden">
+                    <div className="bg-gray-50 border-b border-gray-200 grid grid-cols-[1fr_120px_120px_1fr] gap-2 px-4 py-2">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Sản phẩm</span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">SL yêu cầu</span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tồn hiện có</span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Lý do</span>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {(detailRequest.items || []).map((it) => (
+                        <div key={it.id} className="grid grid-cols-[1fr_120px_120px_1fr] gap-2 px-4 py-3 items-center">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-800">{it.productName || it.productId}</p>
+                            <p className="text-[11px] text-gray-400">{it.unit || '—'}</p>
+                          </div>
+                          <p className="text-sm font-bold text-gray-800">{Number(it.requestedQuantity || 0).toLocaleString()}</p>
+                          <p className="text-sm text-gray-600">{Number(it.currentQuantity || 0).toLocaleString()}</p>
+                          <p className="text-sm text-gray-600">{it.reason || '—'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {statusFromApiToUi(detailRequest.status) === 'Chờ duyệt' && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                      <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Lý do từ chối</label>
+                      <textarea
+                        value={rejectReason}
+                        onChange={(e) => {
+                          setRejectReason(e.target.value)
+                          if (rejectReasonError) setRejectReasonError(null)
+                        }}
+                        rows={2}
+                        placeholder="Nhập lý do khi từ chối yêu cầu..."
+                        className={`w-full border rounded-xl px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 ${
+                          rejectReasonError ? 'border-red-300 bg-red-50/30' : 'border-gray-200'
+                        }`}
+                      />
+                      {rejectReasonError && (
+                        <p className="mt-2 text-xs text-red-600 font-semibold">{rejectReasonError}</p>
+                      )}
+                      <div className="flex items-center justify-end gap-2 mt-3">
+                        <button
+                          onClick={() => onReject(String(detailRequest.id), rejectReason)}
+                          disabled={actionLoadingId === String(detailRequest.id) || !rejectReason.trim()}
+                          className="h-8 px-3 text-xs font-bold rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {actionLoadingId === String(detailRequest.id) ? <Loader2 size={12} className="animate-spin" /> : 'Từ chối'}
+                        </button>
+                        <button
+                          onClick={() => onApprove(String(detailRequest.id))}
+                          disabled={actionLoadingId === String(detailRequest.id)}
+                          className="h-8 px-3 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {actionLoadingId === String(detailRequest.id) ? <Loader2 size={12} className="animate-spin" /> : 'Duyệt'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-6xl mx-auto space-y-5">
         {user?.roleId !== 1 && (
@@ -538,7 +786,7 @@ export default function ReplenishmentAdminRequestsPage() {
         {/* Table */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="bg-[#0f1f3d]">
-            <div className="grid grid-cols-[120px_160px_160px_120px_150px_120px_140px_150px_120px] gap-2 px-6 py-3.5">
+            <div className="grid grid-cols-[110px_130px_180px_90px_120px_90px_110px_minmax(250px,1fr)] gap-2 px-6 py-3.5">
               {[
                 'Mã yêu cầu',
                 'Kho gửi',
@@ -547,8 +795,7 @@ export default function ReplenishmentAdminRequestsPage() {
                 'Tổng SL yêu cầu',
                 'Ưu tiên',
                 'Ngày tạo',
-                'Trạng thái',
-                'Thao tác',
+                'Trạng thái / Thao tác',
               ].map((h) => (
                 <span key={h} className="text-[10px] font-bold text-gray-400 uppercase tracking-wider leading-tight">
                   {h}
@@ -560,8 +807,8 @@ export default function ReplenishmentAdminRequestsPage() {
           <div className="divide-y divide-gray-100">
             {loading ? (
               Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="grid grid-cols-[120px_160px_160px_120px_150px_120px_140px_150px_120px] gap-2 px-6 py-4 items-center">
-                  {Array.from({ length: 9 }).map((__, j) => (
+                <div key={i} className="grid grid-cols-[110px_130px_180px_90px_120px_90px_110px_minmax(250px,1fr)] gap-2 px-6 py-4 items-center">
+                  {Array.from({ length: 8 }).map((__, j) => (
                     <div key={j} className="h-4 bg-gray-100 rounded animate-pulse" />
                   ))}
                 </div>
@@ -580,12 +827,12 @@ export default function ReplenishmentAdminRequestsPage() {
                 const requestCode = String(r.requestNumber || r.id)
                 const warehouseName =
                   r.fromWarehouseId != null ? warehouseNameMap[String(r.fromWarehouseId)] || String(r.fromWarehouseId || '') : parentWarehouseName
-                const createdByName = String(r.requestedBy || '—')
+                const createdByName = getCreatorLabel(r.requestedBy)
 
                 return (
                   <div
                     key={r.id}
-                    className="grid grid-cols-[120px_160px_160px_120px_150px_120px_140px_150px_120px] gap-2 px-6 py-4 items-center hover:bg-blue-50/20 transition-colors"
+                    className="grid grid-cols-[110px_130px_180px_90px_120px_90px_110px_minmax(250px,1fr)] gap-2 px-6 py-4 items-center hover:bg-blue-50/20 transition-colors"
                   >
                     <span className="text-[11px] font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded-lg">
                       {requestCode}
@@ -596,24 +843,14 @@ export default function ReplenishmentAdminRequestsPage() {
                     <span className="text-sm font-bold text-gray-900">{totalQty.toLocaleString()}</span>
                     <PriorityPill priority={pr} />
                     <span className="text-sm text-gray-500 whitespace-nowrap">{formatDateVI(r.requestedDate)}</span>
-                    <StatusBadge ui={uiStatus} />
-                    <div className="flex items-center gap-2">
-                      {uiStatus === 'Chờ duyệt' ? (
-                        <button
-                          onClick={() => onApprove(String(r.id))}
-                          disabled={actionLoadingId === String(r.id)}
-                          className="h-8 px-2 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                          title="Duyệt yêu cầu"
-                        >
-                          {actionLoadingId === String(r.id) ? <Loader2 size={14} className="animate-spin" /> : 'Duyệt'}
-                        </button>
-                      ) : null}
+                    <div className="flex items-center gap-3 min-w-0 pr-2">
+                      <StatusBadge ui={uiStatus} />
                       <button
-                        onClick={() => goDetail(String(r.id))}
-                        className="flex items-center justify-center text-gray-300 hover:text-blue-500 transition-colors w-8 h-8 rounded-lg hover:bg-blue-50/60"
+                        onClick={() => openDetail(String(r.id))}
+                        className="flex items-center justify-center text-gray-400 hover:text-blue-600 border border-gray-200 hover:border-blue-200 transition-colors w-7 h-7 rounded-lg hover:bg-blue-50/60 flex-shrink-0"
                         title="Xem chi tiết"
                       >
-                        <Eye size={15} />
+                        <Eye size={13} />
                       </button>
                     </div>
                   </div>

@@ -31,7 +31,7 @@ export interface RestockRequestItem {
 export interface RestockRequestFromAPI {
   id: string
   requestNumber: string
-  fromWarehouseId: string
+  fromWarehouseId: string | null
   fromLocationType: 'WAREHOUSE' | 'STORE' | string
   toWarehouseId: string
   toLocationType: 'WAREHOUSE' | 'STORE' | string
@@ -47,8 +47,8 @@ export interface RestockRequestFromAPI {
 }
 
 export interface CreateRestockRequestDTO {
-  fromWarehouseId: string
-  fromLocationType: string
+  fromWarehouseId?: string | null
+  fromLocationType?: string | null
   toWarehouseId: string
   toLocationType: string
   priority: string
@@ -114,16 +114,15 @@ export class RestockAPIService {
     return payload?.data ?? payload
   }
 
-  static async reject(id: string): Promise<RestockRequestFromAPI> {
+  static async reject(id: string, reason: string): Promise<RestockRequestFromAPI> {
     if (!id) throw new Error('Request ID is required')
-    const response = await localApiClient.put(`${this.base}/${id}/reject`)
+    const normalizedReason = String(reason ?? '').trim()
+    if (!normalizedReason) throw new Error('Reject reason is required')
+
+    const response = await localApiClient.put(`${this.base}/${id}/reject`, {
+      reason: normalizedReason,
+    })
     const payload = response.data
     return payload?.data ?? payload
   }
-
-  /**
-   * NOTE (2026-03-25):
-   * - Backend contract for approve/reject request body is NOT confirmed in current prompt.
-   * - Do NOT add custom payloads here until Swagger/BE confirms the exact schema.
-   */
 }

@@ -234,10 +234,8 @@ export default function ReplenishmentAdminDetailPage() {
           setActionLoading(null)
           return
         }
-        // NOTE: Reject request body contract is NOT confirmed in prompt.
-        // Do NOT send custom payload until BE confirms. Call endpoint without body for now.
-        await RestockAPIService.reject(String(request.id))
-        pushToast({ type: 'success', message: 'Từ chối yêu cầu thành công! (TODO: gửi lý do khi BE cung cấp contract)' })
+        await RestockAPIService.reject(String(request.id), reason)
+        pushToast({ type: 'success', message: 'Từ chối yêu cầu thành công!' })
         setConfirmOpen(false)
         setRejectReason('')
         router.push('/replenishment-admin')

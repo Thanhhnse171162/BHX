@@ -456,7 +456,13 @@ export default function WarehouseRequestsPage() {
   // ── Resolve warehouse names ────────────────────────────────────────────────
   useEffect(() => {
     if (!token || requests.length === 0) return
-    const ids = Array.from(new Set(requests.flatMap(r => [r.fromWarehouseId, r.toWarehouseId].filter(Boolean))))
+    const ids = Array.from(
+      new Set(
+        requests
+          .flatMap(r => [r.fromWarehouseId, r.toWarehouseId])
+          .filter((id): id is string => Boolean(id)),
+      ),
+    )
       .filter(id => !warehouseNameMap[id])
     if (!ids.length) return
     let cancelled = false
@@ -573,7 +579,7 @@ export default function WarehouseRequestsPage() {
     if (!d) return '—'
     return new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: 'short', year: 'numeric' })
   }
-  const getWarehouseLabel = (id: string) => {
+  const getWarehouseLabel = (id?: string | null) => {
     if (!id) return '—'
     const key = normalizeId(id)
     const direct = warehouseNameMap[id]
@@ -674,8 +680,12 @@ export default function WarehouseRequestsPage() {
       if (status === 'APPROVED') {
         await RestockAPIService.approve(id)
       } else {
-        // NOTE: reject body contract is not confirmed; do not send custom payload here.
-        await RestockAPIService.reject(id)
+        const reason = String(prompt('Nhập lý do từ chối:') ?? '').trim()
+        if (!reason) {
+          alert('Vui lòng nhập lý do từ chối.')
+          return
+        }
+        await RestockAPIService.reject(id, reason)
       }
       await fetchRequests()
     } catch { alert('Không thể cập nhật trạng thái. Vui lòng thử lại.') }
