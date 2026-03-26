@@ -1,126 +1,105 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Plus, FileDown, Search, SlidersHorizontal, Eye,
   ChevronLeft, ChevronRight, X, ChevronDown,
-  Package, ArrowRight, Trash2, CheckCircle2
+  Package, ArrowRight, Trash2
 } from 'lucide-react'
+import { useAuthStore } from '@/store/auth.store'
+import { RestockAPIService, type CreateRestockRequestDTO, type RestockRequestFromAPI } from '@/services/restock-api.service'
+import { WarehouseAPIService } from '@/services/warehouse-api.service'
+import { ReplenishmentProductAPIService, type CatalogProductFromAPI } from '@/services/replenishment-product-api.service'
+import { localApiClient } from '@/shared/api/http'
+import { ToastContainer, type ToastItem } from '@/shared/ui/Toast'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+type UiStatus = 'Tất cả' | 'Chờ duyệt' | 'Đã duyệt' | 'Đã từ chối' | 'Đang xử lý' | 'Hoàn tất'
+type UiPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'
 
-type Priority = 'HIGH' | 'NORMAL' | 'URGENT'
-type Status = 'Chờ duyệt' | 'Đã duyệt' | 'Đã từ chối'
-
-interface LineItem {
+type CreateItem = {
+  productId: string
   sku: string
-  name: string
-  category: string
-  tonHienCo: number
-  minMax: string
-  soLuongYeuCau: number
-  supplier: string
-  priority: Priority
+  productName: string
+  unit: string
+  currentQuantity: number
+  requestedQuantity: number
+  reason: string
 }
 
-interface Product {
-  sku: string
-  name: string
-  category: string
-  quantityRequested: number
-  quantityCurrent: number
-  quantitySuggested: number
-  supplier: string
-  priority: Priority
-  status: Status
-  tonDich: number
-  minMax: string
+const TABS: UiStatus[] = ['Tất cả', 'Chờ duyệt', 'Đã duyệt', 'Đã từ chối', 'Đang xử lý', 'Hoàn tất']
+const PAGE_SIZE = 10
+
+function formatDateVI(value?: string | null) {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return String(value)
+  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const PRODUCTS: Product[] = [
-  {
-    sku: 'SKU-98210', name: 'Nike Air Max 270', category: 'Footwear / Athletics',
-    quantityRequested: 150, quantityCurrent: 2450, quantitySuggested: 50,
-    supplier: 'Nike Suppliers', priority: 'HIGH', status: 'Chờ duyệt',
-    tonDich: 20, minMax: '50 / 500',
-  },
-  {
-    sku: 'SKU-44122', name: 'Smart Watch Pro G3', category: 'Electronics / Gadgets',
-    quantityRequested: 45, quantityCurrent: 112, quantitySuggested: 30,
-    supplier: 'Samsung', priority: 'NORMAL', status: 'Đã duyệt',
-    tonDich: 5, minMax: '10 / 100',
-  },
-  {
-    sku: 'SKU-77215', name: 'Adidas Ultraboost', category: 'Footwear / Athletics',
-    quantityRequested: 80, quantityCurrent: 12, quantitySuggested: 100,
-    supplier: 'Adidas Logistics', priority: 'URGENT', status: 'Đã từ chối',
-    tonDich: 3, minMax: '20 / 200',
-  },
-  {
-    sku: 'SKU-33401', name: 'Sony WH-1000XM5', category: 'Electronics / Audio',
-    quantityRequested: 60, quantityCurrent: 34, quantitySuggested: 40,
-    supplier: 'Sony VN', priority: 'HIGH', status: 'Chờ duyệt',
-    tonDich: 8, minMax: '15 / 150',
-  },
-  {
-    sku: 'SKU-55678', name: 'Levi\'s 501 Jeans', category: 'Apparel / Denim',
-    quantityRequested: 200, quantityCurrent: 430, quantitySuggested: 120,
-    supplier: 'Levi Strauss Asia', priority: 'NORMAL', status: 'Đã duyệt',
-    tonDich: 50, minMax: '100 / 600',
-  },
-]
-
-const SUPPLIER_OPTIONS: Record<string, string[]> = {
-  'SKU-98210': ['Nike Suppliers', 'Sport Direct VN', 'Foot Locker Asia'],
-  'SKU-44122': ['Samsung', 'Tech World VN', 'Điện Máy Xanh'],
-  'SKU-77215': ['Adidas Logistics', 'Sport 2000', 'Joma VN'],
-  'SKU-33401': ['Sony VN', 'FPT Shop', 'Thế Giới Di Động'],
-  'SKU-55678': ['Levi Strauss Asia', 'Fashion World VN', 'Canifa'],
+function toUiPriority(p?: string | null): UiPriority {
+  const s = String(p ?? '').trim().toUpperCase()
+  if (s === 'URGENT') return 'URGENT'
+  if (s === 'HIGH') return 'HIGH'
+  if (s === 'LOW') return 'LOW'
+  return 'NORMAL'
 }
 
-const DEFAULT_LINE_ITEMS: LineItem[] = [
-  {
-    sku: 'SKU-98210', name: 'Nike Air Max 270', category: 'Footwear / Athletics',
-    tonHienCo: 2450, minMax: '50 / 500', soLuongYeuCau: 150,
-    supplier: 'Foot Locker Asia', priority: 'HIGH',
-  },
-  {
-    sku: 'SKU-44122', name: 'Smart Watch Pro G3', category: 'Electronics / Gadgets',
-    tonHienCo: 112, minMax: '10 / 100', soLuongYeuCau: 45,
-    supplier: 'Tech World VN', priority: 'NORMAL',
-  },
-]
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const priorityStyle: Record<Priority, string> = {
-  HIGH:   'text-blue-600 font-semibold',
-  NORMAL: 'text-gray-500 font-medium',
-  URGENT: 'text-red-500 font-semibold',
+function statusFromApiToUi(status?: string | null): Exclude<UiStatus, 'Tất cả'> {
+  const s = String(status ?? '').trim().toUpperCase()
+  if (s === 'APPROVED') return 'Đã duyệt'
+  if (s === 'REJECTED') return 'Đã từ chối'
+  if (s === 'PROCESSING') return 'Đang xử lý'
+  if (s === 'COMPLETED') return 'Hoàn tất'
+  return 'Chờ duyệt'
 }
 
-const priorityDot: Record<Priority, string> = {
-  HIGH:   'bg-blue-500',
-  NORMAL: 'bg-gray-400',
-  URGENT: 'bg-red-500',
+function statusBadgeClass(ui: Exclude<UiStatus, 'Tất cả'>) {
+  switch (ui) {
+    case 'Chờ duyệt':
+      return 'text-amber-600 bg-amber-50 border border-amber-200'
+    case 'Đã duyệt':
+      return 'text-green-600 bg-green-50 border border-green-200'
+    case 'Đã từ chối':
+      return 'text-red-500 bg-red-50 border border-red-200'
+    case 'Đang xử lý':
+      return 'text-indigo-700 bg-indigo-50 border border-indigo-200'
+    case 'Hoàn tất':
+      return 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+  }
 }
 
-const priorityBadge: Record<Priority, string> = {
-  HIGH:   'bg-blue-50 text-blue-600 border border-blue-200',
-  NORMAL: 'bg-gray-100 text-gray-500 border border-gray-200',
-  URGENT: 'bg-red-50 text-red-500 border border-red-200',
+function priorityDotClass(p: UiPriority) {
+  switch (p) {
+    case 'HIGH':
+      return 'bg-blue-500'
+    case 'URGENT':
+      return 'bg-red-500'
+    case 'LOW':
+      return 'bg-emerald-500'
+    case 'NORMAL':
+    default:
+      return 'bg-gray-400'
+  }
 }
 
-const statusStyle: Record<Status, string> = {
-  'Chờ duyệt':  'text-amber-600 bg-amber-50 border border-amber-200',
-  'Đã duyệt':   'text-green-600 bg-green-50 border border-green-200',
-  'Đã từ chối': 'text-red-500 bg-red-50 border border-red-200',
+function priorityTextClass(p: UiPriority) {
+  switch (p) {
+    case 'HIGH':
+      return 'text-blue-600 font-semibold'
+    case 'URGENT':
+      return 'text-red-500 font-semibold'
+    case 'LOW':
+      return 'text-emerald-600 font-semibold'
+    case 'NORMAL':
+    default:
+      return 'text-gray-500 font-medium'
+  }
 }
 
-type TabFilter = 'Tất cả' | 'Chờ duyệt' | 'Đã duyệt' | 'Đã từ chối'
-const TABS: TabFilter[] = ['Tất cả', 'Chờ duyệt', 'Đã duyệt', 'Đã từ chối']
+function sumRequestedQty(req: RestockRequestFromAPI) {
+  const items = Array.isArray(req.items) ? req.items : []
+  return items.reduce((sum, it) => sum + Number(it.requestedQuantity ?? 0), 0)
+}
 
 // ─── Add Product Dropdown ─────────────────────────────────────────────────────
 
@@ -128,19 +107,23 @@ function AddProductDropdown({
   existing,
   onAdd,
   onClose,
+  products,
+  loading,
 }: {
   existing: string[]
-  onAdd: (p: LineItem) => void
+  onAdd: (p: CatalogProductFromAPI) => void
   onClose: () => void
+  products: CatalogProductFromAPI[]
+  loading: boolean
 }) {
-  const available = PRODUCTS.filter(p => !existing.includes(p.sku))
+  const available = products.filter((p) => !existing.includes(String(p.id)))
   const [search, setSearch] = useState('')
   const ref = useRef<HTMLDivElement>(null)
 
-  const filtered = available.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.sku.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = available.filter((p) => {
+    const q = search.toLowerCase()
+    return String(p.name ?? '').toLowerCase().includes(q) || String(p.sku ?? '').toLowerCase().includes(q)
+  })
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -150,20 +133,9 @@ function AddProductDropdown({
     return () => document.removeEventListener('mousedown', handler)
   }, [onClose])
 
-  const handleSelect = (p: Product) => {
-    onAdd({
-      sku: p.sku, name: p.name, category: p.category,
-      tonHienCo: p.quantityCurrent, minMax: p.minMax,
-      soLuongYeuCau: p.quantityRequested,
-      supplier: p.supplier, priority: p.priority,
-    })
+  const handleSelect = (p: CatalogProductFromAPI) => {
+    onAdd(p)
     onClose()
-  }
-
-  const priorityColor: Record<Priority, string> = {
-    HIGH: 'text-blue-500',
-    NORMAL: 'text-gray-400',
-    URGENT: 'text-red-500',
   }
 
   return (
@@ -194,16 +166,21 @@ function AddProductDropdown({
 
       {/* Product list */}
       <div className="max-h-64 overflow-y-auto">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="py-8 text-center">
+            <Package size={20} className="mx-auto text-gray-300 mb-2" />
+            <p className="text-xs text-gray-400">Đang tải danh mục sản phẩm...</p>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="py-8 text-center">
             <Package size={20} className="mx-auto text-gray-300 mb-2" />
             <p className="text-xs text-gray-400">
               {available.length === 0 ? 'Đã thêm tất cả sản phẩm' : 'Không tìm thấy sản phẩm'}
             </p>
           </div>
-        ) : filtered.map((p, i) => (
+        ) : filtered.map((p) => (
           <button
-            key={p.sku}
+            key={p.id}
             onClick={() => handleSelect(p)}
             className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50/60 transition-colors text-left group border-b border-gray-50 last:border-0"
           >
@@ -217,16 +194,16 @@ function AddProductDropdown({
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="text-[10px] text-gray-400 font-mono">{p.sku}</span>
                 <span className="text-gray-200">·</span>
-                <span className="text-[10px] text-gray-400 truncate">{p.category}</span>
+                <span className="text-[10px] text-gray-400 truncate">{p.categoryName ?? ''}</span>
               </div>
             </div>
             {/* Stock + priority */}
             <div className="text-right flex-shrink-0">
-              <p className="text-[10px] font-bold text-gray-600">{p.quantityCurrent.toLocaleString()}</p>
-              <p className="text-[9px] text-gray-400">tồn kho</p>
+              <p className="text-[10px] font-bold text-gray-600">—</p>
+              <p className="text-[9px] text-gray-400">tồn (TODO)</p>
             </div>
-            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${priorityBadge[p.priority]} flex-shrink-0`}>
-              {p.priority}
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500 border border-gray-200 flex-shrink-0">
+              SP
             </span>
           </button>
         ))}
@@ -236,7 +213,7 @@ function AddProductDropdown({
       {available.length > 0 && (
         <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100">
           <p className="text-[10px] text-gray-400 text-center">
-            {available.length} sản phẩm có sẵn trong Kho Tổng
+            {available.length} sản phẩm có sẵn
           </p>
         </div>
       )}
@@ -246,17 +223,207 @@ function AddProductDropdown({
 
 // ─── Create Request Modal ─────────────────────────────────────────────────────
 
-function CreateRequestModal({ onClose }: { onClose: () => void }) {
-  const [items, setItems] = useState<LineItem[]>(DEFAULT_LINE_ITEMS)
-  const [ngayCan, setNgayCan] = useState('')
-  const [mucDoUuTien, setMucDoUuTien] = useState<'Normal' | 'High' | 'Urgent'>('Normal')
-  const [ghiChu, setGhiChu] = useState('')
+function CreateRequestModal({
+  onClose,
+  fromWarehouseId,
+  fromWarehouseName,
+  inventoryLocationType,
+  inventoryLocationId,
+  onCreated,
+}: {
+  onClose: () => void
+  fromWarehouseId: string
+  fromWarehouseName: string
+  inventoryLocationType: string
+  inventoryLocationId: string
+  onCreated: () => void
+}) {
+  const [items, setItems] = useState<CreateItem[]>([])
+  const [priority, setPriority] = useState<UiPriority>('NORMAL')
+  const [notes, setNotes] = useState('')
   const [showAddDropdown, setShowAddDropdown] = useState(false)
+  const [products, setProducts] = useState<CatalogProductFromAPI[]>([])
+  const [productsLoading, setProductsLoading] = useState(false)
 
-  const updateItem = (sku: string, field: keyof LineItem, val: string | number) => {
-    setItems(prev => prev.map(p => p.sku === sku ? { ...p, [field]: val } : p))
+  const [inventoryLoading, setInventoryLoading] = useState(false)
+  const [inventoryByProductId, setInventoryByProductId] = useState<Record<string, number>>({})
+
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    if (!inventoryLocationType || !inventoryLocationId) {
+      setInventoryByProductId({})
+      return
+    }
+    setInventoryLoading(true)
+    const invTypeNormalized = String(inventoryLocationType ?? '')
+      .trim()
+      .toLowerCase()
+      .includes('store')
+      ? 'Store'
+      : 'Warehouse'
+
+    localApiClient
+      .get(`/inventory/location/${encodeURIComponent(invTypeNormalized)}/${encodeURIComponent(inventoryLocationId)}`)
+      .then((res) => {
+        const payload = res.data
+        const list: any[] = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : []
+
+        const map: Record<string, number> = {}
+        for (const row of list) {
+          const pid = String(row?.productId ?? row?.product?.id ?? '').trim()
+          if (!pid) continue
+          const available = Number(row?.availableQuantity ?? row?.quantity ?? 0)
+          map[pid] = Number.isFinite(available) ? Math.max(0, available) : 0
+        }
+
+        if (!cancelled) setInventoryByProductId(map)
+      })
+      .catch(() => {
+        if (!cancelled) setInventoryByProductId({})
+      })
+      .finally(() => {
+        if (!cancelled) setInventoryLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [inventoryLocationType, inventoryLocationId])
+
+  // Nếu inventory load xong sau khi người dùng đã chọn sản phẩm, cập nhật tồn hiện có.
+  useEffect(() => {
+    if (Object.keys(inventoryByProductId).length === 0) return
+    setItems((prev) =>
+      prev.map((it) => ({
+        ...it,
+        currentQuantity: inventoryByProductId[String(it.productId)] ?? it.currentQuantity ?? 0,
+      })),
+    )
+  }, [inventoryByProductId])
+
+  useEffect(() => {
+    let cancelled = false
+    setProductsLoading(true)
+    ReplenishmentProductAPIService.getAllProducts()
+      .then((list) => {
+        if (!cancelled) setProducts(Array.isArray(list) ? list : [])
+      })
+      .catch(() => {
+        if (!cancelled) setProducts([])
+      })
+      .finally(() => {
+        if (!cancelled) setProductsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const updateItem = (productId: string, field: keyof CreateItem, val: string | number) => {
+    setItems((prev) => prev.map((p) => (p.productId === productId ? { ...p, [field]: val as any } : p)))
   }
-  const removeItem = (sku: string) => setItems(prev => prev.filter(p => p.sku !== sku))
+  const removeItem = (productId: string) => setItems((prev) => prev.filter((p) => p.productId !== productId))
+
+  const onAddProduct = async (p: CatalogProductFromAPI) => {
+    const pid = String(p.id || '').trim()
+    if (!pid) return
+    if (items.some((x) => String(x.productId) === pid)) return
+
+    setItems((prev) => [
+      ...prev,
+      {
+        productId: pid,
+        sku: String(p.sku || ''),
+        productName: String(p.name || ''),
+        unit: String(p.unit || ''),
+        currentQuantity: inventoryByProductId[pid] ?? 0,
+        requestedQuantity: 1,
+        reason: '',
+      },
+    ])
+
+    // Best-effort enrich from details-batch in case picker data is incomplete.
+    const enrich = (await ReplenishmentProductAPIService.detailsBatch([pid]).catch(() => ({}))) as Record<
+      string,
+      Partial<CatalogProductFromAPI>
+    >
+    const e = enrich[String(pid)]
+    if (e?.sku || e?.name || e?.unit) {
+      setItems((prev) =>
+        prev.map((it) =>
+          it.productId !== pid
+            ? it
+            : {
+                ...it,
+                sku: it.sku || String(e?.sku || ''),
+                productName: it.productName || String(e?.name || ''),
+                unit: it.unit || String(e?.unit || ''),
+              }
+        )
+      )
+    }
+  }
+
+  const submit = async () => {
+    setSubmitError(null)
+    if (!priority) {
+      setSubmitError('Vui lòng chọn mức độ ưu tiên.')
+      return
+    }
+    if (items.length === 0) {
+      setSubmitError('Vui lòng thêm ít nhất 1 sản phẩm.')
+      return
+    }
+    for (const it of items) {
+      if (!it.productId) {
+        setSubmitError('Có dòng sản phẩm thiếu productId.')
+        return
+      }
+      if (!Number.isFinite(Number(it.requestedQuantity)) || Number(it.requestedQuantity) <= 0) {
+        setSubmitError(`Số lượng yêu cầu của "${it.productName || it.sku || it.productId}" phải > 0.`)
+        return
+      }
+    }
+
+    const toRestockLocationType: string =
+      String(inventoryLocationType ?? '')
+        .toLowerCase()
+        .includes('store')
+        ? 'STORE'
+        : 'WAREHOUSE'
+
+    const dto: CreateRestockRequestDTO = {
+      fromWarehouseId,
+      fromLocationType: 'WAREHOUSE',
+      toWarehouseId: inventoryLocationId,
+      toLocationType: toRestockLocationType,
+      priority,
+      notes: notes.trim() || undefined,
+      items: items.map((it) => ({
+        productId: it.productId,
+        requestedQuantity: Number(it.requestedQuantity),
+        currentQuantity: Number(it.currentQuantity ?? 0),
+        reason: it.reason?.trim() || undefined,
+      })),
+    }
+
+    try {
+      setSubmitting(true)
+      await RestockAPIService.create(dto)
+      onCreated()
+      onClose()
+    } catch (e: any) {
+      setSubmitError(e?.message || 'Tạo yêu cầu thất bại. Vui lòng thử lại.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -268,12 +435,12 @@ function CreateRequestModal({ onClose }: { onClose: () => void }) {
         <div className="px-8 pt-7 pb-5 flex items-start justify-between border-b border-gray-100 flex-shrink-0">
           <div>
             <h2 className="text-xl font-bold text-gray-900">Tạo phiếu yêu cầu nhập hàng</h2>
-            <p className="text-xs text-gray-400 mt-1">Khởi tạo quy trình cung ứng hàng hóa cho hệ thống kho bãi</p>
+            <p className="text-xs text-gray-400 mt-1">Tạo phiếu theo đúng flow duyệt/từ chối (Restock Requests)</p>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Mã phiếu (ID)</p>
-              <p className="text-base font-bold text-blue-600">PR-2024-001</p>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Mã phiếu</p>
+              <p className="text-base font-bold text-blue-600">Tự sinh</p>
             </div>
             <button onClick={onClose} className="text-gray-300 hover:text-gray-500 transition-colors p-1 rounded-lg hover:bg-gray-100">
               <X size={18} />
@@ -295,7 +462,7 @@ function CreateRequestModal({ onClose }: { onClose: () => void }) {
               <div className="relative">
                 <input
                   readOnly
-                  value="Kho Tổng"
+                  value={fromWarehouseName || fromWarehouseId}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-600 bg-gray-50 cursor-not-allowed focus:outline-none pr-14"
                 />
                 <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-md px-1.5 py-0.5 tracking-wide">
@@ -304,16 +471,15 @@ function CreateRequestModal({ onClose }: { onClose: () => void }) {
               </div>
             </div>
 
-            {/* Ngày cần hàng */}
+            {/* toWarehouseId/toLocationType (hidden for now) */}
             <div>
               <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
-                Ngày cần hàng <span className="text-red-400">*</span>
+                Kho đích / Nơi nhận
               </label>
               <input
-                type="date"
-                value={ngayCan}
-                onChange={e => setNgayCan(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                readOnly
+                value="(Ẩn theo nghiệp vụ hiện tại)"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-600 bg-gray-50 cursor-not-allowed"
               />
             </div>
 
@@ -324,15 +490,15 @@ function CreateRequestModal({ onClose }: { onClose: () => void }) {
               </label>
               <div className="flex gap-2 h-[42px]">
                 {([
-                  { val: 'Normal', icon: '●', active: 'bg-gray-800 text-white border-gray-800 shadow-sm' },
-                  { val: 'High',   icon: '▲', active: 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-200' },
-                  { val: 'Urgent', icon: '⚠', active: 'bg-red-500 text-white border-red-500 shadow-sm shadow-red-100' },
+                  { val: 'NORMAL', icon: '●', active: 'bg-gray-800 text-white border-gray-800 shadow-sm' },
+                  { val: 'HIGH', icon: '▲', active: 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-200' },
+                  { val: 'URGENT', icon: '⚠', active: 'bg-red-500 text-white border-red-500 shadow-sm shadow-red-100' },
                 ] as const).map(opt => (
                   <button
                     key={opt.val}
-                    onClick={() => setMucDoUuTien(opt.val)}
+                    onClick={() => setPriority(opt.val)}
                     className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-bold rounded-xl border transition-all ${
-                      mucDoUuTien === opt.val
+                      priority === opt.val
                         ? opt.active
                         : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300 hover:text-gray-600'
                     }`}
@@ -351,8 +517,8 @@ function CreateRequestModal({ onClose }: { onClose: () => void }) {
                 Ghi chú chung
               </label>
               <textarea
-                value={ghiChu}
-                onChange={e => setGhiChu(e.target.value)}
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
                 placeholder="Nhập nội dung ghi chú cho phiếu yêu cầu (lý do nhập hàng, ghi chú quan trọng...)"
                 rows={2}
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 placeholder:text-gray-300 transition-all"
@@ -390,17 +556,19 @@ function CreateRequestModal({ onClose }: { onClose: () => void }) {
 
                 {showAddDropdown && (
                   <AddProductDropdown
-                    existing={items.map(i => i.sku)}
-                    onAdd={p => setItems(prev => [...prev, p])}
+                    products={products}
+                    existing={items.map(i => i.productId)}
+                    onAdd={onAddProduct}
                     onClose={() => setShowAddDropdown(false)}
+                    loading={productsLoading}
                   />
                 )}
               </div>
             </div>
 
             {/* Column headers — light gray */}
-            <div className="bg-gray-50 border-b border-gray-200 grid grid-cols-[80px_1fr_100px_100px_110px_1fr_36px] gap-3 px-5 py-2.5">
-              {['SKU', 'TÊN SẢN PHẨM', 'TỒN HIỆN CÓ', 'MIN / MAX', 'SL YÊU CẦU', 'NHÀ CUNG CẤP ƯU TIÊN', ''].map(h => (
+            <div className="bg-gray-50 border-b border-gray-200 grid grid-cols-[90px_1fr_90px_110px_110px_1fr_36px] gap-3 px-5 py-2.5">
+              {['SKU', 'TÊN SẢN PHẨM', 'ĐƠN VỊ', 'TỒN HIỆN CÓ', 'SL YÊU CẦU', 'LÝ DO DÒNG', ''].map(h => (
                 <span key={h} className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{h}</span>
               ))}
             </div>
@@ -417,12 +585,12 @@ function CreateRequestModal({ onClose }: { onClose: () => void }) {
                 </div>
               ) : items.map(item => (
                 <div
-                  key={item.sku}
-                  className="grid grid-cols-[80px_1fr_100px_100px_110px_1fr_36px] gap-3 px-5 py-3.5 items-center group hover:bg-blue-50/30 transition-colors"
+                  key={item.productId}
+                  className="grid grid-cols-[90px_1fr_90px_110px_110px_1fr_36px] gap-3 px-5 py-3.5 items-center group hover:bg-blue-50/30 transition-colors"
                 >
                   {/* SKU */}
                   <span className="text-[10px] text-gray-400 font-mono bg-gray-100 px-1.5 py-0.5 rounded-md leading-tight inline-block">
-                    {item.sku}
+                    {item.sku || '—'}
                   </span>
 
                   {/* Product */}
@@ -431,46 +599,40 @@ function CreateRequestModal({ onClose }: { onClose: () => void }) {
                       <Package size={13} className="text-gray-400" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-bold text-gray-800 truncate">{item.name}</p>
-                      <p className="text-[10px] text-gray-400 truncate">{item.category}</p>
+                      <p className="text-xs font-bold text-gray-800 truncate">{item.productName || '—'}</p>
+                      <p className="text-[10px] text-gray-400 truncate">{item.productId.slice(0, 8)}…</p>
                     </div>
                   </div>
 
+                  {/* Unit */}
+                  <span className="text-xs text-gray-600 font-semibold">{item.unit || '—'}</span>
+
                   {/* Tồn hiện có */}
                   <div>
-                    <span className="text-sm font-bold text-gray-800">{item.tonHienCo.toLocaleString()}</span>
+                    <span className="text-sm font-bold text-gray-800">{Number(item.currentQuantity ?? 0).toLocaleString()}</span>
                     <span className="text-[10px] text-gray-400 ml-1">sp</span>
                   </div>
-
-                  {/* Min/Max */}
-                  <span className="text-xs text-gray-500 font-medium">{item.minMax}</span>
 
                   {/* SL yêu cầu — editable */}
                   <input
                     type="number"
-                    min={0}
-                    value={item.soLuongYeuCau}
-                    onChange={e => updateItem(item.sku, 'soLuongYeuCau', +e.target.value)}
+                    min={1}
+                    value={item.requestedQuantity}
+                    onChange={e => updateItem(item.productId, 'requestedQuantity', Number(e.target.value))}
                     className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold text-gray-800 text-center focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-400 transition-all bg-white hover:border-gray-300"
                   />
 
-                  {/* Nhà cung cấp — styled select */}
-                  <div className="relative">
-                    <select
-                      value={item.supplier}
-                      onChange={e => updateItem(item.sku, 'supplier', e.target.value)}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-400 transition-all bg-white hover:border-gray-300 pr-7 cursor-pointer"
-                    >
-                      {(SUPPLIER_OPTIONS[item.sku] || [item.supplier]).map(s => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                    <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                  </div>
+                  {/* Reason */}
+                  <input
+                    value={item.reason}
+                    onChange={(e) => updateItem(item.productId, 'reason', e.target.value)}
+                    placeholder="Nhập lý do (tuỳ chọn)"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-400 transition-all bg-white hover:border-gray-300"
+                  />
 
                   {/* Remove */}
                   <button
-                    onClick={() => removeItem(item.sku)}
+                    onClick={() => removeItem(item.productId)}
                     className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all flex items-center justify-center w-7 h-7 rounded-lg hover:bg-red-50"
                   >
                     <Trash2 size={13} />
@@ -482,7 +644,7 @@ function CreateRequestModal({ onClose }: { onClose: () => void }) {
             {/* Table footer */}
             <div className="bg-gray-50 border-t border-gray-200 px-5 py-3 flex items-center justify-between">
               <p className="text-[10px] text-gray-400 italic">
-                Gợi ý: Nhà cung cấp được gợi ý tự động dựa trên lịch sử giao dịch của hệ thống.
+                {inventoryLoading ? 'Đang tải tồn hiện có...' : 'Tồn hiện có lấy theo tồn kho tại vị trí được cấu hình.'}
               </p>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Tổng mặt hàng:</span>
@@ -508,12 +670,23 @@ function CreateRequestModal({ onClose }: { onClose: () => void }) {
             >
               Huỷ bỏ
             </button>
-            <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-sm font-bold px-6 py-2.5 rounded-xl transition-all shadow-lg shadow-blue-600/20">
+            <button
+              onClick={submit}
+              disabled={submitting}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-sm font-bold px-6 py-2.5 rounded-xl transition-all shadow-lg shadow-blue-600/20 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
               <ArrowRight size={15} />
-              Gửi yêu cầu
+              {submitting ? 'Đang gửi...' : 'Gửi yêu cầu'}
             </button>
           </div>
         </div>
+        {submitError && (
+          <div className="px-8 pb-6">
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+              {submitError}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -522,24 +695,96 @@ function CreateRequestModal({ onClose }: { onClose: () => void }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ReplenishmentPage() {
-  const [activeTab, setActiveTab] = useState<TabFilter>('Tất cả')
+  const { token, user } = useAuthStore()
+  const [toasts, setToasts] = useState<ToastItem[]>([])
+  const pushToast = (t: Omit<ToastItem, 'id' | 'onClose'>) => {
+    setToasts((prev) => [{ ...t, id: `${Date.now()}-${Math.random()}`, onClose: () => {} }, ...prev].slice(0, 3))
+  }
+  const removeToast = (id: string) => setToasts((prev) => prev.filter((t) => t.id !== id))
+
+  const [activeTab, setActiveTab] = useState<UiStatus>('Tất cả')
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
+  const [page, setPage] = useState(1)
 
-  const filtered = PRODUCTS.filter(p => {
-    const matchTab = activeTab === 'Tất cả' || p.status === activeTab
-    const matchSearch =
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.sku.toLowerCase().includes(search.toLowerCase())
-    return matchTab && matchSearch
-  })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [requests, setRequests] = useState<RestockRequestFromAPI[]>([])
+  const [warehouseName, setWarehouseName] = useState<string>('')
 
-  const tabCount = (tab: TabFilter) =>
-    tab === 'Tất cả' ? PRODUCTS.length : PRODUCTS.filter(p => p.status === tab).length
+  const warehouseId = String(user?.warehouseId ?? user?.workplaceId ?? '').trim()
+
+  const reload = useMemo(() => {
+    return async () => {
+      if (!token) return
+      if (!warehouseId) {
+        setRequests([])
+        setLoading(false)
+        return
+      }
+      setLoading(true)
+      setError(null)
+      try {
+        const [reqs, wh] = await Promise.all([
+          RestockAPIService.getByWarehouse(warehouseId),
+          WarehouseAPIService.getById(warehouseId).catch(() => null),
+        ])
+        setRequests(Array.isArray(reqs) ? reqs : [])
+        setWarehouseName(String(wh?.name ?? ''))
+      } catch {
+        setError('Không thể tải danh sách phiếu. Vui lòng thử lại.')
+        setRequests([])
+      } finally {
+        setLoading(false)
+      }
+    }
+  }, [token, warehouseId])
+
+  useEffect(() => {
+    reload()
+  }, [reload])
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return requests.filter((r) => {
+      const uiStatus = statusFromApiToUi(r.status)
+      if (activeTab !== 'Tất cả' && uiStatus !== activeTab) return false
+      if (!q) return true
+      const code = String(r.requestNumber || r.id).toLowerCase()
+      return code.includes(q)
+    })
+  }, [requests, search, activeTab])
+
+  useEffect(() => {
+    setPage(1)
+  }, [activeTab, search])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage = Math.min(Math.max(1, page), totalPages)
+  const paged = useMemo(() => {
+    return filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  }, [filtered, safePage])
+
+  const tabCount = (tab: UiStatus) =>
+    tab === 'Tất cả' ? requests.length : requests.filter((r) => statusFromApiToUi(r.status) === tab).length
 
   return (
     <div className="min-h-screen bg-gray-50/80 p-6">
-      {showModal && <CreateRequestModal onClose={() => setShowModal(false)} />}
+      {toasts.length > 0 && <ToastContainer toasts={toasts} onRemove={removeToast} />}
+
+      {showModal && (
+        <CreateRequestModal
+          fromWarehouseId={warehouseId}
+          fromWarehouseName={warehouseName || warehouseId}
+          inventoryLocationType="Warehouse"
+          inventoryLocationId={warehouseId}
+          onClose={() => setShowModal(false)}
+          onCreated={() => {
+            pushToast({ type: 'success', message: 'Tạo phiếu yêu cầu nhập hàng thành công!' })
+            reload()
+          }}
+        />
+      )}
 
       <div className="max-w-6xl mx-auto space-y-5">
 
@@ -548,13 +793,16 @@ export default function ReplenishmentPage() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-              <p className="text-[11px] text-blue-600 font-bold uppercase tracking-widest">Kho HCM</p>
+              <p className="text-[11px] text-blue-600 font-bold uppercase tracking-widest">
+                {warehouseName || (warehouseId ? 'Kho tổng' : 'Chưa gán kho')}
+              </p>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Danh sách đề xuất bổ sung</h1>
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Yêu cầu nhập hàng</h1>
           </div>
           <div className="flex items-center gap-2.5">
             <button
               onClick={() => setShowModal(true)}
+              disabled={user?.roleId !== 7 || !warehouseId}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-all shadow-md shadow-blue-600/20"
             >
               <Plus size={15} />
@@ -572,14 +820,14 @@ export default function ReplenishmentPage() {
           <div className="flex items-end gap-5">
             <div className="w-64 flex-shrink-0">
               <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
-                Tìm kiếm sản phẩm
+                Tìm kiếm
               </label>
               <div className="relative">
                 <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
                 <input
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  placeholder="Mã SP, Tên SP hoặc Lý do..."
+                  placeholder="Tìm theo mã phiếu..."
                   className="w-full border border-gray-200 rounded-xl pl-8 pr-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 placeholder:text-gray-300 transition-all"
                 />
               </div>
@@ -620,14 +868,24 @@ export default function ReplenishmentPage() {
           </div>
         </div>
 
+        {user?.roleId !== 7 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+            Bạn không có quyền tạo/xem phiếu ở màn này. (Yêu cầu roleId = 7)
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
         {/* Table */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="bg-[#0f1f3d]">
-            <div className="grid grid-cols-[110px_1fr_90px_105px_120px_140px_80px_110px_52px] gap-2 px-6 py-3.5">
+            <div className="grid grid-cols-[140px_140px_120px_140px_120px_140px_120px] gap-2 px-6 py-3.5">
               {[
-                'Mã sản phẩm (SKU)', 'Tên sản phẩm', 'SL yêu cầu',
-                'SL hiện có', 'SL đề xuất mua', 'Nhà cung cấp ưu tiên',
-                'Ưu tiên', 'Trạng thái', 'Thao tác',
+                'Mã phiếu', 'Ngày tạo', 'Số mặt hàng', 'Tổng SL yêu cầu', 'Ưu tiên', 'Trạng thái', 'Thao tác',
               ].map(h => (
                 <span key={h} className="text-[10px] font-bold text-gray-400 uppercase tracking-wider leading-tight">{h}</span>
               ))}
@@ -635,53 +893,90 @@ export default function ReplenishmentPage() {
           </div>
 
           <div className="divide-y divide-gray-100">
-            {filtered.length === 0 ? (
+            {loading ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="grid grid-cols-[140px_140px_120px_140px_120px_140px_120px] gap-2 px-6 py-4 items-center">
+                  {Array.from({ length: 7 }).map((__, j) => (
+                    <div key={j} className="h-4 bg-gray-100 rounded animate-pulse" />
+                  ))}
+                </div>
+              ))
+            ) : filtered.length === 0 ? (
               <div className="py-16 text-center">
                 <Package size={32} className="mx-auto text-gray-200 mb-3" />
                 <p className="text-gray-400 text-sm font-medium">Không tìm thấy kết quả</p>
               </div>
-            ) : filtered.map(p => (
+            ) : paged.map((r) => {
+              const uiStatus = statusFromApiToUi(r.status)
+              const pr = toUiPriority(r.priority)
+              const totalItems = Array.isArray(r.items) ? r.items.length : 0
+              const totalQty = sumRequestedQty(r)
+              const code = String(r.requestNumber || r.id)
+              return (
               <div
-                key={p.sku}
-                className="grid grid-cols-[110px_1fr_90px_105px_120px_140px_80px_110px_52px] gap-2 px-6 py-4 items-center hover:bg-blue-50/20 transition-colors"
+                key={r.id}
+                className="grid grid-cols-[140px_140px_120px_140px_120px_140px_120px] gap-2 px-6 py-4 items-center hover:bg-blue-50/20 transition-colors"
               >
-                <span className="text-[11px] font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded-lg">{p.sku}</span>
-                <span className="text-sm font-semibold text-gray-800">{p.name}</span>
-                <span className="text-sm font-bold text-gray-900">{p.quantityRequested}</span>
-                <span className="text-sm text-gray-500">{p.quantityCurrent.toLocaleString()}</span>
-                <span className="text-sm font-bold text-blue-600">{p.quantitySuggested}</span>
-                <span className="text-xs text-gray-600">{p.supplier}</span>
+                <span className="text-[11px] font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded-lg">{code}</span>
+                <span className="text-sm text-gray-500 whitespace-nowrap">{formatDateVI(r.requestedDate)}</span>
+                <span className="text-sm font-bold text-gray-900">{totalItems}</span>
+                <span className="text-sm font-bold text-gray-900">{totalQty.toLocaleString()}</span>
                 <div className="flex items-center gap-1.5">
-                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${priorityDot[p.priority]}`} />
-                  <span className={`text-xs ${priorityStyle[p.priority]}`}>{p.priority}</span>
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${priorityDotClass(pr)}`} />
+                  <span className={`text-xs ${priorityTextClass(pr)}`}>{pr}</span>
                 </div>
-                <span className={`text-[11px] font-semibold px-2 py-1 rounded-lg ${statusStyle[p.status]}`}>
-                  {p.status}
+                <span className={`text-[11px] font-semibold px-2 py-1 rounded-lg inline-flex items-center ${statusBadgeClass(uiStatus)}`}>
+                  {uiStatus}
                 </span>
-                <button className="flex items-center justify-center text-gray-300 hover:text-blue-500 transition-colors w-8 h-8 rounded-lg hover:bg-blue-50">
+                <button
+                  onClick={() => pushToast({ type: 'info', message: 'Màn chi tiết role 7 chưa được triển khai trong phạm vi prompt.' })}
+                  className="flex items-center justify-center text-gray-300 hover:text-blue-500 transition-colors w-8 h-8 rounded-lg hover:bg-blue-50"
+                  title="Xem chi tiết"
+                >
                   <Eye size={15} />
                 </button>
               </div>
-            ))}
+            )})}
           </div>
 
           <div className="px-6 py-3.5 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
             <p className="text-xs text-gray-400">
-              Hiển thị <span className="font-bold text-gray-600">1–{filtered.length}</span> của{' '}
-              <span className="font-bold text-gray-600">24</span> đề xuất
+              Hiển thị{' '}
+              <span className="font-bold text-gray-600">
+                {filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1}-
+                {Math.min(safePage * PAGE_SIZE, filtered.length)}
+              </span>{' '}
+              của <span className="font-bold text-gray-600">{filtered.length}</span> phiếu
             </p>
             <div className="flex items-center gap-1">
-              <button className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-100 transition-colors">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={safePage === 1}
+                className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
                 <ChevronLeft size={13} />
               </button>
-              {[1, 2].map(n => (
-                <button key={n} className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-bold transition-colors ${
-                  n === 1 ? 'bg-blue-600 text-white shadow-sm' : 'border border-gray-200 text-gray-500 hover:bg-gray-100'
-                }`}>
-                  {n}
-                </button>
-              ))}
-              <button className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-100 transition-colors">
+              {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                const n = totalPages <= 7 ? i + 1 : Math.min(totalPages, Math.max(1, safePage - 3 + i))
+                return n
+              })
+                .filter((v, i, arr) => arr.indexOf(v) === i)
+                .map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p)}
+                    className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-bold transition-colors ${
+                      p === safePage ? 'bg-blue-600 text-white shadow-sm' : 'border border-gray-200 text-gray-500 hover:bg-gray-100'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safePage === totalPages}
+                className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
                 <ChevronRight size={13} />
               </button>
             </div>

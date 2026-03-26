@@ -74,6 +74,15 @@ export class RestockAPIService {
     return []
   }
 
+  static async getById(id: string): Promise<RestockRequestFromAPI | null> {
+    if (!id) return null
+    const response = await localApiClient.get(`${this.base}/${encodeURIComponent(id)}`)
+    const payload = response.data
+    if (payload?.data && typeof payload.data === 'object') return payload.data as RestockRequestFromAPI
+    if (payload && typeof payload === 'object') return payload as RestockRequestFromAPI
+    return null
+  }
+
   static async getByWarehouse(warehouseId: string): Promise<RestockRequestFromAPI[]> {
     if (!warehouseId) return []
     const response = await localApiClient.get(`${this.base}/by-warehouse/${warehouseId}`)
@@ -112,19 +121,9 @@ export class RestockAPIService {
     return payload?.data ?? payload
   }
 
-  static async updateStatus(
-    id: string,
-    status: 'APPROVED' | 'REJECTED',
-    reason?: string
-  ): Promise<RestockRequestFromAPI> {
-    if (status === 'APPROVED') {
-      const response = await localApiClient.put(`${this.base}/${id}/approve`)
-      const payload = response.data
-      return payload?.data ?? payload
-    } else {
-      const response = await localApiClient.put(`${this.base}/${id}/reject`, { reason })
-      const payload = response.data
-      return payload?.data ?? payload
-    }
-  }
+  /**
+   * NOTE (2026-03-25):
+   * - Backend contract for approve/reject request body is NOT confirmed in current prompt.
+   * - Do NOT add custom payloads here until Swagger/BE confirms the exact schema.
+   */
 }

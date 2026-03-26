@@ -671,7 +671,12 @@ export default function WarehouseRequestsPage() {
   const handleUpdateStatus = async (id: string, status: 'APPROVED' | 'REJECTED') => {
     if (!confirm(`Bạn có chắc muốn ${status === 'APPROVED' ? 'duyệt' : 'từ chối'} yêu cầu này?`)) return
     try {
-      await RestockAPIService.updateStatus(id, status, status === 'REJECTED' ? 'Rejected by approver' : undefined)
+      if (status === 'APPROVED') {
+        await RestockAPIService.approve(id)
+      } else {
+        // NOTE: reject body contract is not confirmed; do not send custom payload here.
+        await RestockAPIService.reject(id)
+      }
       await fetchRequests()
     } catch { alert('Không thể cập nhật trạng thái. Vui lòng thử lại.') }
   }

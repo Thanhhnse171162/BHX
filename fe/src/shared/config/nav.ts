@@ -138,6 +138,11 @@ export const getAdminNavigation = (): NavGroup[] => {
           icon: 'PackageCheck',
         },
         {
+          label: 'Yêu cầu nhập hàng',
+          href: '/replenishment-admin',
+          icon: 'PackageSearch',
+        },
+        {
           label: 'Low-stock Alerts',
           href: '/inventory-admin/alerts',
           icon: 'AlertTriangle',
