@@ -10,6 +10,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { RestockAPIService, type CreateRestockRequestDTO, type RestockRequestFromAPI } from '@/services/restock-api.service'
 import { WarehouseAPIService } from '@/services/warehouse-api.service'
 import { ReplenishmentProductAPIService, type CatalogProductFromAPI } from '@/services/replenishment-product-api.service'
+import { supplierService } from '@/services/supplier.service'
 import { localApiClient } from '@/shared/api/http'
 import { ToastContainer, type ToastItem } from '@/shared/ui/Toast'
 
@@ -26,8 +27,59 @@ type CreateItem = {
   reason: string
 }
 
+type ReceiveItemForm = {
+  productId: string
+  productName: string
+  quantity: number
+  batchNumber: string
+  unitPrice: number
+  supplierName: string
+  supplierId: string
+  manufacturingDate: string
+  expiryDate: string
+}
+
+type SupplierOption = {
+  id: string
+  name: string
+}
+
 const TABS: UiStatus[] = ['Tất cả', 'Chờ duyệt', 'Đã duyệt', 'Đã từ chối', 'Đang xử lý', 'Hoàn tất']
 const PAGE_SIZE = 10
+const DEFAULT_RECEIVED_BY = '88888888-8888-8888-8888-888888888881'
+
+const looksLikeUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || '').trim())
+
+const extractApiErrorMessage = (error: any): string => {
+  const data = error?.response?.data
+
+  const direct = data?.message || data?.error || error?.message
+  if (typeof direct === 'string' && direct.trim() && direct !== 'Request failed with status code 400') {
+    return direct
+  }
+
+  const errors = data?.errors
+  if (errors && typeof errors === 'object') {
+    const parts: string[] = []
+    for (const key of Object.keys(errors)) {
+      const val = errors[key]
+      if (Array.isArray(val) && val.length > 0) {
+        parts.push(String(val[0]))
+      } else if (typeof val === 'string' && val.trim()) {
+        parts.push(val)
+      }
+    }
+    if (parts.length > 0) return parts.join(' | ')
+  }
+
+  return 'Nhận hàng thất bại (400). Vui lòng kiểm tra lại mã phiếu, kho, người nhận và dữ liệu dòng hàng.'
+}
+
+const shortId = (value: string) => {
+  const v = String(value || '').trim()
+  if (!v) return '—'
+  return v.length > 16 ? `${v.slice(0, 8)}...${v.slice(-4)}` : v
+}
 
 function formatDateVI(value?: string | null) {
   if (!value) return '—'
@@ -749,6 +801,16 @@ export default function ReplenishmentPage() {
   const [detailError, setDetailError] = useState<string | null>(null)
   const [detailRequest, setDetailRequest] = useState<RestockRequestFromAPI | null>(null)
 
+  const [receiveOpen, setReceiveOpen] = useState(false)
+  const [receiveRequest, setReceiveRequest] = useState<RestockRequestFromAPI | null>(null)
+  const [receiveItems, setReceiveItems] = useState<ReceiveItemForm[]>([])
+  const [receiveNotes, setReceiveNotes] = useState('')
+  const [receiveSubmitting, setReceiveSubmitting] = useState(false)
+  const [receiveError, setReceiveError] = useState<string | null>(null)
+  const [suppliers, setSuppliers] = useState<SupplierOption[]>([])
+  const [suppliersLoading, setSuppliersLoading] = useState(false)
+  const [productNameMap, setProductNameMap] = useState<Record<string, string>>({})
+
   const warehouseId = String(user?.warehouseId ?? user?.workplaceId ?? '').trim()
 
   const reload = useMemo(() => {
@@ -780,6 +842,51 @@ export default function ReplenishmentPage() {
   useEffect(() => {
     reload()
   }, [reload])
+
+  useEffect(() => {
+    let cancelled = false
+    ReplenishmentProductAPIService.getAllProducts()
+      .then((list) => {
+        if (cancelled) return
+        const map: Record<string, string> = {}
+        for (const p of Array.isArray(list) ? list : []) {
+          const id = String((p as any)?.id || '').trim()
+          const name = String((p as any)?.name || '').trim()
+          if (id && name) map[id] = name
+        }
+        setProductNameMap(map)
+      })
+      .catch(() => {
+        if (!cancelled) setProductNameMap({})
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    setSuppliersLoading(true)
+    supplierService
+      .getSuppliers()
+      .then((list) => {
+        if (cancelled) return
+        const normalized = (Array.isArray(list) ? list : [])
+          .filter((s) => !s.isDeleted && String(s.status || '').toUpperCase() === 'ACTIVE')
+          .map((s) => ({ id: String(s.id), name: String(s.name) }))
+        setSuppliers(normalized)
+      })
+      .catch(() => {
+        if (!cancelled) setSuppliers([])
+      })
+      .finally(() => {
+        if (!cancelled) setSuppliersLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -814,6 +921,207 @@ export default function ReplenishmentPage() {
       setDetailError('Không thể tải chi tiết phiếu yêu cầu.')
     } finally {
       setDetailLoading(false)
+    }
+  }
+
+  const toDateInput = (d: Date) => d.toISOString().slice(0, 10)
+
+  const openReceiveModal = async (req: RestockRequestFromAPI) => {
+    const lines = Array.isArray(req.items) ? req.items : []
+    if (lines.length === 0) {
+      pushToast({ type: 'error', message: 'Phiếu không có dòng sản phẩm để nhận hàng.' })
+      return
+    }
+
+    const now = new Date()
+    const oneYear = new Date(now)
+    oneYear.setFullYear(oneYear.getFullYear() + 1)
+
+    setReceiveRequest(req)
+    const initialRows: ReceiveItemForm[] = lines.map((it) => {
+      const pid = String(it.productId || '').trim()
+      const fromReq = String(it.productName || '').trim()
+      const fromMap = productNameMap[pid] || ''
+      const displayName = fromReq && !looksLikeUuid(fromReq) ? fromReq : fromMap
+
+      return {
+        productId: pid,
+        productName: displayName,
+        quantity: Math.max(1, Number(it.approvedQuantity ?? it.requestedQuantity ?? 1)),
+        batchNumber: '',
+        unitPrice: 0,
+        supplierName: '',
+        supplierId: '',
+        manufacturingDate: toDateInput(now),
+        expiryDate: toDateInput(oneYear),
+      }
+    })
+
+    setReceiveItems(initialRows)
+    setReceiveNotes('')
+    setReceiveError(null)
+    setReceiveOpen(true)
+
+    try {
+      const ids = initialRows.map((x) => x.productId).filter(Boolean)
+      if (ids.length === 0) return
+      const detailMap = await ReplenishmentProductAPIService.detailsBatch(ids)
+      setReceiveItems((prev) =>
+        prev.map((row) => {
+          const detail = detailMap[row.productId]
+          const nameFromApi = String(detail?.name || '').trim()
+          const existing = String(row.productName || '').trim()
+          const nameFromMap = String(productNameMap[row.productId] || '').trim()
+          const shouldReplace = !existing || existing === row.productId || looksLikeUuid(existing)
+          return {
+            ...row,
+            productName: shouldReplace ? (nameFromApi || nameFromMap || row.productId) : existing,
+          }
+        })
+      )
+
+      const unresolved = initialRows
+        .map((x) => x.productId)
+        .filter((pid) => {
+          const d = String(detailMap?.[pid]?.name || '').trim()
+          return !d
+        })
+
+      if (unresolved.length > 0) {
+        const fetched = await Promise.all(
+          unresolved.map(async (pid) => {
+            const p = await ReplenishmentProductAPIService.getProductById(pid).catch(() => null)
+            return { id: pid, name: String(p?.name || '').trim() }
+          })
+        )
+
+        const fallbackMap: Record<string, string> = {}
+        for (const f of fetched) {
+          if (f.id && f.name) fallbackMap[f.id] = f.name
+        }
+
+        if (Object.keys(fallbackMap).length > 0) {
+          setReceiveItems((prev) =>
+            prev.map((row) => {
+              const existing = String(row.productName || '').trim()
+              const shouldReplace = !existing || existing === row.productId || looksLikeUuid(existing)
+              return {
+                ...row,
+                productName: shouldReplace ? (fallbackMap[row.productId] || row.productName || row.productId) : row.productName,
+              }
+            })
+          )
+        }
+      }
+    } catch {
+      // Keep existing labels when details API fails.
+    }
+  }
+
+  const updateReceiveItem = (idx: number, field: keyof ReceiveItemForm, value: string | number) => {
+    setReceiveItems((prev) => prev.map((it, i) => (i === idx ? { ...it, [field]: value as any } : it)))
+  }
+
+  const updateReceiveItemSupplier = (idx: number, supplierId: string) => {
+    const selected = suppliers.find((s) => s.id === supplierId)
+    setReceiveItems((prev) =>
+      prev.map((it, i) =>
+        i === idx
+          ? {
+              ...it,
+              supplierId: supplierId,
+              supplierName: selected?.name || '',
+            }
+          : it
+      )
+    )
+  }
+
+  useEffect(() => {
+    if (!receiveOpen) return
+    if (suppliers.length === 0) return
+    const defaultSupplier = suppliers[0]
+    setReceiveItems((prev) =>
+      prev.map((it) =>
+        it.supplierId
+          ? it
+          : {
+              ...it,
+              supplierId: defaultSupplier.id,
+              supplierName: defaultSupplier.name,
+            }
+      )
+    )
+  }, [receiveOpen, suppliers])
+
+  const submitReceive = async () => {
+    if (!receiveRequest) return
+    if (!warehouseId) {
+      setReceiveError('Thiếu warehouseId để nhận hàng.')
+      return
+    }
+    if (receiveItems.length === 0) {
+      setReceiveError('Không có dòng sản phẩm để nhận.')
+      return
+    }
+
+    for (const it of receiveItems) {
+      if (!it.productId) return setReceiveError('Thiếu productId ở một dòng sản phẩm.')
+      if (!it.batchNumber.trim()) return setReceiveError(`Thiếu batchNumber cho sản phẩm ${it.productName}.`)
+      if (!it.supplierName.trim()) return setReceiveError(`Thiếu supplierName cho sản phẩm ${it.productName}.`)
+      if (!it.supplierId.trim()) return setReceiveError(`Thiếu supplierId cho sản phẩm ${it.productName}.`)
+      if (!Number.isFinite(it.quantity) || it.quantity <= 0) return setReceiveError(`Số lượng nhận của ${it.productName} phải > 0.`)
+      if (!Number.isFinite(it.unitPrice) || it.unitPrice < 0) return setReceiveError(`Đơn giá của ${it.productName} không hợp lệ.`)
+      if (!it.manufacturingDate || !it.expiryDate) return setReceiveError(`Thiếu ngày NSX/HSD cho sản phẩm ${it.productName}.`)
+    }
+
+    const restockRequestId = String(receiveRequest.id || '').trim()
+    const normalizedWarehouseId = String(warehouseId || '').trim()
+
+    const rawReceivedBy = String(user?.id || '').trim()
+    const receivedBy = looksLikeUuid(rawReceivedBy) ? rawReceivedBy : DEFAULT_RECEIVED_BY
+
+    if (!looksLikeUuid(restockRequestId)) {
+      setReceiveError('restockRequestId không hợp lệ (phải là UUID).')
+      return
+    }
+    if (!looksLikeUuid(normalizedWarehouseId)) {
+      setReceiveError('warehouseId không hợp lệ (phải là UUID).')
+      return
+    }
+    if (!looksLikeUuid(receivedBy)) {
+      setReceiveError('receivedBy không hợp lệ (phải là UUID).')
+      return
+    }
+
+    const payload = {
+      restockRequestId,
+      warehouseId: normalizedWarehouseId,
+      receivedBy,
+      notes: receiveNotes.trim() || 'Nhận hàng từ nhà cung cấp',
+      items: receiveItems.map((it) => ({
+        productId: it.productId,
+        quantity: Number(it.quantity),
+        batchNumber: it.batchNumber.trim(),
+        unitPrice: Number(it.unitPrice),
+        supplierName: it.supplierName.trim(),
+        supplierId: it.supplierId.trim(),
+        manufacturingDate: new Date(`${it.manufacturingDate}T00:00:00.000Z`).toISOString(),
+        expiryDate: new Date(`${it.expiryDate}T00:00:00.000Z`).toISOString(),
+      })),
+    }
+
+    setReceiveSubmitting(true)
+    setReceiveError(null)
+    try {
+      await localApiClient.post('/product-batch/receive-from-supplier', payload)
+      pushToast({ type: 'success', message: 'Nhận hàng thành công.' })
+      setReceiveOpen(false)
+      await reload()
+    } catch (e: any) {
+      setReceiveError(extractApiErrorMessage(e))
+    } finally {
+      setReceiveSubmitting(false)
     }
   }
 
@@ -927,6 +1235,120 @@ export default function ReplenishmentPage() {
         </div>
       )}
 
+      {receiveOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm p-4 flex items-center justify-center" onClick={() => setReceiveOpen(false)}>
+          <div className="w-full max-w-5xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Nhận hàng từ nhà cung cấp</h3>
+                <p className="text-xs text-gray-400 mt-1">Phiếu: {receiveRequest?.requestNumber || receiveRequest?.id || '—'}</p>
+              </div>
+              <button
+                onClick={() => setReceiveOpen(false)}
+                className="text-gray-300 hover:text-gray-500 transition-colors p-1 rounded-lg hover:bg-gray-100"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div>
+                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Ghi chú nhận hàng</label>
+                <input
+                  value={receiveNotes}
+                  onChange={(e) => setReceiveNotes(e.target.value)}
+                  placeholder="Nhập ghi chú nhận hàng..."
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                />
+              </div>
+
+              <div className="rounded-xl border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <div className="min-w-[1180px] bg-gray-50 border-b border-gray-200 grid grid-cols-[minmax(300px,1.4fr)_90px_110px_120px_220px_140px_140px] gap-2 px-4 py-2">
+                    {['Sản phẩm', 'SL nhận', 'Batch', 'Đơn giá', 'Nhà cung cấp', 'NSX', 'HSD'].map((h) => (
+                      <span key={h} className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{h}</span>
+                    ))}
+                  </div>
+                  <div className="min-w-[1180px] divide-y divide-gray-100">
+                    {receiveItems.map((it, idx) => (
+                      <div key={`${it.productId}-${idx}`} className="grid grid-cols-[minmax(300px,1.4fr)_90px_110px_120px_220px_140px_140px] gap-2 px-4 py-3 items-center">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800 truncate">{it.productName || 'Sản phẩm'}</p>
+                        <p className="text-[11px] text-gray-400 truncate">{shortId(it.productId)}</p>
+                      </div>
+                      <input
+                        type="number"
+                        min={1}
+                        value={it.quantity}
+                        onChange={(e) => updateReceiveItem(idx, 'quantity', Number(e.target.value))}
+                        className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm text-center"
+                      />
+                      <input
+                        value={it.batchNumber}
+                        onChange={(e) => updateReceiveItem(idx, 'batchNumber', e.target.value)}
+                        placeholder="VD: 12345"
+                        className="w-full border border-gray-200 rounded-lg px-2 py-2 text-xs"
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        value={it.unitPrice}
+                        onChange={(e) => updateReceiveItem(idx, 'unitPrice', Number(e.target.value))}
+                        className="w-full border border-gray-200 rounded-lg px-2 py-2 text-xs"
+                      />
+                      <select
+                        value={it.supplierId}
+                        onChange={(e) => updateReceiveItemSupplier(idx, e.target.value)}
+                        className="w-full border border-gray-200 rounded-lg px-2 py-2 text-xs bg-white"
+                      >
+                        {suppliersLoading && <option value="">Đang tải NCC...</option>}
+                        {!suppliersLoading && suppliers.length === 0 && <option value="">Không có NCC</option>}
+                        {!suppliersLoading && suppliers.length > 0 && suppliers.map((s) => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="date"
+                        value={it.manufacturingDate}
+                        onChange={(e) => updateReceiveItem(idx, 'manufacturingDate', e.target.value)}
+                        className="w-full border border-gray-200 rounded-lg px-2 py-2 text-xs min-w-[130px]"
+                      />
+                      <input
+                        type="date"
+                        value={it.expiryDate}
+                        onChange={(e) => updateReceiveItem(idx, 'expiryDate', e.target.value)}
+                        className="w-full border border-gray-200 rounded-lg px-2 py-2 text-xs min-w-[130px]"
+                      />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {receiveError && (
+                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">{receiveError}</div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setReceiveOpen(false)}
+                className="px-4 py-2 text-sm font-semibold text-gray-600 border border-gray-200 bg-white rounded-xl hover:bg-gray-50"
+              >
+                Đóng
+              </button>
+              <button
+                onClick={submitReceive}
+                disabled={receiveSubmitting}
+                className="px-5 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {receiveSubmitting ? 'Đang nhận...' : 'Xác nhận nhận hàng'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto space-y-5">
 
         {/* Page Header */}
@@ -1024,7 +1446,7 @@ export default function ReplenishmentPage() {
         {/* Table */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="bg-[#0f1f3d]">
-            <div className="grid grid-cols-[140px_140px_120px_140px_120px_140px_120px] gap-2 px-6 py-3.5">
+            <div className="grid grid-cols-[140px_140px_120px_140px_120px_140px_180px] gap-2 px-6 py-3.5">
               {[
                 'Mã phiếu', 'Ngày tạo', 'Số mặt hàng', 'Tổng SL yêu cầu', 'Ưu tiên', 'Trạng thái', 'Thao tác',
               ].map(h => (
@@ -1036,7 +1458,7 @@ export default function ReplenishmentPage() {
           <div className="divide-y divide-gray-100">
             {loading ? (
               Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="grid grid-cols-[140px_140px_120px_140px_120px_140px_120px] gap-2 px-6 py-4 items-center">
+                <div key={i} className="grid grid-cols-[140px_140px_120px_140px_120px_140px_180px] gap-2 px-6 py-4 items-center">
                   {Array.from({ length: 7 }).map((__, j) => (
                     <div key={j} className="h-4 bg-gray-100 rounded animate-pulse" />
                   ))}
@@ -1056,7 +1478,7 @@ export default function ReplenishmentPage() {
               return (
               <div
                 key={r.id}
-                className="grid grid-cols-[140px_140px_120px_140px_120px_140px_120px] gap-2 px-6 py-4 items-center hover:bg-blue-50/20 transition-colors"
+                className="grid grid-cols-[140px_140px_120px_140px_120px_140px_180px] gap-2 px-6 py-4 items-center hover:bg-blue-50/20 transition-colors"
               >
                 <span className="text-[11px] font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded-lg">{code}</span>
                 <span className="text-sm text-gray-500 whitespace-nowrap">{formatDateVI(r.requestedDate)}</span>
@@ -1069,13 +1491,24 @@ export default function ReplenishmentPage() {
                 <span className={`text-[11px] font-semibold px-2 py-1 rounded-lg inline-flex items-center ${statusBadgeClass(uiStatus)}`}>
                   {uiStatus}
                 </span>
-                <button
-                  onClick={() => openDetail(String(r.id))}
-                  className="flex items-center justify-center text-gray-300 hover:text-blue-500 transition-colors w-8 h-8 rounded-lg hover:bg-blue-50"
-                  title="Xem chi tiết"
-                >
-                  <Eye size={15} />
-                </button>
+                <div className="flex items-center gap-2">
+                  {(uiStatus === 'Đã duyệt' || uiStatus === 'Đang xử lý') && (
+                    <button
+                      onClick={() => openReceiveModal(r)}
+                      className="px-2.5 py-1.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
+                      title="Nhận hàng"
+                    >
+                      Nhận hàng
+                    </button>
+                  )}
+                  <button
+                    onClick={() => openDetail(String(r.id))}
+                    className="flex items-center justify-center text-gray-300 hover:text-blue-500 transition-colors w-8 h-8 rounded-lg hover:bg-blue-50"
+                    title="Xem chi tiết"
+                  >
+                    <Eye size={15} />
+                  </button>
+                </div>
               </div>
             )})}
           </div>
