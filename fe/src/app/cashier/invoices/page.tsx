@@ -1,17 +1,51 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
-  Search, X, Printer, RotateCcw, ChevronLeft, ChevronRight,
-  TrendingUp, TrendingDown, ShoppingCart, DollarSign, AlertCircle,
-  CheckCircle2, XCircle, RefreshCw, Info, ChevronDown, Filter,
+  Search, X, Printer, ChevronLeft, ChevronRight,
+  TrendingUp, TrendingDown, AlertCircle,
+  CheckCircle2, XCircle, RefreshCw, Info, ChevronDown, Filter, Loader2,
 } from 'lucide-react'
+import { useAuthStore } from '@/store/auth.store'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-type PaymentMethod = 'Momo' | 'Tiền mặt' | 'Visa' | 'VNPay' | 'ZaloPay'
 type OrderStatus = 'Thành công' | 'Đã trả hàng' | 'Đã hủy' | 'Đang xử lý'
 type DateFilter = 'all' | 'today' | 'week'
+
+interface SaleItemFromApi {
+  id: string
+  productId: string
+  productName: string
+  sku?: string
+  quantity: number
+  unitPrice: number
+  lineTotal: number
+}
+
+interface SalePaymentFromApi {
+  id: string
+  paymentMethod: string
+  amount: number
+  status: string
+  paymentDate?: string
+  transactionReference?: string
+}
+
+interface SaleFromApi {
+  id: string
+  saleNumber: string
+  storeId: string
+  cashierId: string
+  customerId: string | null
+  saleDate: string
+  subtotal: number
+  totalAmount: number
+  paymentMethod: string
+  paymentStatus: string
+  status: string
+  notes?: string | null
+  items: SaleItemFromApi[]
+  payments?: SalePaymentFromApi[]
+}
 
 interface OrderProduct {
   name: string
@@ -23,168 +57,56 @@ interface OrderProduct {
 
 interface Order {
   id: string
+  code: string
+  saleDateISO: string
   time: string
   date: string
   customer: string
   phone: string
   memberTier: string
   products: OrderProduct[]
-  payment: PaymentMethod
+  payment: string
+  paymentRaw: string
   status: OrderStatus
+  statusRaw: string
   subtotal: number
   vat: number
   discount: number
   total: number
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+interface InvoicePrintItem {
+  productName: string
+  sku: string
+  quantity: number
+  unitPrice: number
+  discount: number
+  lineTotal: number
+}
 
-const MOCK_ORDERS: Order[] = [
-  {
-    id: 'GM-99234', time: '14:20', date: '20/10/2025',
-    customer: 'Lê Minh Tuấn', phone: '090xxxx123', memberTier: 'Gold Member',
-    products: [
-      { name: 'Sữa tươi TH True Milk 1L', sku: '892234578', qty: 2, unitPrice: 35000, total: 70000 },
-      { name: 'Táo MwEnvy Size L', sku: '938651234', qty: 1.5, unitPrice: 180000, total: 270000 },
-      { name: 'Nước suối Aquafina 500ml', sku: '763451290', qty: 4, unitPrice: 10000, total: 40000 },
-    ],
-    payment: 'Momo', status: 'Thành công',
-    subtotal: 380000, vat: 30400, discount: 3800, total: 406600,
-  },
-  {
-    id: 'GM-99230', time: '13:55', date: '20/10/2025',
-    customer: 'Trần Thị B', phone: '091xxxx456', memberTier: 'Silver Member',
-    products: [
-      { name: 'Dầu ăn Neptune 1L', sku: '556782341', qty: 1, unitPrice: 65000, total: 65000 },
-      { name: 'Mì tôm Hảo Hảo (thùng)', sku: '223459871', qty: 1, unitPrice: 85000, total: 85000 },
-    ],
-    payment: 'Tiền mặt', status: 'Đã trả hàng',
-    subtotal: 150000, vat: 12000, discount: 0, total: 162000,
-  },
-  {
-    id: 'GM-99228', time: '12:30', date: '20/10/2025',
-    customer: 'Khách vãng lai', phone: '—', memberTier: '—',
-    products: [
-      { name: 'Bánh mì sandwich', sku: '112233445', qty: 2, unitPrice: 15000, total: 30000 },
-      { name: 'Bơ Pháp Elle & Vire 200g', sku: '556677889', qty: 1, unitPrice: 58000, total: 58000 },
-    ],
-    payment: 'Visa', status: 'Thành công',
-    subtotal: 88000, vat: 7040, discount: 0, total: 95040,
-  },
-  {
-    id: 'GM-99225', time: '11:10', date: '20/10/2025',
-    customer: 'Phạm Hữu Nghĩa', phone: '093xxxx789', memberTier: 'Platinum',
-    products: [
-      { name: 'Thịt bò Úc 500g', sku: '778899001', qty: 2, unitPrice: 250000, total: 500000 },
-      { name: 'Rượu vang đỏ Casillero', sku: '334455667', qty: 1, unitPrice: 350000, total: 350000 },
-      { name: 'Phô mai Brie 200g', sku: '445566778', qty: 1, unitPrice: 120000, total: 120000 },
-    ],
-    payment: 'VNPay', status: 'Thành công',
-    subtotal: 970000, vat: 77600, discount: 48500, total: 999100,
-  },
-  {
-    id: 'GM-99221', time: '10:45', date: '20/10/2025',
-    customer: 'Nguyễn Thùy Linh', phone: '097xxxx321', memberTier: 'Silver Member',
-    products: [
-      { name: 'Sữa chua Vinamilk (hộp 4)', sku: '223344556', qty: 3, unitPrice: 36000, total: 108000 },
-      { name: 'Nước cam Tropicana 1L', sku: '667788990', qty: 2, unitPrice: 45000, total: 90000 },
-    ],
-    payment: 'ZaloPay', status: 'Thành công',
-    subtotal: 198000, vat: 15840, discount: 1980, total: 211860,
-  },
-  {
-    id: 'GM-99218', time: '10:02', date: '20/10/2025',
-    customer: 'Võ Đình Long', phone: '088xxxx654', memberTier: '—',
-    products: [
-      { name: 'Gạo ST25 5kg', sku: '889900112', qty: 1, unitPrice: 125000, total: 125000 },
-    ],
-    payment: 'Tiền mặt', status: 'Đã hủy',
-    subtotal: 125000, vat: 10000, discount: 0, total: 135000,
-  },
-  {
-    id: 'GM-99215', time: '09:20', date: '20/10/2025',
-    customer: 'Bùi Minh Châu', phone: '076xxxx987', memberTier: 'Gold Member',
-    products: [
-      { name: 'Dâu tây Đà Lạt 500g', sku: '112233001', qty: 2, unitPrice: 80000, total: 160000 },
-      { name: 'Kem tươi Anchor 250ml', sku: '332211009', qty: 1, unitPrice: 45000, total: 45000 },
-    ],
-    payment: 'Momo', status: 'Thành công',
-    subtotal: 205000, vat: 16400, discount: 6150, total: 215250,
-  },
-  {
-    id: 'GM-99210', time: '08:55', date: '19/10/2025',
-    customer: 'Đinh Thị Lan Anh', phone: '091xxxx100', memberTier: 'Silver Member',
-    products: [
-      { name: 'Mì Ý De Cecco 500g', sku: '990011223', qty: 2, unitPrice: 42000, total: 84000 },
-      { name: 'Cà chua bi hộp 400g', sku: '334455001', qty: 3, unitPrice: 28000, total: 84000 },
-    ],
-    payment: 'Visa', status: 'Thành công',
-    subtotal: 168000, vat: 13440, discount: 1680, total: 179760,
-  },
-  {
-    id: 'GM-99205', time: '08:10', date: '19/10/2025',
-    customer: 'Hồ Minh Khôi', phone: '094xxxx222', memberTier: '—',
-    products: [
-      { name: 'Nước tăng lực Sting đỏ', sku: '556677001', qty: 6, unitPrice: 12000, total: 72000 },
-      { name: 'Kẹo mút Chupa Chups 10c', sku: '778899221', qty: 1, unitPrice: 35000, total: 35000 },
-    ],
-    payment: 'Tiền mặt', status: 'Thành công',
-    subtotal: 107000, vat: 8560, discount: 0, total: 115560,
-  },
-  {
-    id: 'GM-99200', time: '07:30', date: '19/10/2025',
-    customer: 'Trịnh Minh Châu', phone: '089xxxx333', memberTier: 'Gold Member',
-    products: [
-      { name: 'Sô-cô-la Lindt 85% 100g', sku: '221100334', qty: 3, unitPrice: 95000, total: 285000 },
-      { name: 'Cà phê Highlands 200g', sku: '443322115', qty: 1, unitPrice: 120000, total: 120000 },
-    ],
-    payment: 'VNPay', status: 'Đã trả hàng',
-    subtotal: 405000, vat: 32400, discount: 12150, total: 425250,
-  },
-  {
-    id: 'GM-99196', time: '16:45', date: '18/10/2025',
-    customer: 'Phan Văn Đức', phone: '079xxxx444', memberTier: 'Silver Member',
-    products: [
-      { name: 'Thịt heo ba chỉ 1kg', sku: '664455332', qty: 1, unitPrice: 180000, total: 180000 },
-      { name: 'Rau muống sạch 500g', sku: '775544221', qty: 2, unitPrice: 15000, total: 30000 },
-    ],
-    payment: 'ZaloPay', status: 'Thành công',
-    subtotal: 210000, vat: 16800, discount: 2100, total: 224700,
-  },
-  {
-    id: 'GM-99191', time: '15:20', date: '18/10/2025',
-    customer: 'Mai Thị Hồng Nhung', phone: '086xxxx555', memberTier: '—',
-    products: [
-      { name: 'Trứng gà ta 10 quả', sku: '998877665', qty: 2, unitPrice: 42000, total: 84000 },
-    ],
-    payment: 'Tiền mặt', status: 'Thành công',
-    subtotal: 84000, vat: 6720, discount: 0, total: 90720,
-  },
-  {
-    id: 'GM-99187', time: '14:00', date: '18/10/2025',
-    customer: 'Cao Xuân Trường', phone: '082xxxx666', memberTier: 'Platinum',
-    products: [
-      { name: 'Whey Protein Gold Standard', sku: '554433221', qty: 1, unitPrice: 850000, total: 850000 },
-      { name: 'Shaker bình lắc 700ml', sku: '443322110', qty: 1, unitPrice: 95000, total: 95000 },
-    ],
-    payment: 'Visa', status: 'Thành công',
-    subtotal: 945000, vat: 75600, discount: 47250, total: 973350,
-  },
-  {
-    id: 'GM-99183', time: '11:35', date: '18/10/2025',
-    customer: 'Lâm Thị Bảo Châu', phone: '098xxxx777', memberTier: 'Gold Member',
-    products: [
-      { name: 'Phấn nền Maybelline', sku: '332211008', qty: 1, unitPrice: 280000, total: 280000 },
-      { name: 'Kem dưỡng Neutrogena 50ml', sku: '221100997', qty: 2, unitPrice: 145000, total: 290000 },
-    ],
-    payment: 'Momo', status: 'Thành công',
-    subtotal: 570000, vat: 45600, discount: 17100, total: 598500,
-  },
-]
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+interface InvoicePrintData {
+  saleId: string
+  saleNumber: string
+  saleDate: string
+  storeId: string
+  cashierId: string
+  items: InvoicePrintItem[]
+  subtotal: number
+  discount: number
+  tax: number
+  total: number
+  paymentMethod: string
+  paymentStatus: string
+  cashReceived: number | null
+  cashChange: number | null
+  transactionReference: string | null
+}
 
 const PAGE_SIZE = 7
+
+const STORE_NAME_BY_ID: Record<string, string> = {
+  'b0000001-0001-0001-0001-000000000001': 'Bách Hóa Xanh',
+}
 
 const statusCfg: Record<OrderStatus, { label: string; cls: string; icon: React.ReactNode }> = {
   'Thành công': {
@@ -212,40 +134,230 @@ const statusCfg: Record<OrderStatus, { label: string; cls: string; icon: React.R
 const fmt = (n: number) =>
   new Intl.NumberFormat('vi-VN').format(n) + 'đ'
 
-// ─── Order Detail Modal ───────────────────────────────────────────────────────
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
 
-function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => void }) {
+const openInvoicePrintView = (invoice: InvoicePrintData, storeName: string, cashierName: string) => {
+  if (typeof window === 'undefined') return
+
+  const paid = String(invoice.paymentStatus || '').toUpperCase() === 'PAID'
+  const saleDate = new Date(invoice.saleDate)
+  const dateText = Number.isNaN(saleDate.getTime()) ? invoice.saleDate : saleDate.toLocaleDateString('vi-VN')
+  const timeText = Number.isNaN(saleDate.getTime()) ? '' : saleDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+
+  const rows = invoice.items.map((p) => `
+    <tr>
+      <td>
+        <div class="product-name">${escapeHtml(p.productName)}</div>
+        <div class="sku">SKU: ${escapeHtml(p.sku)}</div>
+      </td>
+      <td class="center">${p.quantity}</td>
+      <td class="right">${fmt(p.unitPrice)}</td>
+      <td class="right">${fmt(p.lineTotal)}</td>
+    </tr>
+  `).join('')
+
+  const qrValue = encodeURIComponent(invoice.saleNumber)
+  const qrUrl = `https://quickchart.io/qr?text=${qrValue}&size=170`
+
+  const html = `<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hoa don ${escapeHtml(invoice.saleNumber)}</title>
+  <style>
+    :root { --green:#006a4e; --green2:#0a7d57; --gray:#f3f4f6; --text:#1f2937; --muted:#6b7280; --yellow:#f7be00; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#efefef; color:var(--text); }
+    .topbar { background:var(--green); color:#ffd44d; font-weight:900; font-style:italic; padding:10px 14px; font-size:20px; letter-spacing:.3px; }
+    .sheet-wrap { padding:18px; display:flex; justify-content:center; }
+    .sheet { width:420px; background:#fff; border-radius:6px; overflow:hidden; box-shadow:0 8px 22px rgba(0,0,0,.12); }
+    .header { padding:18px 18px 10px; border-bottom:1px solid #ececec; }
+    .title-row { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+    .brand { color:var(--green2); font-weight:900; font-size:34px; line-height:1; letter-spacing:.2px; }
+    .meta-small { color:var(--muted); font-size:11px; margin-top:5px; }
+    .badge { background:#dff7ea; color:#1f9d63; border:1px solid #bce9d1; border-radius:999px; font-size:11px; padding:3px 8px; font-weight:700; display:inline-block; }
+    .code { font-size:20px; font-weight:700; margin-top:8px; }
+    .grid2 { margin-top:12px; display:grid; grid-template-columns:1fr 1fr; gap:8px 20px; font-size:11px; color:var(--muted); }
+    .grid2 b { color:#111827; font-weight:700; }
+    .content { padding:14px 18px 0; }
+    .section-title { font-size:13px; font-weight:800; margin-bottom:8px; color:#374151; }
+    .table { width:100%; border-collapse:collapse; font-size:12px; }
+    .table th { text-align:left; background:#f7f7f7; color:#6b7280; font-weight:700; font-size:10px; padding:8px; border:1px solid #ebebeb; text-transform:uppercase; }
+    .table td { padding:9px 8px; border:1px solid #efefef; vertical-align:top; }
+    .table .center { text-align:center; }
+    .table .right { text-align:right; }
+    .product-name { font-weight:700; color:#1f2937; }
+    .sku { font-size:10px; color:#9ca3af; margin-top:2px; }
+    .totals { margin-top:0; background:var(--yellow); padding:14px 18px; }
+    .totals .line { display:flex; justify-content:space-between; color:#3b3b3b; font-size:14px; margin:4px 0; }
+    .totals .sum { display:flex; justify-content:space-between; margin-top:8px; font-size:30px; font-weight:900; color:#1e1e1e; }
+    .qr-wrap { text-align:center; padding:20px 16px 12px; }
+    .qr-box { display:inline-flex; border:1px solid #ddd; padding:8px; background:#fff; }
+    .qr-box img { width:120px; height:120px; display:block; }
+    .footer-note { font-size:11px; color:#6b7280; margin-top:8px; }
+    @media print {
+      body { background:#fff; }
+      .topbar { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .sheet { box-shadow:none; width:100%; }
+      .totals { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .sheet-wrap { padding:0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">BACH HOA XANH</div>
+  <div class="sheet-wrap">
+    <div class="sheet">
+      <div class="header">
+        <div class="title-row">
+          <div>
+            <div class="brand">BACH HOA XANH</div>
+            <div class="meta-small">CUA HANG<br>${escapeHtml(storeName)}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="badge">${paid ? 'DA THANH TOAN' : 'CHUA THANH TOAN'}</div>
+            <div class="meta-small" style="margin-top:8px">SO HOA DON</div>
+            <div class="code">${escapeHtml(invoice.saleNumber)}</div>
+          </div>
+        </div>
+        <div class="grid2">
+          <div><span>THOI GIAN GIAO DICH</span><br><b>${escapeHtml(`${dateText} ${timeText}`.trim())}</b></div>
+          <div><span>SALE ID</span><br><b>${escapeHtml(invoice.saleId)}</b></div>
+          <div><span>NHAN VIEN (CASHIER)</span><br><b>${escapeHtml(cashierName)}</b></div>
+          <div><span>PHUONG THUC THANH TOAN</span><br><b>${escapeHtml(String(invoice.paymentMethod || '').toUpperCase())}</b></div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="section-title">Chi tiet gio hang</div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>SAN PHAM / SKU</th>
+              <th class="center">SL</th>
+              <th class="right">DON GIA</th>
+              <th class="right">THANH TIEN</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      </div>
+      <div class="totals">
+        <div class="line"><span>Tam tinh:</span><b>${fmt(invoice.subtotal || 0)}</b></div>
+        <div class="line"><span>Giam gia:</span><b>${fmt(invoice.discount || 0)}</b></div>
+        <div class="line"><span>Thue (VAT):</span><b>${fmt(invoice.tax || 0)}</b></div>
+        <div class="sum"><span>TONG THANH TOAN</span><span>${fmt(invoice.total || 0)}</span></div>
+      </div>
+      <div class="qr-wrap">
+        <div class="qr-box"><img src="${qrUrl}" alt="QR" /></div>
+        <div class="footer-note">Cam on quy khach da mua sam tai Bach Hoa Xanh.</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`
+
+  const printWindow = window.open('', '_blank', 'width=520,height=900')
+  if (!printWindow) return
+  printWindow.document.open()
+  printWindow.document.write(html)
+  printWindow.document.close()
+  printWindow.focus()
+  window.setTimeout(() => {
+    printWindow.print()
+  }, 350)
+}
+
+const extractSalesArray = (payload: any): SaleFromApi[] => {
+  if (Array.isArray(payload)) return payload as SaleFromApi[]
+  if (Array.isArray(payload?.data)) return payload.data as SaleFromApi[]
+  if (Array.isArray(payload?.items)) return payload.items as SaleFromApi[]
+  return []
+}
+
+const mapPaymentLabel = (raw: string): string => {
+  const v = String(raw || '').toUpperCase()
+  if (v === 'MOMO') return 'Momo'
+  if (v === 'CASH') return 'Tiền mặt'
+  return raw || 'Khác'
+}
+
+const mapOrderStatus = (status: string, paymentStatus: string): OrderStatus => {
+  const s = String(status || '').toUpperCase()
+  const p = String(paymentStatus || '').toUpperCase()
+
+  if (s.includes('CANCEL') || s.includes('VOID')) return 'Đã hủy'
+  if (s.includes('RETURN') || s.includes('REFUND') || p.includes('REFUND')) return 'Đã trả hàng'
+  if (s.includes('COMPLETE') || s.includes('SUCCESS') || p === 'PAID' || p === 'COMPLETED' || p === 'SUCCESS') return 'Thành công'
+  return 'Đang xử lý'
+}
+
+const mapSaleToOrder = (sale: SaleFromApi): Order => {
+  const d = new Date(sale.saleDate)
+  const products = (sale.items || []).map((item) => ({
+    name: item.productName,
+    sku: item.sku || '—',
+    qty: item.quantity,
+    unitPrice: item.unitPrice,
+    total: item.lineTotal,
+  }))
+
+  const subtotal = sale.subtotal ?? 0
+  const total = sale.totalAmount ?? subtotal
+  const vat = Math.max(0, total - subtotal)
+
+  return {
+    id: sale.id,
+    code: sale.saleNumber || sale.id,
+    saleDateISO: sale.saleDate,
+    time: d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+    date: d.toLocaleDateString('vi-VN'),
+    customer: sale.customerId ? `KH ${sale.customerId.slice(0, 8)}` : 'Khách vãng lai',
+    phone: '—',
+    memberTier: '—',
+    products,
+    payment: mapPaymentLabel(sale.paymentMethod),
+    paymentRaw: sale.paymentMethod,
+    status: mapOrderStatus(sale.status, sale.paymentStatus),
+    statusRaw: sale.status,
+    subtotal,
+    vat,
+    discount: 0,
+    total,
+  }
+}
+
+function OrderDetailModal({ order, onClose, onPrint }: { order: Order; onClose: () => void; onPrint: () => void }) {
   const timeline = [
-    { label: 'Thanh toán thành công', time: `${order.time}, ${order.date}`, done: true },
-    { label: 'Đã xuất hóa đơn', time: `${order.time.split(':')[0]}:${String(+order.time.split(':')[1] + 1).padStart(2, '0')}, ${order.date}`, done: true },
+    { label: order.status === 'Thành công' ? 'Thanh toán thành công' : 'Đơn hàng đang xử lý', time: `${order.time}, ${order.date}`, done: order.status === 'Thành công' },
+    { label: 'Đã xuất hóa đơn', time: `${order.time}, ${order.date}`, done: order.status === 'Thành công' },
   ]
   if (order.status === 'Đã trả hàng') {
-    timeline.push({ label: 'Khách trả hàng', time: `${order.time.split(':')[0]}:${String(+order.time.split(':')[1] + 30).padStart(2, '0')}, ${order.date}`, done: true })
+    timeline.push({ label: 'Khách trả hàng', time: `${order.time}, ${order.date}`, done: true })
   }
   if (order.status === 'Đã hủy') {
     timeline[0] = { label: 'Đơn hàng đã hủy', time: `${order.time}, ${order.date}`, done: false }
     timeline.splice(1)
   }
 
-  const memberColor: Record<string, string> = {
-    'Platinum': 'text-violet-600',
-    'Gold Member': 'text-amber-500',
-    'Silver Member': 'text-slate-500',
-  }
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Panel */}
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 max-h-[90vh] flex flex-col overflow-hidden">
-
-        {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
           <div>
             <h2 className="text-lg font-bold text-gray-900">Chi tiết đơn hàng</h2>
-            <p className="text-sm font-semibold text-indigo-600 mt-0.5">#{order.id}</p>
+            <p className="text-sm font-semibold text-indigo-600 mt-0.5">#{order.code}</p>
           </div>
           <button
             onClick={onClose}
@@ -255,22 +367,17 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
           </button>
         </div>
 
-        {/* Scrollable body */}
         <div className="overflow-y-auto flex-1 px-6 py-4 space-y-5">
-
-          {/* Action buttons */}
-          <div className="grid grid-cols-2 gap-3">
-            <button className="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-medium text-sm hover:bg-gray-50 transition-colors">
+          <div className="grid grid-cols-1 gap-3">
+            <button
+              onClick={onPrint}
+              className="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-medium text-sm hover:bg-gray-50 transition-colors"
+            >
               <Printer className="w-4 h-4" />
               In hóa đơn
             </button>
-            <button className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-rose-500 text-white font-medium text-sm hover:bg-rose-600 transition-colors">
-              <RotateCcw className="w-4 h-4" />
-              Tạo đơn trả
-            </button>
           </div>
 
-          {/* Timeline */}
           <div className="bg-gray-50 rounded-xl p-4">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Trình trạng đơn hàng</p>
             <div className="space-y-3">
@@ -286,22 +393,6 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
             </div>
           </div>
 
-          {/* Customer info */}
-          <div className="bg-gray-50 rounded-xl p-4">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Thông tin khách hàng</p>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Tên:</span>
-                <span className="font-semibold text-gray-800">{order.customer}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">SĐT:</span>
-                <span className="font-medium text-gray-700">{order.phone}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Product list */}
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Danh sách sản phẩm</p>
             <div className="space-y-3">
@@ -318,19 +409,18 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
             </div>
           </div>
 
-          {/* Summary */}
           <div className="border-t border-dashed border-gray-200 pt-4 space-y-2 text-sm">
             <div className="flex justify-between text-gray-500">
               <span>Tạm tính ({order.products.length} sản phẩm)</span>
               <span>{fmt(order.subtotal)}</span>
             </div>
             <div className="flex justify-between text-gray-500">
-              <span>VAT (8%)</span>
+              <span>VAT</span>
               <span>{fmt(order.vat)}</span>
             </div>
             {order.discount > 0 && (
               <div className="flex justify-between text-rose-500">
-                <span>Giảm giá thành viên</span>
+                <span>Giảm giá</span>
                 <span>-{fmt(order.discount)}</span>
               </div>
             )}
@@ -345,38 +435,214 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
   )
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
-
 export default function InvoicesPage() {
+  const { user, token } = useAuthStore()
+
+  const [orders, setOrders] = useState<Order[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   const [search, setSearch] = useState('')
   const [dateFilter, setDateFilter] = useState<DateFilter>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [paymentFilter, setPaymentFilter] = useState<string>('all')
   const [page, setPage] = useState(1)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [loadingDetail, setLoadingDetail] = useState(false)
 
-  // Filtered orders
+  const buildPrintDataFromPayload = (payload: any, order: Order): InvoicePrintData => {
+    const sale = payload?.data && typeof payload.data === 'object' ? payload.data : payload
+    const saleId = String(sale?.saleId || sale?.id || order.id)
+    const saleNumber = String(sale?.saleNumber || order.code)
+    const saleDate = String(sale?.saleDate || order.saleDateISO)
+    const storeId = String(sale?.storeId || user?.workplaceId || user?.storeId || '')
+    const cashierId = String(sale?.cashierId || user?.id || '')
+
+    const itemsFromApi = Array.isArray(sale?.items) ? sale.items : []
+    const items: InvoicePrintItem[] = (itemsFromApi.length > 0 ? itemsFromApi : order.products).map((item: any) => ({
+      productName: String(item?.productName || item?.name || ''),
+      sku: String(item?.sku || '—'),
+      quantity: Number(item?.quantity ?? item?.qty ?? 0),
+      unitPrice: Number(item?.unitPrice ?? 0),
+      discount: Number(item?.discount ?? 0),
+      lineTotal: Number(item?.lineTotal ?? item?.total ?? 0),
+    }))
+
+    return {
+      saleId,
+      saleNumber,
+      saleDate,
+      storeId,
+      cashierId,
+      items,
+      subtotal: Number(sale?.subtotal ?? order.subtotal ?? 0),
+      discount: Number(sale?.discount ?? order.discount ?? 0),
+      tax: Number(sale?.tax ?? order.vat ?? 0),
+      total: Number(sale?.total ?? sale?.totalAmount ?? order.total ?? 0),
+      paymentMethod: String(sale?.paymentMethod || order.paymentRaw || ''),
+      paymentStatus: String(sale?.paymentStatus || order.statusRaw || ''),
+      cashReceived: sale?.cashReceived ?? null,
+      cashChange: sale?.cashChange ?? null,
+      transactionReference: sale?.transactionReference ?? null,
+    }
+  }
+
+  const resolveStoreName = (storeId: string) => {
+    const key = String(storeId || '').toLowerCase()
+    return STORE_NAME_BY_ID[key] || 'Bách Hóa Xanh'
+  }
+
+  const resolveCashierName = (cashierId: string) => {
+    if (user?.id && String(user.id).toLowerCase() === String(cashierId).toLowerCase()) {
+      return user.name || 'Nhân viên'
+    }
+    return user?.name || `Nhân viên ${String(cashierId).slice(0, 8)}`
+  }
+
+  const handlePrintInvoice = async (order: Order) => {
+    try {
+      const res = await fetch(`http://localhost:5006/api/sales/${order.id}`, {
+        headers: {
+          accept: 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        cache: 'no-store',
+      })
+
+      const body = await res.json().catch(() => null)
+      const printData = buildPrintDataFromPayload(body, order)
+      const storeName = resolveStoreName(printData.storeId)
+      const cashierName = resolveCashierName(printData.cashierId)
+      openInvoicePrintView(printData, storeName, cashierName)
+    } catch {
+      const fallback = buildPrintDataFromPayload(null, order)
+      openInvoicePrintView(fallback, resolveStoreName(fallback.storeId), resolveCashierName(fallback.cashierId))
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false
+
+    const fetchSales = async () => {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const storeId = user?.workplaceType === 'STORE' ? user?.workplaceId : user?.storeId
+        const urls = [
+          storeId ? `http://localhost:5006/api/sales?storeId=${encodeURIComponent(storeId)}` : null,
+          storeId ? `http://localhost:5006/api/sales/store/${encodeURIComponent(storeId)}` : null,
+          'http://localhost:5006/api/sales',
+        ].filter(Boolean) as string[]
+
+        let sales: SaleFromApi[] = []
+        let lastErr = 'Không thể tải lịch sử đơn hàng'
+
+        for (const url of urls) {
+          const res = await fetch(url, {
+            headers: {
+              accept: 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            cache: 'no-store',
+          })
+
+          const body = await res.json().catch(() => null)
+          if (!res.ok) {
+            lastErr = body?.message || body?.error || `API lỗi ${res.status}`
+            continue
+          }
+
+          const list = extractSalesArray(body)
+          if (list.length > 0 || Array.isArray(body)) {
+            sales = list
+            break
+          }
+        }
+
+        if (sales.length === 0) {
+          if (cancelled) return
+          setOrders([])
+          setError(lastErr)
+          return
+        }
+
+        if (!cancelled) {
+          setOrders(sales.map(mapSaleToOrder))
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setOrders([])
+          setError(err?.message || 'Không thể tải lịch sử đơn hàng')
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    fetchSales()
+
+    return () => {
+      cancelled = true
+    }
+  }, [token, user?.storeId, user?.workplaceId, user?.workplaceType])
+
+  const handleOpenDetail = async (order: Order) => {
+    setSelectedOrder(order)
+    setLoadingDetail(true)
+
+    try {
+      const res = await fetch(`http://localhost:5006/api/sales/${order.id}`, {
+        headers: {
+          accept: 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        cache: 'no-store',
+      })
+
+      const body = await res.json().catch(() => null)
+      if (!res.ok) return
+
+      const sale = (body?.data || body) as SaleFromApi
+      if (!sale?.id) return
+
+      setSelectedOrder(mapSaleToOrder(sale))
+    } catch {
+      // Keep current selected order data if detail call fails.
+    } finally {
+      setLoadingDetail(false)
+    }
+  }
+
   const filtered = useMemo(() => {
-    return MOCK_ORDERS.filter((o) => {
+    const now = new Date()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const weekStart = new Date(todayStart)
+    weekStart.setDate(weekStart.getDate() - 6)
+
+    return orders.filter((o) => {
       const q = search.toLowerCase()
       const matchSearch =
         !q ||
-        o.id.toLowerCase().includes(q) ||
+        o.code.toLowerCase().includes(q) ||
         o.customer.toLowerCase().includes(q)
 
-      const today = '20/10/2025'
-      const thisWeekDates = ['18/10/2025', '19/10/2025', '20/10/2025']
+      const saleDate = new Date(o.saleDateISO)
       const matchDate =
         dateFilter === 'all' ||
-        (dateFilter === 'today' && o.date === today) ||
-        (dateFilter === 'week' && thisWeekDates.includes(o.date))
+        (dateFilter === 'today' && saleDate >= todayStart) ||
+        (dateFilter === 'week' && saleDate >= weekStart)
 
       const matchStatus = statusFilter === 'all' || o.status === statusFilter
       const matchPayment = paymentFilter === 'all' || o.payment === paymentFilter
 
       return matchSearch && matchDate && matchStatus && matchPayment
     })
-  }, [search, dateFilter, statusFilter, paymentFilter])
+  }, [orders, search, dateFilter, statusFilter, paymentFilter])
+
+  const paymentOptions = useMemo(() => {
+    return Array.from(new Set(orders.map((o) => o.payment))).filter(Boolean)
+  }, [orders])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -389,29 +655,24 @@ export default function InvoicesPage() {
     setPage(1)
   }
 
-  // Stats (all-time mock)
-  const totalOrders = MOCK_ORDERS.length
-  const revenue = MOCK_ORDERS.filter((o) => o.status === 'Thành công').reduce((s, o) => s + o.total, 0)
-  const returned = MOCK_ORDERS.filter((o) => o.status === 'Đã trả hàng' || o.status === 'Đã hủy').length
+  const totalOrders = orders.length
+  const revenue = orders.filter((o) => o.status === 'Thành công').reduce((s, o) => s + o.total, 0)
+  const returned = orders.filter((o) => o.status === 'Đã trả hàng' || o.status === 'Đã hủy').length
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-
-      {/* ── Header ── */}
       <header className="bg-white border-b border-gray-200 px-8 py-4 sticky top-0 z-30">
         <h1 className="text-xl font-bold text-gray-900">Lịch sử đơn hàng</h1>
       </header>
 
       <main className="flex-1 px-6 py-6 space-y-5">
-
-        {/* ── Stats Cards ── */}
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-white rounded-2xl px-5 py-4 shadow-sm border border-gray-100">
             <p className="text-xs font-medium text-gray-400 mb-1">Tổng đơn hàng</p>
             <div className="flex items-end justify-between">
               <span className="text-2xl font-extrabold text-gray-900">{totalOrders}</span>
               <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                <TrendingUp className="w-3 h-3" /> +5%
+                <TrendingUp className="w-3 h-3" /> API
               </span>
             </div>
           </div>
@@ -422,7 +683,7 @@ export default function InvoicesPage() {
                 {new Intl.NumberFormat('vi-VN', { notation: 'compact', maximumFractionDigits: 1 }).format(revenue)}
               </span>
               <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                <TrendingUp className="w-3 h-3" /> +12%
+                <TrendingUp className="w-3 h-3" /> API
               </span>
             </div>
           </div>
@@ -431,16 +692,13 @@ export default function InvoicesPage() {
             <div className="flex items-end justify-between">
               <span className="text-2xl font-extrabold text-gray-900">{returned}</span>
               <span className="flex items-center gap-1 text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">
-                <TrendingDown className="w-3 h-3" /> -2%
+                <TrendingDown className="w-3 h-3" /> API
               </span>
             </div>
           </div>
         </div>
 
-        {/* ── Filter Bar ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
-
-          {/* Date tabs + Search */}
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
               {(['all', 'today', 'week'] as DateFilter[]).map((v) => {
@@ -472,11 +730,9 @@ export default function InvoicesPage() {
             </div>
           </div>
 
-          {/* Dropdown filters */}
           <div className="flex items-center gap-3 flex-wrap">
             <Filter className="w-4 h-4 text-gray-400 flex-shrink-0" />
 
-            {/* Status filter */}
             <div className="relative">
               <select
                 value={statusFilter}
@@ -492,7 +748,6 @@ export default function InvoicesPage() {
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
             </div>
 
-            {/* Payment filter */}
             <div className="relative">
               <select
                 value={paymentFilter}
@@ -500,11 +755,9 @@ export default function InvoicesPage() {
                 className="appearance-none pl-3 pr-8 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-pointer"
               >
                 <option value="all">Thanh toán: Tất cả</option>
-                <option value="Momo">Momo</option>
-                <option value="Tiền mặt">Tiền mặt</option>
-                <option value="Visa">Visa</option>
-                <option value="VNPay">VNPay</option>
-                <option value="ZaloPay">ZaloPay</option>
+                {paymentOptions.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
               </select>
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
             </div>
@@ -521,15 +774,26 @@ export default function InvoicesPage() {
           </div>
         </div>
 
-        {/* ── Table ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          {loading && (
+            <div className="px-5 py-10 flex items-center justify-center gap-2 text-gray-500 text-sm">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Đang tải lịch sử đơn hàng...
+            </div>
+          )}
+
+          {!loading && error && (
+            <div className="px-5 py-6 text-sm text-red-600 border-b border-red-100 bg-red-50">
+              {error}
+            </div>
+          )}
+
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Mã đơn</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Thời gian</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Khách hàng</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Sản phẩm</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Tổng tiền</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Thanh toán</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Trạng thái</th>
@@ -539,24 +803,22 @@ export default function InvoicesPage() {
             <tbody className="divide-y divide-gray-50">
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-16 text-center text-gray-400 text-sm">
+                  <td colSpan={7} className="py-16 text-center text-gray-400 text-sm">
                     Không tìm thấy đơn hàng nào.
                   </td>
                 </tr>
               ) : (
                 paginated.map((order) => {
                   const sc = statusCfg[order.status]
-                  const firstProducts = order.products.slice(0, 2)
-                  const extra = order.products.length - 2
                   return (
                     <tr
                       key={order.id}
-                      onClick={() => setSelectedOrder(order)}
+                      onClick={() => handleOpenDetail(order)}
                       className="hover:bg-indigo-50/40 cursor-pointer transition-colors group"
                     >
                       <td className="px-5 py-3.5">
                         <span className="font-semibold text-indigo-600 group-hover:text-indigo-700">
-                          #{order.id}
+                          #{order.code}
                         </span>
                       </td>
                       <td className="px-4 py-3.5 text-gray-500 whitespace-nowrap">
@@ -567,16 +829,6 @@ export default function InvoicesPage() {
                       <td className="px-4 py-3.5">
                         <p className="font-medium text-gray-800">{order.customer}</p>
                         <p className="text-xs text-gray-400">{order.phone}</p>
-                      </td>
-                      <td className="px-4 py-3.5 text-gray-600">
-                        {firstProducts.map((p, i) => (
-                          <span key={i} className="block text-xs leading-5 truncate max-w-[160px]">
-                            {p.name}
-                          </span>
-                        ))}
-                        {extra > 0 && (
-                          <span className="text-xs text-indigo-500 font-medium">+{extra} sản phẩm</span>
-                        )}
                       </td>
                       <td className="px-4 py-3.5 text-right font-semibold text-gray-800 whitespace-nowrap">
                         {fmt(order.total)}
@@ -594,7 +846,7 @@ export default function InvoicesPage() {
                       </td>
                       <td className="px-4 py-3.5 text-center">
                         <button
-                          onClick={(e) => { e.stopPropagation(); setSelectedOrder(order) }}
+                          onClick={(e) => { e.stopPropagation(); handleOpenDetail(order) }}
                           className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
                           title="Xem chi tiết"
                         >
@@ -608,7 +860,6 @@ export default function InvoicesPage() {
             </tbody>
           </table>
 
-          {/* ── Pagination ── */}
           <div className="flex items-center justify-between px-5 py-3.5 border-t border-gray-100 bg-gray-50/60">
             <p className="text-xs text-gray-400">
               Hiển thị{' '}
@@ -648,11 +899,18 @@ export default function InvoicesPage() {
             </div>
           </div>
         </div>
+
+        {loadingDetail && selectedOrder && (
+          <div className="text-xs text-gray-500 -mt-2">Đang làm mới chi tiết đơn từ API...</div>
+        )}
       </main>
 
-      {/* ── Detail Modal ── */}
       {selectedOrder && (
-        <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />
+        <OrderDetailModal
+          order={selectedOrder}
+          onClose={() => setSelectedOrder(null)}
+          onPrint={() => handlePrintInvoice(selectedOrder)}
+        />
       )}
     </div>
   )
