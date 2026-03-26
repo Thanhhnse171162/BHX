@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
 import { InventoryAPIService, InventoryItem } from '@/services/inventory-api.service'
 import { CategoryAPIService, CategoryFromAPI } from '@/services/category-api.service'
+import { supplierService } from '@/services/supplier.service'
 import { useAuthStore } from '@/store/auth.store'
 import { Button } from '@/shared/ui/Button'
 import { Input } from '@/shared/ui/Input'
@@ -11,6 +12,7 @@ import DataTable from '@/shared/ui/DataTable'
 import PageHeader from '@/shared/ui/PageHeader'
 import EmptyState from '@/shared/ui/EmptyState'
 import Modal from '@/shared/ui/Modal'
+import type { SupplierListItem } from '@/types/supplier.types'
 
 type ProductStatus = 'ACTIVE' | 'INACTIVE'
 
@@ -37,6 +39,7 @@ export default function ProductsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const ITEMS_PER_PAGE = 10
   const [categories, setCategories] = useState<CategoryFromAPI[]>([])
+  const [suppliers, setSuppliers] = useState<SupplierListItem[]>([])
   const [categoryIdByName, setCategoryIdByName] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -65,6 +68,7 @@ export default function ProductsPage() {
   const [metaTitle, setMetaTitle] = useState('')
   const [metaDescription, setMetaDescription] = useState('')
   const [metaKeywords, setMetaKeywords] = useState('')
+  const [supplierId, setSupplierId] = useState('')
 
   const getCategoryId = (category: CategoryFromAPI): string => {
     const candidates: Array<unknown> = [
@@ -115,6 +119,7 @@ export default function ProductsPage() {
   useEffect(() => {
     fetchProducts()
     fetchCategories()
+    fetchSuppliers()
   }, [])
 
   const fetchCategories = async () => {
@@ -138,6 +143,20 @@ export default function ProductsPage() {
       setCategories(activeCategories)
     } catch (err) {
       console.error('Error loading categories:', err)
+    }
+  }
+
+  const fetchSuppliers = async () => {
+    try {
+      const data = await supplierService.getSuppliers()
+      const activeSuppliers = data.filter((s) => {
+        const normalizedStatus = String(s.status || '').trim().toUpperCase()
+        return !s.isDeleted && (!normalizedStatus || normalizedStatus === 'ACTIVE')
+      })
+      setSuppliers(activeSuppliers)
+      setSupplierId((prev) => prev || activeSuppliers[0]?.id || '')
+    } catch (err) {
+      console.error('Error loading suppliers:', err)
     }
   }
 
@@ -245,6 +264,7 @@ export default function ProductsPage() {
     setMetaTitle('')
     setMetaDescription('')
     setMetaKeywords('')
+    setSupplierId(suppliers[0]?.id || '')
     setIsModalOpen(true)
   }
 
@@ -375,6 +395,11 @@ export default function ProductsPage() {
           return
         }
 
+        if (!supplierId) {
+          alert('Vui lòng chọn nhà cung cấp (SupplierId).')
+          return
+        }
+
         const formData = new FormData()
         const appendIfDefined = (key: string, value: unknown) => {
           if (value === undefined || value === null || value === '') return
@@ -384,6 +409,7 @@ export default function ProductsPage() {
         appendIfDefined('Sku', sku)
         appendIfDefined('Name', name)
         appendIfDefined('CategoryId', category)
+        appendIfDefined('SupplierId', supplierId)
         appendIfDefined('Price', price)
         appendIfDefined('Unit', unit)
         appendIfDefined('Barcode', barcode)
@@ -715,6 +741,28 @@ export default function ProductsPage() {
               })}
             </select>
           </div>
+          {mode === 'create' && (
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-gray-700">
+                SupplierId *
+              </label>
+              <select
+                className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                value={supplierId}
+                onChange={(e) => setSupplierId(e.target.value)}
+                required
+              >
+                <option value="" disabled>
+                  {suppliers.length > 0 ? 'Select supplier' : 'No supplier available'}
+                </option>
+                {suppliers.map((supplier) => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {supplier.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <Input
             label="Price"
             type="number"
