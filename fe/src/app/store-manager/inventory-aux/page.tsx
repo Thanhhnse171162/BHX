@@ -203,7 +203,6 @@ export default function InventoryAuxPage() {
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-[30px] leading-[32px] font-extrabold text-slate-900">Lô hàng cửa hàng</h1>
-          <p className="text-[13px] text-slate-500">Dữ liệu lấy trực tiếp từ BE theo cửa hàng hiện tại.</p>
           {workplaceId && (
             <p className="text-xs text-slate-500 mt-1">Cửa hàng hiện tại: {warehouseName || workplaceId}</p>
           )}

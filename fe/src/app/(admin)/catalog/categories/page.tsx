@@ -48,7 +48,9 @@ const buildFallbackCategoryId = (index: number): string => {
 }
 
 export default function CategoriesPage() {
+  const PAGE_SIZE = 10
   const [categories, setCategories] = useState<CategoryRow[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -91,6 +93,7 @@ export default function CategoriesPage() {
       
       console.log('✅ Transformed rows:', rows)
       setCategories(rows)
+      setCurrentPage(1)
     } catch (err: any) {
       console.error('❌ Error loading categories:', err)
       console.error('Error details:', err.response?.data || err.message)
@@ -174,6 +177,16 @@ export default function CategoriesPage() {
     }
   }
 
+  const totalPages = Math.max(1, Math.ceil(categories.length / PAGE_SIZE))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const startIndex = (safeCurrentPage - 1) * PAGE_SIZE
+  const paginatedCategories = categories.slice(startIndex, startIndex + PAGE_SIZE)
+
+  const handleChangePage = (page: number) => {
+    if (page < 1 || page > totalPages) return
+    setCurrentPage(page)
+  }
+
   return (
     <div className="p-6">
       <PageHeader
@@ -220,79 +233,118 @@ export default function CategoriesPage() {
 
         {/* Data table */}
         {!isLoading && !error && categories.length > 0 && (
-          <DataTable
-            data={categories}
-            columns={[
-              { key: 'name', label: 'Name' },
-              {
-                key: 'status',
-                label: 'Status',
-                render: (value) => (
-                  <span
-                    className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      value === 'ACTIVE'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-700'
-                    }`}
+          <>
+            <DataTable
+              data={paginatedCategories}
+              columns={[
+                { key: 'name', label: 'Name' },
+                {
+                  key: 'status',
+                  label: 'Status',
+                  render: (value) => (
+                    <span
+                      className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        value === 'ACTIVE'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      {String(value)}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'createdAt',
+                  label: 'Created At',
+                  render: (value) => {
+                    const dateValue = value as string
+                    if (!dateValue) return '-'
+                    const date = new Date(dateValue)
+                    return Number.isNaN(date.getTime())
+                      ? '-'
+                      : date.toLocaleDateString('vi-VN', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                        })
+                  },
+                },
+                {
+                  key: 'updatedAt',
+                  label: 'Updated At',
+                  render: (value) => {
+                    if (!value) return '-'
+                    const date = new Date(value as string)
+                    return Number.isNaN(date.getTime())
+                      ? '-'
+                      : date.toLocaleDateString('vi-VN', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                        })
+                  },
+                },
+                {
+                  key: 'id',
+                  label: 'Actions',
+                  render: (_value, item) => {
+                    const row = item as unknown as CategoryRow
+                    return (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleOpenEdit(row)
+                          }}
+                        >
+                          Edit
+                        </Button>
+                      </div>
+                    )
+                  },
+                },
+              ]}
+            />
+
+            <div className="mt-4 flex items-center justify-between px-1">
+              <p className="text-sm text-gray-600">
+                Showing {startIndex + 1} - {Math.min(startIndex + PAGE_SIZE, categories.length)} of {categories.length}
+              </p>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleChangePage(safeCurrentPage - 1)}
+                  disabled={safeCurrentPage === 1}
+                >
+                  Prev
+                </Button>
+
+                {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((page) => (
+                  <Button
+                    key={page}
+                    size="sm"
+                    variant={page === safeCurrentPage ? 'primary' : 'outline'}
+                    onClick={() => handleChangePage(page)}
                   >
-                    {String(value)}
-                  </span>
-                ),
-              },
-              {
-                key: 'createdAt',
-                label: 'Created At',
-                render: (value) => {
-                  const dateValue = value as string
-                  if (!dateValue) return '-'
-                  const date = new Date(dateValue)
-                  return Number.isNaN(date.getTime())
-                    ? '-'
-                    : date.toLocaleDateString('vi-VN', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                      })
-                },
-              },
-              {
-                key: 'updatedAt',
-                label: 'Updated At',
-                render: (value) => {
-                  if (!value) return '-'
-                  const date = new Date(value as string)
-                  return Number.isNaN(date.getTime())
-                    ? '-'
-                    : date.toLocaleDateString('vi-VN', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                      })
-                },
-              },
-              {
-                key: 'id',
-                label: 'Actions',
-                render: (_value, item) => {
-                  const row = item as unknown as CategoryRow
-                  return (
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleOpenEdit(row)
-                        }}
-                      >
-                        Edit
-                      </Button>
-                    </div>
-                  )
-                },
-              },
-            ]}
-          />
+                    {page}
+                  </Button>
+                ))}
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleChangePage(safeCurrentPage + 1)}
+                  disabled={safeCurrentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          </>
         )}
       </div>
 
