@@ -1,16 +1,20 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { Search, Filter, Package, CheckCircle, AlertTriangle, XCircle, Download, Loader2 } from 'lucide-react'
+import { Search, Filter, Package, CheckCircle, AlertTriangle, XCircle, Download, Loader2, Edit2 } from 'lucide-react'
 import { Button } from '@/shared/ui/Button'
+import { Input } from '@/shared/ui/Input'
+import Modal from '@/shared/ui/Modal'
 import { InventoryAPIService } from '@/services/inventory-api.service'
 import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
 import { useAuthStore } from '@/store/auth.store'
 
 interface InventoryItemDisplay {
+  id: string
   productId: string
   productName: string
   sku: string
+  unit?: string
   category: string
   locationType: string
   locationId: string
@@ -33,6 +37,11 @@ export default function InventoryListPage() {
   const [inventory, setInventory] = useState<InventoryItemDisplay[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isMinStockModalOpen, setIsMinStockModalOpen] = useState(false)
+  const [minStockEditingId, setMinStockEditingId] = useState<string | null>(null)
+  const [minStockEditValue, setMinStockEditValue] = useState(0)
+  const [isUpdatingMinStock, setIsUpdatingMinStock] = useState(false)
+  const [minStockError, setMinStockError] = useState<string | null>(null)
   const itemsPerPage = 10
 
   // Get user from auth store
@@ -99,9 +108,11 @@ export default function InventoryListPage() {
           }
 
           return {
+            id: item.id,
             productId: item.productId,
             productName: product?.name || 'Unknown Product',
             sku: product?.sku || 'N/A',
+            unit: item.unit || item.Unit || item.product?.unit || product?.unit,
             category: product?.categoryName || 'Uncategorized',
             locationType: item.locationType,
             locationId: item.locationId,
@@ -144,6 +155,50 @@ export default function InventoryListPage() {
 
     fetchInventoryData()
   }, [hydrated, user?.workplaceType, user?.workplaceId])
+
+  const handleEditMinStockClick = (inventoryId: string, currentValue: number) => {
+    setMinStockEditingId(inventoryId)
+    setMinStockEditValue(currentValue)
+    setMinStockError(null)
+    setIsMinStockModalOpen(true)
+  }
+
+  const handleCloseMinStockModal = () => {
+    setIsMinStockModalOpen(false)
+    setMinStockEditingId(null)
+    setMinStockEditValue(0)
+    setMinStockError(null)
+  }
+
+  const handleUpdateMinStock = async () => {
+    if (!minStockEditingId) return
+
+    setIsUpdatingMinStock(true)
+    setMinStockError(null)
+
+    try {
+      await InventoryAPIService.updateMinStockLevel(
+        minStockEditingId,
+        minStockEditValue
+      )
+
+      // Update the inventory state
+      setInventory(prev =>
+        prev.map(item =>
+          item.id === minStockEditingId
+            ? { ...item, minStockLevel: minStockEditValue }
+            : item
+        )
+      )
+
+      handleCloseMinStockModal()
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.message || 'Cập nhật mục tiêu tồn kho thất bại'
+      setMinStockError(errorMsg)
+    } finally {
+      setIsUpdatingMinStock(false)
+    }
+  }
 
   const categories = useMemo(() => {
     return Array.from(new Set(inventory.map(item => item.category)))
@@ -363,10 +418,14 @@ export default function InventoryListPage() {
                         <span className="text-sm text-gray-600">{item.category}</span>
                       </td>
                       <td className="py-4 px-6 text-center">
-                        <span className="font-semibold text-gray-900">{item.quantity}</span>
+                        <span className="font-semibold text-gray-900">
+                          {item.quantity}{item.unit ? ` ${item.unit}` : ''}
+                        </span>
                       </td>
                       <td className="py-4 px-6 text-center">
-                        <span className="text-sm text-gray-600">{item.reservedQuantity}</span>
+                        <span className="text-sm text-gray-600">
+                          {item.reservedQuantity}{item.unit ? ` ${item.unit}` : ''}
+                        </span>
                       </td>
                       <td className="py-4 px-6 text-center">
                         <span className={`font-semibold ${
@@ -374,13 +433,22 @@ export default function InventoryListPage() {
                             ? 'text-orange-600' 
                             : 'text-green-600'
                         }`}>
-                          {item.availableQuantity}
+                          {item.availableQuantity}{item.unit ? ` ${item.unit}` : ''}
                         </span>
                       </td>
                       <td className="py-4 px-6 text-center">
-                        <span className="text-sm text-gray-600">
-                          {item.minStockLevel} / {item.maxStockLevel}
-                        </span>
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="text-sm text-gray-600">
+                            {item.minStockLevel}{item.unit ? ` ${item.unit}` : ''} / {item.maxStockLevel}{item.unit ? ` ${item.unit}` : ''}
+                          </span>
+                          <button
+                            onClick={() => handleEditMinStockClick(item.id, item.minStockLevel)}
+                            className="text-blue-500 hover:text-blue-700 transition"
+                            title="Chỉnh sửa mục tiêu tồn kho"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                        </div>
                       </td>
                       <td className="py-4 px-6 text-center">
                         {getStatusBadge(item.status)}
@@ -444,6 +512,51 @@ export default function InventoryListPage() {
           </div>
         </>
       )}
+
+      <Modal
+        isOpen={isMinStockModalOpen}
+        onClose={handleCloseMinStockModal}
+        title="Chỉnh sửa mục tiêu tồn kho"
+        size="sm"
+        footer={
+          <div className="flex items-center justify-between">
+            <div>
+              {minStockError && (
+                <div className="flex items-center gap-2 text-red-600 text-sm">
+                  <AlertTriangle size={16} />
+                  <span>{minStockError}</span>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCloseMinStockModal}
+                disabled={isUpdatingMinStock}
+              >
+                Hủy
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleUpdateMinStock}
+                disabled={isUpdatingMinStock}
+              >
+                {isUpdatingMinStock ? 'Đang cập nhật...' : 'Cập nhật'}
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <Input
+          label="Mục tiêu tồn kho tối thiểu"
+          type="number"
+          value={minStockEditValue}
+          onChange={(e) => setMinStockEditValue(Number(e.target.value))}
+          disabled={isUpdatingMinStock}
+          placeholder="Nhập số lượng"
+        />
+      </Modal>
     </div>
   )
 }

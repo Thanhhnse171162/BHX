@@ -21,7 +21,7 @@ export async function GET(
       headers['Authorization'] = authHeader
     }
 
-    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Category/Get-Category-by-ID?id=${id}`, {
+    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Category/Get-Category-by-ID/${id}`, {
       method: 'GET',
       headers,
       cache: 'no-store',
@@ -67,7 +67,7 @@ export async function PUT(
       headers['Authorization'] = authHeader
     }
 
-    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Category/Update-Category-by-ID?id=${id}`, {
+    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Category/Update-Category-by-ID/${id}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify(body),

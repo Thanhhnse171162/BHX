@@ -31,7 +31,7 @@ const sidebarItems: SidebarItem[] = [
     icon: <Warehouse size={20} />
   },
   {
-    label: 'Nhập hàng',
+    label: 'Xuất hàng',
     href: '/warehouse-store/receive-goods',
     
     icon: <Archive size={20} />
@@ -42,7 +42,7 @@ const sidebarItems: SidebarItem[] = [
     icon: <ClipboardCheck size={20} />
   },
   {
-    label: 'Xuất hàng',
+    label: 'Nhập hàng',
     href: '/warehouse-store/dispatch-goods',
     icon: <PlusSquare size={20} />
   },

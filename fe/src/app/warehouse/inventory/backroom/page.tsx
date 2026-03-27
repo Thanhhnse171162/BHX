@@ -13,6 +13,10 @@ function normalizeId(value?: string | null): string {
   return String(value || '').trim().toLowerCase()
 }
 
+function resolveBatchUnit(row: ProductBatchFromAPI, product?: ProductFromAPI): string {
+  return String(row.unit ?? row.Unit ?? product?.unit ?? '').trim()
+}
+
 export default function BackroomStockPage() {
   const { user, token } = useAuthStore()
 
@@ -383,6 +387,7 @@ export default function BackroomStockPage() {
                 paginatedData.map((item) => {
                   const product = productMap[normalizeId(item.productId)]
                   const status = String(item.status || '').toUpperCase()
+                  const unit = resolveBatchUnit(item, product)
 
                   return (
                     <tr key={item.id} className="hover:bg-gray-50">
@@ -400,7 +405,7 @@ export default function BackroomStockPage() {
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-sm font-semibold text-green-600">
-                          {Math.max(0, Number(item.quantity || 0))}
+                          {Math.max(0, Number(item.quantity || 0))}{unit ? ` ${unit}` : ''}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
@@ -500,7 +505,13 @@ export default function BackroomStockPage() {
               <p><span className="text-gray-500">Mã lô gốc:</span> {splitBatch.batchNumber || splitBatch.id}</p>
               <p><span className="text-gray-500">Sản phẩm:</span> {productMap[normalizeId(splitBatch.productId)]?.name || splitBatch.productId}</p>
               <p><span className="text-gray-500">Kho đích:</span> {warehouseName || workplaceId}</p>
-              <p><span className="text-gray-500">Số lượng hiện có:</span> {Math.max(0, Number(splitBatch.quantity || 0))}</p>
+              <p>
+                <span className="text-gray-500">Số lượng hiện có:</span>{' '}
+                {Math.max(0, Number(splitBatch.quantity || 0))}
+                {resolveBatchUnit(splitBatch, productMap[normalizeId(splitBatch.productId)])
+                  ? ` ${resolveBatchUnit(splitBatch, productMap[normalizeId(splitBatch.productId)])}`
+                  : ''}
+              </p>
             </div>
 
             <div>

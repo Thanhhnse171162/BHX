@@ -8,6 +8,7 @@ interface InventoryItem {
   id: string
   productName: string
   sku: string
+  unit?: string
   inStorage: number
   onShelf: number
   minStock: number

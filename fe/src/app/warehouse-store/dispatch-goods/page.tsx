@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Plus, Search, Eye, CheckCircle2, Clock3, Truck, AlertCircle, RefreshCw, X } from 'lucide-react'
+import { Search, Eye, CheckCircle2, Clock3, Truck, AlertCircle, RefreshCw, X } from 'lucide-react'
 import { TransferAPIService, type TransferFromAPI } from '@/services/transfer-api.service'
 import { WarehouseLookupAPIService } from '@/services/warehouse-lookup-api.service'
 import { ProductAPIService } from '@/services/product-api.service'
@@ -56,7 +55,6 @@ function mapTransferStatus(status?: string): StatusType {
 }
 
 export default function DispatchGoodsPage() {
-  const router = useRouter()
   const { user, token } = useAuthStore()
 
   const [statusFilter, setStatusFilter] = useState<'all' | StatusType>('all')
@@ -453,20 +451,14 @@ export default function DispatchGoodsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">
-            Danh sách phiếu xuất hàng
+            Danh sách phiếu nhập hàng
           </h1>
           <p className="text-sm text-slate-500">
-            Theo dõi và quản lý các chứng từ xuất kho
+            Theo dõi và quản lý các chứng từ nhập kho
           </p>
         </div>
 
-        <button
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium shadow-sm"
-          onClick={() => router.push('/warehouse-store/dispatch-goods/create')}
-        >
-          <Plus size={18}/>
-          Tạo phiếu xuất mới
-        </button>
+
       </div>
 
       {/* FILTER BAR */}

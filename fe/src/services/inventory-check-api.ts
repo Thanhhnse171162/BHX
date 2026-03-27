@@ -36,6 +36,8 @@ export interface InventoryCheckListDto {
 export interface InventoryCheckItemDto {
   id: string;
   productId: string;
+  unit?: string;
+  Unit?: string;
   systemQuantity: number;
   actualQuantity: number;
   difference: number;
@@ -66,6 +68,7 @@ export interface CreateInventoryCheckDto {
 
 export interface InventoryCheckItemSubmitDto {
   productId: string;
+  unit?: string;
   actualQuantity: number;
   note?: string;
 }

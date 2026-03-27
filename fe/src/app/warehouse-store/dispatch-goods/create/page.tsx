@@ -74,7 +74,7 @@ export default function CreateDispatchPage() {
       return
     }
     alert('Phiếu xuất hàng đã được tạo thành công!')
-    router.push('/warehouse-store/dispatch-goods')
+    router.push('/warehouse-store/receive-goods')
   }
 
   const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0)

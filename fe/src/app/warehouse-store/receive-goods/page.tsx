@@ -290,7 +290,7 @@ export default function ReceiveGoodsPage() {
         (err as any)?.response?.data?.message ||
         (err as any)?.response?.data?.error ||
         (err as any)?.message
-      setSubmitError(typeof axiosMsg === 'string' && axiosMsg.trim() ? axiosMsg : 'Lỗi xác nhận nhập kho')
+      setSubmitError(typeof axiosMsg === 'string' && axiosMsg.trim() ? axiosMsg : 'Lỗi xác nhận xuất kho')
     } finally {
       setSubmitLoading(false)
     }
@@ -327,8 +327,8 @@ export default function ReceiveGoodsPage() {
     <div className="p-6 bg-slate-50 min-h-screen">
 
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-slate-800 tracking-tight">Danh sách phiếu nhập hàng</h1>
-        <p className="text-sm text-slate-500 mt-0.5">Theo dõi và quản lý các chứng từ nhập kho</p>
+        <h1 className="text-xl font-bold text-slate-800 tracking-tight">Danh sách phiếu xuất hàng</h1>
+        <p className="text-sm text-slate-500 mt-0.5">Theo dõi và quản lý các chứng từ xuất kho</p>
       </div>
 
       {!loading && hydrated && !destinationLocationId && (
@@ -520,7 +520,7 @@ export default function ReceiveGoodsPage() {
                   <ClipboardCheck size={17} className="text-amber-600" />
                 </div>
                 <div>
-                  <p className="font-semibold text-slate-800 text-sm">Kiểm tra phiếu nhập hàng</p>
+                  <p className="font-semibold text-slate-800 text-sm">Kiểm tra phiếu xuất hàng</p>
                   <p className="text-xs text-slate-500 font-mono mt-0.5">{inspectingOrder.transferNumber}</p>
                 </div>
               </div>
@@ -761,7 +761,7 @@ export default function ReceiveGoodsPage() {
                       <p className={`text-sm font-semibold ${hasDiscrepancy ? 'text-amber-800' : 'text-emerald-800'}`}>
                         {hasDiscrepancy
                           ? 'Phát hiện sai lệch – Kiểm tra lại trước khi xác nhận'
-                          : 'Tất cả mặt hàng đạt yêu cầu – Sẵn sàng xác nhận nhập kho'}
+                          : 'Tất cả mặt hàng đạt yêu cầu – Sẵn sàng xác nhận xuất kho'}
                       </p>
                     </div>
                   )}
@@ -832,7 +832,7 @@ export default function ReceiveGoodsPage() {
                       }`}
                     >
                       <CheckCircle2 size={14} />
-                      Xác nhận nhập kho
+                      Xác nhận xuất kho
                     </button>
                   </div>
                 </>
@@ -854,7 +854,7 @@ export default function ReceiveGoodsPage() {
               }
             </div>
             <h3 className="text-sm font-bold text-slate-800 text-center mb-2">
-              {confirmAction === 'complete' ? 'Xác nhận nhập kho?' : 'Hủy phiếu nhập hàng?'}
+              {confirmAction === 'complete' ? 'Xác nhận xuất kho?' : 'Hủy phiếu xuất hàng?'}
             </h3>
             <p className="text-xs text-slate-500 text-center mb-5 leading-relaxed">
               {confirmAction === 'complete'

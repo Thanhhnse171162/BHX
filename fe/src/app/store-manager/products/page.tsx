@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Edit2 } from 'lucide-react'
 import useAuthStore from '@/store/auth.store'
 import { InventoryAPIService, type InventoryItem } from '@/services/inventory-api.service'
 import { ProductAPIService, type ProductFromAPI } from '@/services/product-api.service'
 import { Button } from '@/shared/ui/Button'
+import { Input } from '@/shared/ui/Input'
+import Modal from '@/shared/ui/Modal'
 import { localApiClient } from '@/shared/api/http'
 
 function normalizeId(value?: string | null) {
@@ -54,6 +56,12 @@ export default function StoreManagerProductsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Min stock modal state
+  const [isMinStockModalOpen, setIsMinStockModalOpen] = useState(false)
+  const [minStockEditingId, setMinStockEditingId] = useState<string | null>(null)
+  const [minStockEditValue, setMinStockEditValue] = useState(0)
+  const [isUpdatingMinStock, setIsUpdatingMinStock] = useState(false)
+  const [minStockError, setMinStockError] = useState<string | null>(null)
 
   const { locationType, locationId } = useMemo(() => resolveLocationContext(user), [user])
 
@@ -167,6 +175,51 @@ export default function StoreManagerProductsPage() {
     return locationMap[key] || `${item.locationType} hiện tại`
   }
 
+  const handleEditMinStockClick = (inventoryId: string, currentValue: number) => {
+    setMinStockEditingId(inventoryId)
+    setMinStockEditValue(currentValue)
+    setMinStockError(null)
+    setIsMinStockModalOpen(true)
+  }
+
+  const handleCloseMinStockModal = () => {
+    setIsMinStockModalOpen(false)
+    setMinStockEditingId(null)
+    setMinStockEditValue(0)
+    setMinStockError(null)
+  }
+
+  const handleUpdateMinStock = async () => {
+    if (!minStockEditingId) return
+
+    setIsUpdatingMinStock(true)
+    setMinStockError(null)
+
+    try {
+      await InventoryAPIService.updateMinStockLevel(minStockEditingId, minStockEditValue)
+
+      // Update local inventory state
+      setRows(
+        rows.map((item) =>
+          item.id === minStockEditingId
+            ? { ...item, minStockLevel: minStockEditValue }
+            : item
+        )
+      )
+
+      handleCloseMinStockModal()
+    } catch (error: any) {
+      console.error('Error updating min stock level:', error)
+      const errorMessage =
+        error?.response?.data?.detail ||
+        error?.message ||
+        'Failed to update min stock level. Please try again.'
+      setMinStockError(errorMessage)
+    } finally {
+      setIsUpdatingMinStock(false)
+    }
+  }
+
   return (
     <div className="p-6 space-y-4 bg-[#f5f7fb] min-h-screen">
       <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -232,7 +285,18 @@ export default function StoreManagerProductsPage() {
                     <td className="py-3 px-4 text-slate-700 whitespace-nowrap">{item.quantity}</td>
                     <td className="py-3 px-4 text-slate-700 whitespace-nowrap">{item.reservedQuantity}</td>
                     <td className="py-3 px-4 text-slate-700 whitespace-nowrap">{item.availableQuantity}</td>
-                    <td className="py-3 px-4 text-slate-700 whitespace-nowrap">{item.minStockLevel}</td>
+                    <td className="py-3 px-4 text-slate-700">
+                      <div className="flex items-center gap-3 whitespace-nowrap">
+                        <span className="font-semibold">{item.minStockLevel}</span>
+                        <button
+                          onClick={() => handleEditMinStockClick(item.id, item.minStockLevel)}
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                          title="Edit minimum stock level"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                      </div>
+                    </td>
                     <td className="py-3 px-4 text-slate-700 whitespace-nowrap">{item.maxStockLevel}</td>
                     <td className="py-3 px-4 whitespace-nowrap">
                       <span
@@ -292,6 +356,46 @@ export default function StoreManagerProductsPage() {
           </div>
         )}
       </div>
+
+      {/* Min Stock Level Modal */}
+      <Modal
+        isOpen={isMinStockModalOpen}
+        onClose={handleCloseMinStockModal}
+        title="Điều chỉnh mức tồn kho tối thiểu"
+        size="sm"
+        footer={
+          <div className="flex flex-col gap-3">
+            {minStockError && (
+              <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+                {minStockError}
+              </div>
+            )}
+            <div className="flex justify-end gap-3">
+              <Button variant="secondary" onClick={handleCloseMinStockModal} disabled={isUpdatingMinStock}>
+                Cancel
+              </Button>
+              <Button onClick={handleUpdateMinStock} disabled={isUpdatingMinStock}>
+                {isUpdatingMinStock ? 'Updating...' : 'Update'}
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <Input
+            label="Mức tồn kho tối thiểu"
+            type="number"
+            value={minStockEditValue}
+            onChange={(e) => setMinStockEditValue(Number(e.target.value))}
+            placeholder="0"
+            min={0}
+            required
+          />
+          <p className="text-sm text-gray-500">
+            Giá trị này xác định khi nào hàng tồn kho được coi là thấp.
+          </p>
+        </div>
+      </Modal>
     </div>
   )
 }

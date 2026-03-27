@@ -26,6 +26,10 @@ function statusLabel(status?: string) {
   return 'Còn hàng'
 }
 
+function resolveBatchUnit(row: ProductBatchFromAPI, product?: ProductFromAPI): string {
+  return String(row.unit ?? row.Unit ?? product?.unit ?? '').trim()
+}
+
 export default function InventoryAuxPage() {
   const { user, token } = useAuthStore()
 
@@ -302,6 +306,7 @@ export default function InventoryAuxPage() {
                 paged.map((row) => {
                   const product = productMap[normalizeId(row.productId)]
                   const status = String(row.status || '').toUpperCase()
+                  const unit = resolveBatchUnit(row, product)
 
                   return (
                     <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/60">
@@ -315,7 +320,9 @@ export default function InventoryAuxPage() {
                       </td>
                       <td className="py-3 px-4 text-slate-700">{row.supplier || '—'}</td>
                       <td className="py-3 px-4">
-                        <span className="font-semibold text-green-600">{formatNumber(Math.max(0, Number(row.quantity || 0)))}</span>
+                        <span className="font-semibold text-green-600">
+                          {formatNumber(Math.max(0, Number(row.quantity || 0)))}{unit ? ` ${unit}` : ''}
+                        </span>
                       </td>
                       <td className="py-3 px-4 text-slate-700">
                         {row.manufacturingDate ? new Date(row.manufacturingDate).toLocaleDateString('vi-VN') : '—'}
@@ -397,7 +404,13 @@ export default function InventoryAuxPage() {
               <p><span className="text-gray-500">Mã lô gốc:</span> {splitBatch.batchNumber || splitBatch.id}</p>
               <p><span className="text-gray-500">Sản phẩm:</span> {productMap[normalizeId(splitBatch.productId)]?.name || splitBatch.productId}</p>
               <p><span className="text-gray-500">Cửa hàng đích:</span> {warehouseName || workplaceId}</p>
-              <p><span className="text-gray-500">Số lượng hiện có:</span> {Math.max(0, Number(splitBatch.quantity || 0))}</p>
+              <p>
+                <span className="text-gray-500">Số lượng hiện có:</span>{' '}
+                {Math.max(0, Number(splitBatch.quantity || 0))}
+                {resolveBatchUnit(splitBatch, productMap[normalizeId(splitBatch.productId)])
+                  ? ` ${resolveBatchUnit(splitBatch, productMap[normalizeId(splitBatch.productId)])}`
+                  : ''}
+              </p>
             </div>
 
             <div>

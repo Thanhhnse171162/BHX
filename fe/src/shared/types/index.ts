@@ -123,6 +123,7 @@ export interface OrderItem {
 export interface InventoryRecord {
   id: string
   productId: string
+  unit?: string
   quantity: number
   warehouseId?: string
   storeId?: string
