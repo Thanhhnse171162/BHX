@@ -128,7 +128,7 @@ export const getAdminNavigation = (): NavGroup[] => {
           icon: 'Building2',
         },
         {
-          label: 'Inventory Overview',
+          label: 'Tổng Quan Tồn Kho',
           href: '/inventory-admin',
           icon: 'Warehouse',
         },

@@ -5,6 +5,8 @@ export interface ProductBatchFromAPI {
   productId: string
   warehouseId: string
   batchNumber: string
+  unit?: string | null
+  Unit?: string | null
   quantity: number
   manufacturingDate: string
   expiryDate: string

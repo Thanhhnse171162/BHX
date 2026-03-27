@@ -30,6 +30,7 @@ export interface InventoryItem {
   productId: string
   locationType: 'WAREHOUSE' | 'STORE'
   locationId: string
+  Unit?: string
   quantity: number
   reservedQuantity: number
   availableQuantity: number
@@ -50,6 +51,7 @@ export interface InventoryItem {
     brand?: string
     price: number
     unit: string
+    Unit?: string
     originalPrice?: number
     costPrice?: number
     isActive: boolean
@@ -183,6 +185,48 @@ export class InventoryAPIService {
       await localApiClient.delete(`${this.baseURL}/${id}`)
     } catch (error) {
       console.error('Error deleting inventory:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Check hoặc tạo inventory item
+   * Frontend: POST /api/inventory/check-or-create (Next.js proxy route)
+   * Backend: POST /api/Inventory/check-or-create
+   */
+  static async checkOrCreateInventory(data: {
+    productId: string
+    locationType: 'WAREHOUSE' | 'STORE'
+    locationId: string
+    quantity: number
+    minStockLevel: number
+    maxStockLevel: number
+  }): Promise<InventoryItem> {
+    try {
+      const response = await localApiClient.post<{ data: InventoryItem }>(
+        `${this.baseURL}/check-or-create`,
+        data
+      )
+      return response.data.data
+    } catch (error) {
+      console.error('Error checking or creating inventory:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Cập nhật minimum stock level
+   * Endpoint: PUT /api/Inventory/{inventoryId}/min-stock-level
+   */
+  static async updateMinStockLevel(inventoryId: string, minStockLevel: number): Promise<InventoryItem> {
+    try {
+      const response = await localApiClient.put<{ data: InventoryItem }>(
+        `/inventory/${inventoryId}/min-stock-level`,
+        { minStockLevel }
+      )
+      return response.data.data
+    } catch (error) {
+      console.error('Error updating min stock level:', error)
       throw error
     }
   }

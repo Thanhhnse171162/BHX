@@ -42,6 +42,7 @@ export default function ShipmentsApiPage() {
   const [selectedBatchId, setSelectedBatchId] = useState<string>('')
   const [toast, setToast] = useState('')
   const [productNameMap, setProductNameMap] = useState<Record<string, string>>({})
+  const [productUnitMap, setProductUnitMap] = useState<Record<string, string>>({})
   const [warehouseNameMap, setWarehouseNameMap] = useState<Record<string, string>>({})
 
   const [detailOpen, setDetailOpen] = useState(false)
@@ -112,11 +113,14 @@ export default function ShipmentsApiPage() {
       const entries = await Promise.all(
         ids.map(async (id) => {
           const product = await ProductAPIService.getById(id)
-          return [id, product?.name || id] as const
+          return [id, { name: product?.name || id, unit: String(product?.unit || '').trim() }] as const
         })
       )
       if (cancelled) return
-      setProductNameMap((prev) => ({ ...prev, ...Object.fromEntries(entries) }))
+      const nameEntries: Array<[string, string]> = entries.map(([id, value]) => [id, value.name])
+      const unitEntries: Array<[string, string]> = entries.map(([id, value]) => [id, value.unit])
+      setProductNameMap((prev) => ({ ...prev, ...Object.fromEntries(nameEntries) }))
+      setProductUnitMap((prev) => ({ ...prev, ...Object.fromEntries(unitEntries) }))
     })()
 
     return () => {
@@ -264,6 +268,11 @@ export default function ShipmentsApiPage() {
     return warehouseNameMap[id] || id
   }
 
+  const unitOf = (batch?: ProductBatchFromAPI | ProductBatchDetailFromAPI | null) => {
+    const productId = normalizeId(batch?.productId)
+    return String(batch?.unit ?? batch?.Unit ?? productUnitMap[productId] ?? '').trim()
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 p-6 space-y-5">
       <div className="flex items-center justify-between">
@@ -333,7 +342,9 @@ export default function ShipmentsApiPage() {
                     <div className="font-medium text-slate-800">{productNameOf(b.productId)}</div>
                     <div className="text-xs text-slate-400">{b.productId}</div>
                   </td>
-                  <td className="p-3 font-semibold">{Number(b.quantity || 0).toLocaleString()}</td>
+                  <td className="p-3 font-semibold">
+                    {Number(b.quantity || 0).toLocaleString()}{unitOf(b) ? ` ${unitOf(b)}` : ''}
+                  </td>
                   <td className="p-3">{b.supplier || '—'}</td>
                   <td className="p-3">{b.expiryDate ? new Date(b.expiryDate).toLocaleDateString('vi-VN') : '—'}</td>
                   <td className="p-3">{statusLabel(b.status)}</td>
@@ -385,7 +396,7 @@ export default function ShipmentsApiPage() {
                   <p><span className="text-slate-500">Batch:</span> {detail.batchNumber || detail.id}</p>
                   <p><span className="text-slate-500">Product:</span> {productNameOf(detail.productId)}</p>
                   <p><span className="text-slate-500">Warehouse:</span> {warehouseNameOf(detail.warehouseId)}</p>
-                  <p><span className="text-slate-500">Số lượng:</span> {Number(detail.quantity || 0).toLocaleString()}</p>
+                  <p><span className="text-slate-500">Số lượng:</span> {Number(detail.quantity || 0).toLocaleString()}{unitOf(detail) ? ` ${unitOf(detail)}` : ''}</p>
                   <p><span className="text-slate-500">HSD:</span> {detail.expiryDate || '—'}</p>
                   <p><span className="text-slate-500">Trạng thái:</span> {statusLabel(detail.status)}</p>
                 </div>
@@ -406,7 +417,7 @@ export default function ShipmentsApiPage() {
                   <p><span className="text-slate-500">Lô gốc:</span> {sourceBatch?.batchNumber || selectedBatchId || '—'}</p>
                   <p><span className="text-slate-500">Sản phẩm:</span> {productNameOf(sourceBatch?.productId)}</p>
                   <p><span className="text-slate-500">Kho đích:</span> {warehouseNameOf(workplaceId)}</p>
-                  <p><span className="text-slate-500">Số lượng hiện có:</span> {Number(sourceBatch?.quantity || 0).toLocaleString()}</p>
+                  <p><span className="text-slate-500">Số lượng hiện có:</span> {Number(sourceBatch?.quantity || 0).toLocaleString()}{unitOf(sourceBatch) ? ` ${unitOf(sourceBatch)}` : ''}</p>
                 </div>
               )
             })()}
