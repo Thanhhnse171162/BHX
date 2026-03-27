@@ -10,7 +10,6 @@ import { ProductAPIService, ProductFromAPI } from '@/services/product-api.servic
 import { InventoryAPIService, InventoryItem } from '@/services/inventory-api.service'
 import { useAuthStore } from '@/store/auth.store'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 interface Product {
   id: string
   sku: string
@@ -18,6 +17,7 @@ interface Product {
   price: number
   category: string
   emoji: string
+  imageUrl?: string | null
 }
 
 interface CartItem extends Product {
@@ -40,59 +40,44 @@ interface SimpleSaleResponse {
 
 const DEFAULT_POS_STORE_ID = 'B0000001-0001-0001-0001-000000000001'
 const DEFAULT_POS_CASHIER_ID = '33333333-3333-3333-3333-333333333331'
+const DEFAULT_IMAGE = '/default-product.png'
 
 const GUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const isGuid = (value: unknown): value is string =>
+  typeof value === 'string' && GUID_REGEX.test(value.trim())
 
-const isGuid = (value: unknown): value is string => {
-  return typeof value === 'string' && GUID_REGEX.test(value.trim())
-}
-
-const extractApiErrorMessage = (result: any): string => {
+const extractApiErrorMessage = (result: unknown): string => {
   if (!result) return 'Không thể tạo đơn thanh toán POS'
-
+  const r = result as Record<string, unknown>
   const directMessage =
-    result?.error?.message ||
-    result?.error ||
-    result?.message ||
-    result?.title
+    (r?.error as Record<string, unknown>)?.message ?? r?.error ?? r?.message ?? r?.title
   if (typeof directMessage === 'string' && directMessage.trim()) return directMessage
-
-  const errors = result?.errors
+  const errors = r?.errors
   if (errors && typeof errors === 'object') {
-    const firstKey = Object.keys(errors)[0]
-    const firstVal = firstKey ? errors[firstKey] : null
+    const firstKey = Object.keys(errors as object)[0]
+    const firstVal = firstKey ? (errors as Record<string, unknown>)[firstKey] : null
     if (Array.isArray(firstVal) && firstVal.length > 0) return String(firstVal[0])
     if (typeof firstVal === 'string' && firstVal.trim()) return firstVal
   }
-
   return 'Không thể tạo đơn thanh toán POS'
 }
 
-const normalizeSalePayload = (payload: any): any => {
+const normalizeSalePayload = (payload: unknown): Record<string, unknown> | null => {
   if (!payload || typeof payload !== 'object') return null
-  if (payload.data && typeof payload.data === 'object') return payload.data
-  return payload
+  const p = payload as Record<string, unknown>
+  if (p.data && typeof p.data === 'object') return p.data as Record<string, unknown>
+  return p
 }
 
-const normalizePaymentStatus = (payload: any): string => {
+const isPaymentCompleted = (payload: unknown): boolean => {
   const sale = normalizeSalePayload(payload)
-  const raw = String(sale?.paymentStatus || sale?.status || '').trim().toUpperCase()
-  return raw
-}
-
-const isPaymentCompleted = (payload: any): boolean => {
-  const status = normalizePaymentStatus(payload)
+  const status = String(sale?.paymentStatus ?? sale?.status ?? '').trim().toUpperCase()
   return ['PAID', 'COMPLETED', 'COMPLETE', 'SUCCESS', 'SUCCEEDED', 'SUCCESSFUL'].includes(status)
 }
 
 const EMOJI_BY_CATEGORY: Record<string, string> = {
-  'Nước uống': '🥤',
-  'Thực phẩm': '🍜',
-  'Bánh kẹo': '🍪',
-  Snack: '🍟',
-  Sữa: '🥛',
-  'Gia dụng': '🧴',
-  'Vệ sinh': '🧼',
+  'Nước uống': '🥤', 'Thực phẩm': '🍜', 'Bánh kẹo': '🍪',
+  Snack: '🍟', Sữa: '🥛', 'Gia dụng': '🧴', 'Vệ sinh': '🧼',
 }
 
 const emojiFromText = (name: string, category: string): string => {
@@ -108,120 +93,147 @@ const emojiFromText = (name: string, category: string): string => {
   return EMOJI_BY_CATEGORY[category] ?? '📦'
 }
 
-function mapApiProductToPOS(p: ProductFromAPI & Record<string, any>): Product {
-  const sku = p.barcode ?? p.sku ?? p.id
-  const category = p.categoryName ?? 'Khác'
+function mapApiProductToPOS(p: ProductFromAPI & Record<string, unknown>): Product {
+  const sku = (p.barcode ?? p.sku ?? p.id) as string
+  const category = (p.categoryName ?? 'Khác') as string
+  let imageUrl: string | null =
+    (p.imageUrl as string | null) ?? null
+  if (!imageUrl && typeof p.images === 'string') {
+    try {
+      const arr = JSON.parse(p.images)
+      if (Array.isArray(arr) && arr.length > 0) imageUrl = arr[0] as string
+    } catch {}
+  }
+  if (!imageUrl) {
+    imageUrl =
+      (p.image_url as string | null) ??
+      (p.mainImage as string | null) ??
+      (p.thumbnail as string | null) ??
+      null
+  }
   return {
     id: p.id,
     sku,
     name: p.name,
-    price: p.price ?? 0,
+    price: (p.price as number) ?? 0,
     category,
     emoji: emojiFromText(p.name, category),
+    imageUrl,
   }
 }
 
 function mapInventoryToPOS(item: InventoryItem): Product {
-  const product = item.product
+  const product = item.product as Record<string, unknown> | undefined
   const id = item.productId || item.id
-  const name = product?.name || item.productName || item.name || item.sku || item.barcode || `Product ${id.substring(0, 8)}`
-  const sku = product?.barcode || product?.sku || item.barcode || item.sku || id
-  const category = product?.categoryName || item.categoryName || 'Khác'
-  const price = product?.price || item.price || 0
-
+  const name =
+    (product?.name as string) ||
+    item.productName || item.name || item.sku || item.barcode ||
+    `Product ${id.substring(0, 8)}`
+  const sku = (product?.barcode as string) || (product?.sku as string) || item.barcode || item.sku || id
+  const category = (product?.categoryName as string) || item.categoryName || 'Khác'
+  const price = (product?.price as number) || item.price || 0
+  const imageUrl =
+    (product?.imageUrl as string | null) ??
+    (product?.image_url as string | null) ??
+    null
   return {
-    id,
-    sku,
-    name,
-    price,
-    category,
+    id, sku, name, price, category,
     emoji: emojiFromText(name, category),
+    imageUrl,
   }
 }
 
 const PAYMENT_METHODS = [
-  { id: 'cash',    label: 'Tiền mặt',      icon: Banknote    },
-  { id: 'momo',    label: 'MoMo',          icon: Wallet      },
+  { id: 'cash', label: 'Tiền mặt', icon: Banknote },
+  { id: 'momo', label: 'MoMo',     icon: Wallet   },
 ]
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n)
 
+// ✅ ProductImage — tự fallback, tránh onError loop
+function ProductImage({
+  src, alt, className,
+}: {
+  src?: string | null
+  alt: string
+  className?: string
+}) {
+  const [errored, setErrored] = useState(false)
+  const imgSrc = !src || errored ? DEFAULT_IMAGE : src
+  return (
+    <img
+      src={imgSrc}
+      alt={alt}
+      className={className}
+      onError={() => setErrored(true)}
+    />
+  )
+}
+
 export default function POSPage() {
   const { user, hydrated } = useAuthStore()
 
-  const [products, setProducts]             = useState<Product[]>([])
+  const [products, setProducts]               = useState<Product[]>([])
   const [loadingProducts, setLoadingProducts] = useState(true)
-  const [productError, setProductError]     = useState<string | null>(null)
-  const [query, setQuery]                   = useState('')
-  const [category, setCategory]             = useState('Tất cả')
-  const [cart, setCart]                     = useState<CartItem[]>([])
-  const [payMethod, setPayMethod]           = useState('cash')
+  const [productError, setProductError]       = useState<string | null>(null)
+  const [query, setQuery]                     = useState('')
+  const [category, setCategory]               = useState('Tất cả')
+  const [cart, setCart]                       = useState<CartItem[]>([])
+  const [payMethod, setPayMethod]             = useState('cash')
   const [submittingPayment, setSubmittingPayment] = useState(false)
-  const [paymentError, setPaymentError]     = useState<string | null>(null)
-  const [paymentResult, setPaymentResult]   = useState<SimpleSaleResponse | null>(null)
+  const [paymentError, setPaymentError]       = useState<string | null>(null)
+  const [paymentResult, setPaymentResult]     = useState<SimpleSaleResponse | null>(null)
   const [paymentDisplayStatus, setPaymentDisplayStatus] = useState<'PENDING' | 'COMPLETE' | 'PAID' | null>(null)
   const [isPollingPayment, setIsPollingPayment] = useState(false)
-  const [scanning, setScanning]             = useState(false)
-  const [scanValue, setScanValue]           = useState('')
-  const scanRef                             = useRef<HTMLInputElement>(null)
-  const orderNumber                         = useRef(`#${Math.floor(10000 + Math.random() * 90000)}`)
+  const [scanning, setScanning]               = useState(false)
+  const [scanValue, setScanValue]             = useState('')
+  const scanRef                               = useRef<HTMLInputElement>(null)
+  const orderNumber                           = useRef(`#${Math.floor(10000 + Math.random() * 90000)}`)
 
+  // Fetch products
   useEffect(() => {
     if (!hydrated) return
-
     let cancelled = false
     setLoadingProducts(true)
     setProductError(null)
 
-    const fetchProducts = async () => {
+    const fetchProducts = async (): Promise<Product[]> => {
       if (!user?.workplaceType || !user?.workplaceId) {
         throw new Error('Tài khoản chưa có thông tin cửa hàng (workplace). Vui lòng đăng xuất và đăng nhập lại.')
       }
       if (user.workplaceType !== 'STORE') {
         throw new Error('Tài khoản này không thuộc cửa hàng (STORE), không thể xem danh sách sản phẩm POS.')
       }
-
       const inventoryData = await InventoryAPIService.getInventoryByLocation('STORE', user.workplaceId)
-
       let productsData: ProductFromAPI[] = []
-      try {
-        productsData = await ProductAPIService.getAllProducts()
-      } catch {
-        productsData = []
-      }
-
+      try { productsData = await ProductAPIService.getAllProducts() } catch { productsData = [] }
       const productMap = new Map<string, ProductFromAPI>()
       productsData.forEach((p) => productMap.set(p.id, p))
-
       return inventoryData.map((item) => {
         const product = productMap.get(item.productId)
-        if (product) {
-          return mapApiProductToPOS(product)
-        }
-        return mapInventoryToPOS(item)
+        return product
+          ? mapApiProductToPOS(product as ProductFromAPI & Record<string, unknown>)
+          : mapInventoryToPOS(item)
       })
     }
 
     fetchProducts()
-      .then((data) => {
-        if (!cancelled) {
-          setProducts(data)
-        }
-      })
-      .catch((err) => {
+      .then((data) => { if (!cancelled) setProducts(data) })
+      .catch((err: Error) => {
         if (!cancelled) {
           setProducts([])
-          setProductError(err?.response?.data?.error || err?.message || 'Không thể tải danh sách sản phẩm')
+          const e = err as unknown as Record<string, unknown>
+          setProductError(
+            ((e?.response as Record<string, unknown>)?.data as Record<string, unknown>)?.error as string
+            || err?.message
+            || 'Không thể tải danh sách sản phẩm'
+          )
         }
       })
-      .finally(() => {
-        if (!cancelled) setLoadingProducts(false)
-      })
+      .finally(() => { if (!cancelled) setLoadingProducts(false) })
 
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [hydrated, user?.workplaceId, user?.workplaceType])
 
   useEffect(() => { if (scanning) scanRef.current?.focus() }, [scanning])
@@ -243,11 +255,10 @@ export default function POSPage() {
     })
   }, [])
 
-  const changeQty = (id: string, delta: number) =>
+  const changeQty  = (id: string, delta: number) =>
     setCart(prev => prev.map(x => x.id === id ? { ...x, qty: x.qty + delta } : x).filter(x => x.qty > 0))
-
-  const removeItem  = (id: string) => setCart(prev => prev.filter(x => x.id !== id))
-  const clearOrder  = () => {
+  const removeItem = (id: string) => setCart(prev => prev.filter(x => x.id !== id))
+  const clearOrder = () => {
     setCart([])
     setPaymentError(null)
     setPaymentResult(null)
@@ -258,137 +269,92 @@ export default function POSPage() {
     e.preventDefault()
     const normalized = scanValue.trim().replace(/^#/, '')
     const found = products.find(p => {
-      const skuNormalized = p.sku.replace(/^#/, '')
-      return p.sku === scanValue || p.id === scanValue || skuNormalized === normalized
+      const skuNorm = p.sku.replace(/^#/, '')
+      return p.sku === scanValue || p.id === scanValue || skuNorm === normalized
     })
     if (found) addToCart(found)
     setScanValue('')
     setScanning(false)
   }
 
-  const subTotal      = cart.reduce((s, x) => s + x.price * x.qty, 0)
-  const total           = subTotal
-  const cartCount       = cart.reduce((s, x) => s + x.qty, 0)
-
-  const categories = ['Tất cả', ...Array.from(new Set(products.map((p) => p.category).filter(Boolean)))]
-
+  const subTotal  = cart.reduce((s, x) => s + x.price * x.qty, 0)
+  const total     = subTotal
+  const cartCount = cart.reduce((s, x) => s + x.qty, 0)
+  const categories = ['Tất cả', ...Array.from(new Set(products.map(p => p.category).filter(Boolean)))]
   const filtered = products.filter(p => {
     const matchCat = category === 'Tất cả' || p.category === category
     const matchQ   = p.name.toLowerCase().includes(query.toLowerCase()) || p.sku.includes(query)
     return matchCat && matchQ
   })
 
+  // MoMo polling
   useEffect(() => {
-    if (!paymentResult?.saleId) return
-    if (paymentResult.paymentMethod !== 'MOMO') return
-    if (paymentDisplayStatus !== 'PENDING') return
-
+    if (!paymentResult?.saleId || paymentResult.paymentMethod !== 'MOMO' || paymentDisplayStatus !== 'PENDING') return
     let cancelled = false
     setIsPollingPayment(true)
 
     const poll = async () => {
       try {
         const token = useAuthStore.getState().token
-        const response = await fetch(`/api/sales/${paymentResult.saleId}?_ts=${Date.now()}`, {
-          method: 'GET',
-          cache: 'no-store',
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
+        const res = await fetch(`/api/sales/${paymentResult.saleId}?_ts=${Date.now()}`, {
+          method: 'GET', cache: 'no-store',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
         })
-
-        if (!response.ok) return
-
-        const latest = await response.json().catch(() => null)
+        if (!res.ok) return
+        const latest = await res.json().catch(() => null) as unknown
         if (!latest || cancelled) return
-
         const latestSale = normalizeSalePayload(latest)
-        const isComplete = isPaymentCompleted(latest)
-
-        setPaymentResult((prev) => {
-          if (!prev) return prev
-          return {
-            ...prev,
-            status: latestSale?.status ?? prev.status,
-            paymentStatus: latestSale?.paymentStatus ?? prev.paymentStatus,
-          }
-        })
-
-        if (isComplete) {
+        setPaymentResult(prev => prev ? {
+          ...prev,
+          status: (latestSale?.status as string) ?? prev.status,
+          paymentStatus: (latestSale?.paymentStatus as string) ?? prev.paymentStatus,
+        } : prev)
+        if (isPaymentCompleted(latest)) {
           setPaymentDisplayStatus('COMPLETE')
           setIsPollingPayment(false)
         }
-      } catch {
-        // Keep polling silently; temporary network issues should not break POS flow.
-      }
+      } catch { /* keep polling silently */ }
     }
 
     poll()
     const timer = window.setInterval(poll, 3000)
-
-    return () => {
-      cancelled = true
-      setIsPollingPayment(false)
-      window.clearInterval(timer)
-    }
+    return () => { cancelled = true; setIsPollingPayment(false); window.clearInterval(timer) }
   }, [paymentDisplayStatus, paymentResult?.paymentMethod, paymentResult?.saleId])
 
-  const getCashierId = () => {
+  const getCashierId = (): string => {
     const candidates = [
       user?.id,
-      (user as any)?.userId,
-      (user as any)?.cashierId,
-      (user as any)?.staffId,
       process.env.NEXT_PUBLIC_POS_CASHIER_ID,
       DEFAULT_POS_CASHIER_ID,
     ]
-
-    const found = candidates.find((value) => isGuid(value))
-    return found || ''
+    return (candidates.find(v => isGuid(v)) as string) || ''
   }
 
-  const getStoreId = () => {
+  const getStoreId = (): string => {
     const candidates = [
       user?.workplaceType === 'STORE' ? user?.workplaceId : null,
       user?.storeId,
-      (user as any)?.storeLocationId,
+      user?.storeLocationId,
       process.env.NEXT_PUBLIC_POS_STORE_ID,
       DEFAULT_POS_STORE_ID,
     ]
-
-    const found = candidates.find((value) => isGuid(value))
-    return found || ''
+    return (candidates.find(v => isGuid(v)) as string) || ''
   }
 
   const handleCheckout = async () => {
     if (cart.length === 0 || submittingPayment) return
-
-    const storeId = getStoreId()
+    const storeId   = getStoreId()
     const cashierId = getCashierId()
-
     if (!storeId || !cashierId) {
       setPaymentError('Thiếu thông tin cửa hàng hoặc thu ngân. Vui lòng đăng nhập lại.')
       return
     }
-
     setSubmittingPayment(true)
     setPaymentError(null)
     setPaymentResult(null)
     setPaymentDisplayStatus(null)
-
     try {
       const paymentMethod = payMethod === 'momo' ? 'MOMO' : 'CASH'
-      const payload = {
-        storeId,
-        cashierId,
-        paymentMethod,
-        items: cart.map((item) => ({
-          productId: item.id,
-          quantity: item.qty,
-        })),
-        notes: `POS payment via ${paymentMethod}`,
-      }
-
       const token = useAuthStore.getState().token
       const response = await fetch('/api/sales/simple', {
         method: 'POST',
@@ -396,28 +362,24 @@ export default function POSPage() {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          storeId, cashierId, paymentMethod,
+          items: cart.map(item => ({ productId: item.id, quantity: item.qty })),
+          notes: `POS payment via ${paymentMethod}`,
+        }),
       })
-
       const result = await response.json().catch(() => null)
-
       if (!response.ok) throw new Error(extractApiErrorMessage(result))
-
       const sale = result as SimpleSaleResponse
       setPaymentResult(sale)
-
-      if (paymentMethod === 'MOMO') {
-        const mappedStatus = isPaymentCompleted(sale)
-          ? 'COMPLETE'
-          : 'PENDING'
-        setPaymentDisplayStatus(mappedStatus)
-      } else {
-        setPaymentDisplayStatus('PAID')
-      }
-
+      setPaymentDisplayStatus(
+        paymentMethod === 'MOMO'
+          ? (isPaymentCompleted(sale) ? 'COMPLETE' : 'PENDING')
+          : 'PAID'
+      )
       setCart([])
-    } catch (err: any) {
-      setPaymentError(err?.message || 'Không thể thanh toán. Vui lòng thử lại.')
+    } catch (err: unknown) {
+      setPaymentError((err as Error)?.message || 'Không thể thanh toán. Vui lòng thử lại.')
     } finally {
       setSubmittingPayment(false)
     }
@@ -426,9 +388,7 @@ export default function POSPage() {
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden font-sans">
 
-      {/* ════════════════════════════════════════
-          LEFT — Product catalogue
-      ════════════════════════════════════════ */}
+      {/* ════ LEFT — Product catalogue ════ */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
         {/* Top bar */}
@@ -437,7 +397,6 @@ export default function POSPage() {
             <p className="text-base font-bold text-gray-900 leading-tight">Bách Hóa Xanh</p>
             <p className="text-xs text-green-600 font-semibold">POS Bán hàng</p>
           </div>
-
           <div className="flex-1 relative max-w-xl">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
@@ -447,7 +406,6 @@ export default function POSPage() {
               className="w-full pl-9 pr-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
             />
           </div>
-
           <button
             onClick={() => setScanning(true)}
             className="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm"
@@ -456,7 +414,6 @@ export default function POSPage() {
             Quét mã
             <kbd className="ml-1 px-1.5 py-0.5 text-[10px] bg-green-500 rounded font-mono tracking-wide">F2</kbd>
           </button>
-
           <div className="relative flex-shrink-0">
             <ShoppingCart className="w-6 h-6 text-gray-500" />
             {cartCount > 0 && (
@@ -528,7 +485,13 @@ export default function POSPage() {
                       {inCart.qty}
                     </span>
                   )}
-                  <div className="h-14 flex items-center justify-center text-4xl mb-2">{p.emoji}</div>
+                  <div className="h-14 flex items-center justify-center mb-2">
+                    <ProductImage
+                      src={p.imageUrl}
+                      alt={p.name}
+                      className="w-14 h-14 object-contain rounded-xl border border-gray-100 bg-gray-50"
+                    />
+                  </div>
                   <p className="text-[10px] text-gray-400 font-mono">{p.sku}</p>
                   <p className="text-xs font-semibold text-gray-800 leading-tight mt-0.5 line-clamp-2">{p.name}</p>
                   <p className="text-sm font-bold text-green-600 mt-1.5">{fmt(p.price)}</p>
@@ -549,9 +512,7 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* ════════════════════════════════════════
-          RIGHT — Cart + Payment
-      ════════════════════════════════════════ */}
+      {/* ════ RIGHT — Cart + Payment ════ */}
       <div className="w-[360px] flex-shrink-0 bg-white border-l border-gray-200 flex flex-col shadow-xl">
 
         {/* Order header */}
@@ -581,7 +542,14 @@ export default function POSPage() {
             <div className="divide-y divide-gray-50">
               {cart.map(item => (
                 <div key={item.id} className="flex items-center gap-3 px-2 py-3 rounded-xl hover:bg-gray-50 group transition-colors">
-                  <div className="text-2xl flex-shrink-0 w-8 text-center">{item.emoji}</div>
+                  {/* ✅ Ảnh thay vì emoji */}
+                  <div className="flex-shrink-0 w-10 h-10">
+                    <ProductImage
+                      src={item.imageUrl}
+                      alt={item.name}
+                      className="w-10 h-10 rounded-lg object-cover border border-gray-100 bg-gray-50"
+                    />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-gray-800 leading-tight truncate">{item.name}</p>
                     <p className="text-xs text-green-600 font-bold mt-0.5">{fmt(item.price)}</p>
@@ -630,7 +598,7 @@ export default function POSPage() {
               <span className="text-green-700 text-base">{fmt(total)}</span>
             </div>
 
-            {paymentDisplayStatus && (
+            {paymentDisplayStatus !== null && (
               <div className="pt-1.5 border-t border-gray-100 flex justify-between items-center">
                 <span className="text-[11px] text-gray-500">Trạng thái thanh toán</span>
                 <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${
@@ -651,16 +619,21 @@ export default function POSPage() {
               <div className="text-[11px] text-gray-500">Mã đơn: {paymentResult.saleNumber}</div>
             )}
 
-            {paymentResult?.paymentMethod === 'MOMO' && paymentResult?.momoPayUrl && paymentDisplayStatus === 'PENDING' && (
-              <a
-                href={paymentResult.momoPayUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center justify-center w-full mt-1 px-3 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition-colors"
-              >
-                Mở MoMo để thanh toán
-              </a>
-            )}
+            {/* ✅ FIX: thêm <a> tag đầy đủ — đây là lỗi chính ts(1128) */}
+            {paymentResult?.paymentMethod === 'MOMO'
+              && paymentResult?.momoPayUrl
+              && paymentDisplayStatus === 'PENDING'
+              && (
+                <a
+                  href={paymentResult.momoPayUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center justify-center w-full mt-1 px-3 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition-colors"
+                >
+                  Mở MoMo để thanh toán
+                </a>
+              )
+            }
 
             {paymentError && (
               <p className="text-[11px] text-red-600 font-medium">{paymentError}</p>
@@ -691,7 +664,7 @@ export default function POSPage() {
             </div>
           </div>
 
-          {/* Print row */}
+          {/* Print */}
           <div>
             <button className="w-full flex items-center justify-center gap-1.5 px-3 py-2 border border-gray-200 bg-white rounded-xl text-xs text-gray-500 hover:border-green-400 hover:text-green-600 transition-colors">
               <Receipt className="w-3.5 h-3.5" />
@@ -699,21 +672,24 @@ export default function POSPage() {
             </button>
           </div>
 
-          {/* Pay button */}
+          {/* Checkout button */}
           <button
             disabled={cart.length === 0}
             onClick={handleCheckout}
             className="w-full py-4 bg-green-600 hover:bg-green-700 active:bg-green-800 disabled:bg-gray-200 disabled:cursor-not-allowed text-white font-bold text-base rounded-2xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-green-200 disabled:shadow-none"
           >
             <CreditCard className="w-5 h-5" />
-            {submittingPayment ? 'Đang xử lý...' : cart.length === 0 ? 'Thanh toán ngay' : `Thanh toán — ${fmt(total)}`}
+            {submittingPayment
+              ? 'Đang xử lý...'
+              : cart.length === 0
+                ? 'Thanh toán ngay'
+                : `Thanh toán — ${fmt(total)}`
+            }
           </button>
         </div>
       </div>
 
-      {/* ════════════════════════════════════════
-          BARCODE SCANNER MODAL
-      ════════════════════════════════════════ */}
+      {/* ════ BARCODE SCANNER MODAL ════ */}
       {scanning && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md">
@@ -734,8 +710,6 @@ export default function POSPage() {
                 <X className="w-4 h-4 text-gray-600" />
               </button>
             </div>
-
-            {/* Scanner viewfinder */}
             <div className="w-full h-48 bg-gray-900 rounded-2xl mb-6 flex items-center justify-center relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-black/20" />
               <div className="w-52 h-36 border-2 border-green-400 rounded-xl relative">
@@ -747,7 +721,6 @@ export default function POSPage() {
               </div>
               <p className="absolute bottom-3 text-green-400 text-xs font-medium tracking-wide">Đang quét...</p>
             </div>
-
             <form onSubmit={handleBarcodeScan} className="space-y-3">
               <div className="relative">
                 <Scan className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -768,7 +741,6 @@ export default function POSPage() {
                 Xác nhận & thêm vào giỏ
               </button>
             </form>
-
             <p className="text-center text-xs text-gray-400 mt-4">
               Nhấn <kbd className="px-1.5 py-0.5 bg-gray-100 rounded font-mono text-[10px] text-gray-600">Esc</kbd> để đóng
             </p>

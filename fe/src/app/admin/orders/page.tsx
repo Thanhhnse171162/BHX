@@ -8,6 +8,14 @@ import { DataTable } from '@/shared/ui/DataTable'
 import Modal from '@/shared/ui/Modal'
 import { Button } from '@/shared/ui/Button'
 
+interface OrderItem {
+  productId: string
+  name: string
+  quantity: number
+  price: number
+  imageUrl?: string
+}
+
 interface OrderRow {
   id: string
   orderNumber: string
@@ -19,7 +27,10 @@ interface OrderRow {
   storeName: string
   createdAt: string
   updatedAt: string
+  items?: OrderItem[]
 }
+
+const DEFAULT_IMAGE = 'https://placehold.co/48x48?text=No+Image'
 
 const statusLabels: Record<string, string> = {
   PENDING: 'Pending',
@@ -53,9 +64,34 @@ export default function AdminOrderStatusPage() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return
+
+    // Build productId → image_url map from demo-products
+    const productImageMap: Record<string, string> = {}
+    try {
+      const productsRaw = window.localStorage.getItem('demo-products')
+      if (productsRaw) {
+        const products = JSON.parse(productsRaw) as Array<{
+          id: string
+          image_url?: string
+          imageUrl?: string
+        }>
+        products.forEach((p) => {
+          productImageMap[p.id] = p.image_url || p.imageUrl || DEFAULT_IMAGE
+        })
+      }
+    } catch {
+      // ignore
+    }
+
+    // Helper: enrich items with imageUrl
+    const enrichItems = (items?: OrderItem[]): OrderItem[] =>
+      (items || []).map((item) => ({
+        ...item,
+        imageUrl: productImageMap[item.productId] || DEFAULT_IMAGE,
+      }))
+
     const onlineRaw = window.localStorage.getItem('demo-online-orders')
     const posRaw = window.localStorage.getItem('demo-pos-orders')
-
     const all: OrderRow[] = []
 
     if (onlineRaw) {
@@ -70,6 +106,7 @@ export default function AdminOrderStatusPage() {
           storeName: string
           createdAt: string
           updatedAt: string
+          items?: OrderItem[]
         }>
         online.forEach((o) =>
           all.push({
@@ -83,6 +120,7 @@ export default function AdminOrderStatusPage() {
             storeName: o.storeName,
             createdAt: o.createdAt,
             updatedAt: o.updatedAt,
+            items: enrichItems(o.items),
           })
         )
       } catch {
@@ -102,6 +140,7 @@ export default function AdminOrderStatusPage() {
           storeName: string
           createdAt: string
           updatedAt: string
+          items?: OrderItem[]
         }>
         pos.forEach((o) =>
           all.push({
@@ -115,6 +154,7 @@ export default function AdminOrderStatusPage() {
             storeName: o.storeName,
             createdAt: o.createdAt,
             updatedAt: o.updatedAt,
+            items: enrichItems(o.items),
           })
         )
       } catch {
@@ -135,7 +175,9 @@ export default function AdminOrderStatusPage() {
     return matchesSearch && matchesType && matchesStatus
   })
 
-  const sorted = [...filtered].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  const sorted = [...filtered].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )
 
   return (
     <div className="p-6">
@@ -191,7 +233,7 @@ export default function AdminOrderStatusPage() {
           <EmptyState title="No Orders" description="No orders found" />
         ) : (
           <DataTable
-            data={sorted}
+            data={sorted as unknown as Record<string, unknown>[]}
             columns={[
               { key: 'orderNumber', label: 'Order Number' },
               {
@@ -202,7 +244,9 @@ export default function AdminOrderStatusPage() {
                   return (
                     <span
                       className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        type === 'ONLINE' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                        type === 'ONLINE'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-green-100 text-green-800'
                       }`}
                     >
                       {type}
@@ -213,12 +257,61 @@ export default function AdminOrderStatusPage() {
               {
                 key: 'customerName',
                 label: 'Customer',
+                // ✅ Fix: item as unknown as OrderRow
                 render: (_value, item) => {
-                  const o = item as OrderRow
+                  const o = item as unknown as OrderRow
                   return (
                     <div>
-                      <div className="font-medium text-gray-900">{o.customerName || (o.orderType === 'POS' ? 'Walk-in' : 'N/A')}</div>
-                      {o.customerPhone ? <div className="text-xs text-gray-500">{o.customerPhone}</div> : null}
+                      <div className="font-medium text-gray-900">
+                        {o.customerName ||
+                          (o.orderType === 'POS' ? 'Walk-in' : 'N/A')}
+                      </div>
+                      {o.customerPhone ? (
+                        <div className="text-xs text-gray-500">
+                          {o.customerPhone}
+                        </div>
+                      ) : null}
+                    </div>
+                  )
+                },
+              },
+              {
+                key: 'items',
+                label: 'Products',
+                // ✅ Fix: item as unknown as OrderRow
+                render: (_value, item) => {
+                  const o = item as unknown as OrderRow
+                  if (!o.items || o.items.length === 0)
+                    return <span className="text-gray-400 text-xs">—</span>
+
+                  const preview = o.items.slice(0, 3)
+                  const overflow = o.items.length - preview.length
+
+                  return (
+                    <div className="flex items-center gap-1">
+                      {preview.map((it, idx) => (
+                        <div key={idx} className="relative group">
+                          <img
+                            src={it.imageUrl || DEFAULT_IMAGE}
+                            alt={it.name}
+                            className="w-9 h-9 rounded-md object-cover border border-gray-200 bg-gray-50"
+                            onError={(e) => {
+                              ;(e.currentTarget as HTMLImageElement).src =
+                                DEFAULT_IMAGE
+                            }}
+                          />
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10 pointer-events-none">
+                            <div className="bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap max-w-[140px] truncate shadow-lg">
+                              {it.name} x{it.quantity}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {overflow > 0 && (
+                        <span className="w-9 h-9 rounded-md bg-gray-100 border border-gray-200 flex items-center justify-center text-xs font-medium text-gray-500">
+                          +{overflow}
+                        </span>
+                      )}
                     </div>
                   )
                 },
@@ -226,13 +319,22 @@ export default function AdminOrderStatusPage() {
               {
                 key: 'totalAmount',
                 label: 'Total Amount',
-                render: (value) => <span className="font-semibold text-gray-900">{Number(value).toLocaleString('vi-VN')} ₫</span>,
+                render: (value) => (
+                  <span className="font-semibold text-gray-900">
+                    {Number(value).toLocaleString('vi-VN')} ₫
+                  </span>
+                ),
               },
               {
                 key: 'status',
                 label: 'Status',
                 render: (value) => (
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[value as string] || 'bg-gray-100 text-gray-800'}`}>
+                  <span
+                    className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      statusColors[value as string] ||
+                      'bg-gray-100 text-gray-800'
+                    }`}
+                  >
                     {statusLabels[value as string] || (value as string)}
                   </span>
                 ),
@@ -241,8 +343,9 @@ export default function AdminOrderStatusPage() {
               {
                 key: 'id',
                 label: 'Actions',
+                // ✅ Fix: item as unknown as OrderRow
                 render: (_v, item) => {
-                  const o = item as OrderRow
+                  const o = item as unknown as OrderRow
                   return (
                     <Button
                       size="sm"
@@ -276,27 +379,80 @@ export default function AdminOrderStatusPage() {
         }
       >
         {selected ? (
-          <div className="space-y-3 text-sm">
-            <div className="p-3 bg-gray-50 rounded-lg">
+          <div className="space-y-4 text-sm">
+            <div className="p-3 bg-gray-50 rounded-lg space-y-1">
               <div>
-                <span className="text-gray-600">Type:</span> <span className="font-medium text-gray-900">{selected.orderType}</span>
+                <span className="text-gray-600">Type:</span>{' '}
+                <span className="font-medium text-gray-900">
+                  {selected.orderType}
+                </span>
               </div>
-              <div className="mt-1">
+              <div>
                 <span className="text-gray-600">Status:</span>{' '}
-                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${statusColors[selected.status] || 'bg-gray-100 text-gray-800'}`}>
+                <span
+                  className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                    statusColors[selected.status] || 'bg-gray-100 text-gray-800'
+                  }`}
+                >
                   {statusLabels[selected.status] || selected.status}
                 </span>
               </div>
-              <div className="mt-1">
-                <span className="text-gray-600">Store:</span> <span className="font-medium text-gray-900">{selected.storeName}</span>
+              <div>
+                <span className="text-gray-600">Store:</span>{' '}
+                <span className="font-medium text-gray-900">
+                  {selected.storeName}
+                </span>
               </div>
-              <div className="mt-1">
+              <div>
                 <span className="text-gray-600">Created:</span>{' '}
-                <span className="font-medium text-gray-900">{new Date(selected.createdAt).toLocaleString('vi-VN')}</span>
+                <span className="font-medium text-gray-900">
+                  {new Date(selected.createdAt).toLocaleString('vi-VN')}
+                </span>
               </div>
             </div>
-            <div className="text-gray-500">
-              Chi tiết đầy đủ: Online xem ở <span className="font-medium">/admin/orders/online</span>, POS xem ở <span className="font-medium">/admin/orders/pos</span>.
+
+            {selected.items && selected.items.length > 0 && (
+              <div>
+                <p className="font-semibold text-gray-700 mb-2">
+                  Sản phẩm ({selected.items.length})
+                </p>
+                <ul className="space-y-2">
+                  {selected.items.map((it, idx) => (
+                    <li
+                      key={idx}
+                      className="flex items-center gap-3 p-2 rounded-lg border border-gray-100 bg-white"
+                    >
+                      <img
+                        src={it.imageUrl || DEFAULT_IMAGE}
+                        alt={it.name}
+                        className="w-12 h-12 rounded-md object-cover border border-gray-200 bg-gray-50 flex-shrink-0"
+                        onError={(e) => {
+                          ;(e.currentTarget as HTMLImageElement).src =
+                            DEFAULT_IMAGE
+                        }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 truncate">
+                          {it.name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          x{it.quantity} &nbsp;·&nbsp;{' '}
+                          {it.price.toLocaleString('vi-VN')} ₫/sp
+                        </p>
+                      </div>
+                      <span className="font-semibold text-gray-800 whitespace-nowrap">
+                        {(it.price * it.quantity).toLocaleString('vi-VN')} ₫
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="text-gray-500 text-xs">
+              Chi tiết đầy đủ: Online xem ở{' '}
+              <span className="font-medium">/admin/orders/online</span>, POS xem
+              ở <span className="font-medium">/admin/orders/pos</span>.
             </div>
           </div>
         ) : null}
@@ -304,4 +460,3 @@ export default function AdminOrderStatusPage() {
     </div>
   )
 }
-
