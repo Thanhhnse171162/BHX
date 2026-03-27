@@ -9,7 +9,6 @@ import {
   Warehouse,
   ChevronLeft,
   ChevronRight,
-  AlertTriangle,
   X,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
@@ -538,7 +537,6 @@ function CreateTransferModal({
       if (!it.batchId) return false
       if (Number(it.requestedQuantity ?? 0) <= 0) return false
       if (Number(it.shippedQuantity ?? 0) <= 0) return false
-      if (Number(it.shippedQuantity ?? 0) > Number(it.currentQuantity ?? 0)) return false
     }
     return true
   }, [currentWarehouseId, toStoreId, expectedDelivery, userId, items])
@@ -550,9 +548,6 @@ function CreateTransferModal({
     if (!expectedDelivery) return setSubmitError('Vui lòng chọn ngày dự kiến giao.')
     if (!userId) return setSubmitError('Không tìm thấy người giao từ tài khoản.')
     if (!items.length) return setSubmitError('Vui lòng chọn ít nhất 1 sản phẩm.')
-
-    const invalid = items.find((it) => Number(it.shippedQuantity) > Number(it.currentQuantity))
-    if (invalid) return setSubmitError('SL xuất vượt tồn kho. Vui lòng chỉnh lại trước khi tạo phiếu.')
 
     try {
       setSubmitLoading(true)
@@ -702,21 +697,12 @@ function CreateTransferModal({
               <div className="space-y-3">
                 {items.map((it, idx) => {
                   const batchOptions = batchesByProductId[normalizeId(it.productId)] ?? []
-                  const currentQty = Number(it.currentQuantity ?? 0)
-                  const shippedQty = Number(it.shippedQuantity ?? 0)
-                  const isOverflow = shippedQty > currentQty
                   return (
                     <div key={`${it.productId}-${idx}`} className="border border-gray-100 rounded-xl p-3.5 bg-gray-50/50">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-[13px] font-semibold text-gray-800 truncate">{it.productName}</p>
                         </div>
-                        {isOverflow && (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-full">
-                            <AlertTriangle className="w-3.5 h-3.5" />
-                            SL vượt tồn kho
-                          </span>
-                        )}
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-6 gap-2 mt-3">
@@ -759,15 +745,6 @@ function CreateTransferModal({
                               setItems((prev) => prev.map((row, i) => (i === idx ? { ...row, shippedQuantity: v } : row)))
                             }}
                             className="w-full h-9 rounded-lg border border-gray-200 px-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-200"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-medium text-gray-500 mb-1">SL hiện có</label>
-                          <input
-                            readOnly
-                            value={currentQty}
-                            className="w-full h-9 rounded-lg border border-gray-200 px-2 text-sm bg-gray-50 text-center cursor-not-allowed"
                           />
                         </div>
 
