@@ -197,7 +197,7 @@ export default function StoreManagerDashboard() {
   return (
     <div className="p-6 space-y-5 min-h-full">
 
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-3">
         <Link
           href="/store-manager/inventory-check"
           className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors"

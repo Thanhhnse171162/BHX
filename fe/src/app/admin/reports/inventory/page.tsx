@@ -597,12 +597,7 @@ function InventoryFormModal({ open, onClose, onSuccess, editRow }: ModalProps) {
 // Main Page
 // ---------------------------------------------------------------------------
 
-interface InventoryReportsPageProps {
-  onExportPdf?:   () => void
-  onExportExcel?: () => void
-}
-
-export default function InventoryReportsPage({ onExportPdf, onExportExcel }: InventoryReportsPageProps) {
+export default function InventoryReportsPage() {
   // --- Data ---
   const [rawData,       setRawData]       = useState<InventoryReportRow[]>([])
   const [isLoading,     setIsLoading]     = useState(true)
@@ -743,14 +738,6 @@ export default function InventoryReportsPage({ onExportPdf, onExportExcel }: Inv
               className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 transition-all disabled:opacity-50">
               <span className={`text-base ${isLoading ? 'animate-spin' : ''}`}>🔄</span>
               <span className="hidden sm:inline">Làm mới</span>
-            </button>
-            <button onClick={onExportPdf} disabled={isLoading}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 transition-all disabled:opacity-50">
-              <span>📄</span><span className="hidden sm:inline">Xuất PDF</span>
-            </button>
-            <button onClick={onExportExcel} disabled={isLoading}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 transition-all disabled:opacity-50">
-              <span>📊</span><span className="hidden sm:inline">Xuất Excel</span>
             </button>
             {/* ← Primary CTA: mở modal tạo mới */}
             <button

@@ -30,6 +30,7 @@ const PRIMARY_NAV = [
   { href: '/store-manager',                          label: 'Tổng quan',            icon: LayoutDashboard, exact: true  },
   { href: '/store-manager/reports',                  label: 'Doanh thu',            icon: TrendingUp,      exact: false },
   { href: '/store-manager/discounts',                label: 'Giảm giá',             icon: BadgePercent,    exact: false },
+  { href: '/store-manager/products',                 label: 'Sản phẩm',            icon: Archive,         exact: false },
   // { href: '/store-manager/inventory',                label: 'Tồn kho kệ hàng',     icon: Archive,         exact: false },
   { href: '/store-manager/inventory-aux',            label: 'Tồn kho kho phụ',     icon: Warehouse,       exact: false },
   { href: '/store-manager/inventory-check',          label: 'Kiểm kê',             icon: ClipboardCheck,  exact: false },
@@ -47,6 +48,7 @@ function getPageTitle(pathname: string): string {
   if (pathname === '/store-manager') return 'Tổng Quan'
   if (pathname.startsWith('/store-manager/reports'))           return 'Doanh Thu'
   if (pathname.startsWith('/store-manager/discounts'))         return 'Giảm Giá'
+  if (pathname.startsWith('/store-manager/products'))          return 'Sản Phẩm'
   if (pathname.startsWith('/store-manager/inventory-aux'))     return 'Tồn Kho Phụ'
   if (pathname.startsWith('/store-manager/inventory-check'))   return 'Kiểm Kê'
   // if (pathname.startsWith('/store-manager/inventory'))         return 'Tồn Kho Kệ Hàng'
