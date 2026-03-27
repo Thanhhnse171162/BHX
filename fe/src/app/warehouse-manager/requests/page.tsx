@@ -232,7 +232,7 @@ export default function WarehouseManagerRequestsPage() {
   // Inventory Check Modal State
   const [isInventoryCheckModalOpen, setIsInventoryCheckModalOpen] = useState(false)
   const [newInventoryCheck, setNewInventoryCheck] = useState({
-    locationType: 'STORE' as 'STORE' | 'WAREHOUSE',
+    locationType: 'WAREHOUSE' as 'STORE' | 'WAREHOUSE',
     locationId: '',
     checkType: 'PARTIAL' as 'PARTIAL' | 'FULL',
     notes: '',
@@ -1843,19 +1843,12 @@ export default function WarehouseManagerRequestsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <label className="text-sm text-gray-600">
                   Loại vị trí
-                  <div className="relative mt-1">
-                    <select
-                      value={newInventoryCheck.locationType}
-                      onChange={(e) =>
-                        setNewInventoryCheck((prev) => ({ ...prev, locationType: e.target.value as 'STORE' | 'WAREHOUSE' }))
-                      }
-                      className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-200 text-sm"
-                    >
-                      <option value="STORE">Cửa hàng (STORE)</option>
-                      <option value="WAREHOUSE">Kho (WAREHOUSE)</option>
-                    </select>
-                    <ChevronDown className="w-3 h-3 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                  </div>
+                  <input
+                    type="text"
+                    value="Kho (WAREHOUSE)"
+                    disabled
+                    className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-300 bg-gray-50 text-sm text-gray-600"
+                  />
                 </label>
                 <label className="text-sm text-gray-600">
                   Chọn vị trí <span className="text-red-500">*</span>
@@ -1868,17 +1861,12 @@ export default function WarehouseManagerRequestsPage() {
                       }
                       className="w-full pl-8 pr-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-200 text-sm"
                     >
-                      <option value="">-- Chọn kho/cửa hàng --</option>
+                      <option value="">-- Chọn kho --</option>
                       {locations
-                        .filter((loc) => {
-                          if (newInventoryCheck.locationType === 'STORE') {
-                            return normalizeId(loc.parentId ?? loc.parent_id) === normalizedCurrentWarehouseId
-                          }
-                          return normalizeId(loc.id) === normalizedCurrentWarehouseId
-                        })
+                        .filter((loc) => normalizeId(loc.id) === normalizedCurrentWarehouseId)
                         .map((loc) => (
                           <option key={loc.id} value={loc.id}>
-                            {loc.name} ({loc.id})
+                            {loc.name}
                           </option>
                         ))}
                     </select>

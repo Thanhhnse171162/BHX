@@ -46,6 +46,7 @@ export default function StoreManagerInventoryCheckPage() {
   const [detailsError, setDetailsError] = useState<string | null>(null)
   const [detailsData, setDetailsData] = useState<InventoryCheckDto | null>(null)
   const [detailProductNameMap, setDetailProductNameMap] = useState<Map<string, string>>(new Map())
+  const [currentStoreName, setCurrentStoreName] = useState<string>('')
   const [createForm, setCreateForm] = useState<CreateCheckForm>({
     locationType: 'STORE',
     checkType: 'PARTIAL',
@@ -78,6 +79,18 @@ export default function StoreManagerInventoryCheckPage() {
 
   useEffect(() => {
     loadChecks()
+  }, [hydrated, user?.workplaceId])
+
+  useEffect(() => {
+    if (!hydrated || !user?.workplaceId) return
+    
+    WarehouseLookupAPIService.getById(String(user.workplaceId))
+      .then((warehouse) => {
+        setCurrentStoreName(warehouse?.name || String(user.workplaceId))
+      })
+      .catch(() => {
+        setCurrentStoreName(String(user.workplaceId))
+      })
   }, [hydrated, user?.workplaceId])
 
   useEffect(() => {
@@ -273,22 +286,18 @@ export default function StoreManagerInventoryCheckPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <label className="text-sm text-gray-600">
                   Loại vị trí
-                  <div className="relative mt-1">
-                    <select
-                      value={createForm.locationType}
-                      onChange={(e) => setCreateForm((prev) => ({ ...prev, locationType: e.target.value as 'STORE' | 'WAREHOUSE' }))}
-                      className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-200 text-sm"
-                    >
-                      <option value="STORE">Cửa hàng (STORE)</option>
-                      <option value="WAREHOUSE">Kho (WAREHOUSE)</option>
-                    </select>
-                  </div>
+                  <input
+                    type="text"
+                    value="Cửa hàng (STORE)"
+                    disabled
+                    className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-300 bg-gray-50 text-sm text-gray-600"
+                  />
                 </label>
 
                 <label className="text-sm text-gray-600">
                   Vị trí
                   <input
-                    value={String(user?.workplaceId || '')}
+                    value={currentStoreName}
                     disabled
                     className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-300 bg-gray-50 text-sm text-gray-600"
                   />
