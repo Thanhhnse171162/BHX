@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { RefreshCw, Edit2 } from 'lucide-react'
+import { RefreshCw, Edit2, Download } from 'lucide-react'
 import useAuthStore from '@/store/auth.store'
 import { InventoryAPIService, type InventoryItem } from '@/services/inventory-api.service'
 import { ProductAPIService, type ProductFromAPI } from '@/services/product-api.service'
@@ -62,6 +62,9 @@ export default function StoreManagerProductsPage() {
   const [minStockEditValue, setMinStockEditValue] = useState(0)
   const [isUpdatingMinStock, setIsUpdatingMinStock] = useState(false)
   const [minStockError, setMinStockError] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const [isExportConfirmOpen, setIsExportConfirmOpen] = useState(false)
+  const [errorModal, setErrorModal] = useState<{ title: string; message: string; details?: string } | null>(null)
 
   const { locationType, locationId } = useMemo(() => resolveLocationContext(user), [user])
 
@@ -220,6 +223,89 @@ export default function StoreManagerProductsPage() {
     }
   }
 
+  const handleExportExpiredBatches = () => {
+    setIsExportConfirmOpen(true)
+  }
+
+  const confirmExportExpiredBatches = async () => {
+    if (!token || !locationId) {
+      setErrorModal({
+        title: '❌ Lỗi',
+        message: 'Vui lòng đảm bảo bạn đã đăng nhập và được gán cửa hàng/kho.',
+      })
+      return
+    }
+
+    setExporting(true)
+    try {
+      const response = await fetch('http://localhost:5003/api/ProductBatch/expired-batches/create-outbound', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          warehouseId: locationId,
+          locationType: locationType || 'WAREHOUSE',
+          locationId: locationId,
+          notes: 'hết hạn',
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Không thể xuất lô hết hạn' }))
+        
+        // Phân tích lỗi từ backend
+        let errorTitle = 'Lỗi xuất lô hết hạn'
+        let errorMessage = error.message || 'Đã xảy ra lỗi khi xuất lô'
+        let errorDetails = ''
+
+        if (errorMessage.includes('Insufficient inventory')) {
+          errorTitle = '❌ Tồn kho không đủ'
+          errorMessage = 'Không thể xuất lô vì tồn kho không đủ.'
+          const match = errorMessage.match(/available (\d+).*required (\d+)/)
+          if (match) {
+            errorDetails = `Có sẵn: ${match[1]} đơn vị\nYêu cầu: ${match[2]} đơn vị`
+          }
+        } else if (errorMessage.includes('No expired batches')) {
+          errorTitle = '✅ Không có lô hết hạn'
+          errorMessage = 'Không có lô nào hết hạn trong kho hiện tại.'
+        }
+
+        setErrorModal({
+          title: errorTitle,
+          message: errorMessage,
+          details: errorDetails || undefined,
+        })
+        setIsExportConfirmOpen(false)
+        setExporting(false)
+        return
+      }
+
+      const data = await response.json()
+      const totalBatches = data.data?.totalBatchesProcessed || 0
+      const totalQty = data.data?.totalQuantityOutbound || 0
+      
+      setErrorModal({
+        title: '✅ Xuất lô thành công',
+        message: `Đã xuất ${totalBatches} lô hết hạn`,
+        details: `Tổng số lượng: ${totalQty} đơn vị`,
+      })
+      
+      setIsExportConfirmOpen(false)
+      setTimeout(() => setErrorModal(null), 2000)
+      await fetchInventory()
+    } catch (err) {
+      setErrorModal({
+        title: '❌ Lỗi kết nối',
+        message: err instanceof Error ? err.message : 'Không thể kết nối đến server',
+      })
+      setIsExportConfirmOpen(false)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div className="p-6 space-y-4 bg-[#f5f7fb] min-h-screen">
       <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -230,9 +316,15 @@ export default function StoreManagerProductsPage() {
             
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchInventory} className="gap-2" disabled={isLoading}>
-          <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} /> Làm mới
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={fetchInventory} className="gap-2" disabled={isLoading}>
+            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} /> Làm mới
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportExpiredBatches} className="gap-2" disabled={exporting} style={{ borderColor: '#dc2626', color: '#dc2626' }}>
+            <Download size={14} />
+            Xuất lô hết hạn
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -396,6 +488,78 @@ export default function StoreManagerProductsPage() {
           </p>
         </div>
       </Modal>
+
+      {isExportConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 space-y-4 shadow-lg">
+            <div className="flex items-start justify-between">
+              <h3 className="text-xl font-bold text-gray-900">Xuất lô hàng hết hạn</h3>
+              <button 
+                onClick={() => setIsExportConfirmOpen(false)}
+                disabled={exporting}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ×
+              </button>
+            </div>
+            
+            <p className="text-sm text-gray-700">
+              Bạn có chắc chắn muốn xuất tất cả các lô hàng hết hạn khỏi kho?
+            </p>
+
+            <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
+              <p className="text-sm text-blue-900">
+                ⓘ Hệ thống sẽ tạo phiếu xuất kho (outbound) cho tất cả các lô hàng có ngày hết hạn đã qua.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsExportConfirmOpen(false)}
+                disabled={exporting}
+                className="text-gray-700"
+              >
+                Hủy
+              </Button>
+              <button
+                onClick={confirmExportExpiredBatches}
+                disabled={exporting}
+                className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {exporting && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                {!exporting && <Download size={16} />}
+                {exporting ? 'Đang xử lý...' : 'Xuất ngay'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {errorModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 space-y-4 shadow-lg">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">{errorModal.title}</h3>
+              <p className="text-sm text-gray-600 mt-2">{errorModal.message}</p>
+              {errorModal.details && (
+                <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-sm text-gray-700 whitespace-pre-line">{errorModal.details}</p>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setErrorModal(null)}
+                className="text-gray-700"
+              >
+                Đóng
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

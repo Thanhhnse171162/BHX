@@ -1,12 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import axios from 'axios'
 import { useAuth } from '@/shared/hooks/useAuth'
 import { InventoryAPIService, InventoryItem } from '@/services/inventory-api.service'
 import { ProductAPIService } from '@/services/product-api.service'
-import { Package, AlertTriangle, Search, Filter, RefreshCw, Edit2 } from 'lucide-react'
+import { Package, AlertTriangle, Search, Filter, RefreshCw, Edit2, Package2 } from 'lucide-react'
 import Modal from '@/shared/ui/Modal'
 import { Input } from '@/shared/ui/Input'
+import { useAuthStore } from '@/store/auth.store'
 
 // Extended inventory item with product details
 interface InventoryWithProduct extends InventoryItem {
@@ -37,6 +39,12 @@ export default function WarehouseManagerInventoryPage() {
   const [minStockEditValue, setMinStockEditValue] = useState(0)
   const [isUpdatingMinStock, setIsUpdatingMinStock] = useState(false)
   const [minStockError, setMinStockError] = useState<string | null>(null)
+  // Export expired batches modal state
+  const [isExportExpiredModalOpen, setIsExportExpiredModalOpen] = useState(false)
+  const [isExportingExpired, setIsExportingExpired] = useState(false)
+  const [exportExpiredError, setExportExpiredError] = useState<string | null>(null)
+  const [exportExpiredSuccess, setExportExpiredSuccess] = useState<string | null>(null)
+  const [isNoExpiredBatchesModalOpen, setIsNoExpiredBatchesModalOpen] = useState(false)
 
   const fetchInventory = async () => {
     if (!user?.workplaceId) {
@@ -136,6 +144,72 @@ export default function WarehouseManagerInventoryPage() {
     setMinStockError(null)
   }
 
+  const handleExportExpiredBatches = async () => {
+    if (!user?.workplaceId) {
+      setExportExpiredError('Không tìm thấy thông tin kho')
+      return
+    }
+
+    setIsExportingExpired(true)
+    setExportExpiredError(null)
+    setExportExpiredSuccess(null)
+
+    try {
+      const token = useAuthStore.getState().token
+      const response = await axios.post(
+        'http://localhost:5003/api/ProductBatch/expired-batches/create-outbound',
+        {
+          warehouseId: user.workplaceId,
+          locationType: 'WAREHOUSE',
+          locationId: user.workplaceId,
+          notes: 'hết hạn'
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          }
+        }
+      )
+
+      if (response.data.success) {
+        // Check if any batches were found and processed
+        if (response.data.data.totalBatchesProcessed === 0) {
+          setIsExportExpiredModalOpen(false)
+          setIsNoExpiredBatchesModalOpen(true)
+        } else {
+          setExportExpiredSuccess(
+            `Đã xuất thành công: ${response.data.data.totalBatchesProcessed} lô hàng, ` +
+            `tổng số lượng ${response.data.data.totalQuantityOutbound} sản phẩm`
+          )
+          // Refresh inventory after successful export
+          setTimeout(() => {
+            fetchInventory()
+            setIsExportExpiredModalOpen(false)
+            setExportExpiredSuccess(null)
+          }, 2000)
+        }
+      }
+    } catch (error: any) {
+      console.error('Error exporting expired batches:', error)
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.detail ||
+        error?.message ||
+        'Lỗi khi xuất lô hết hạn. Vui lòng thử lại.'
+      
+      // Check if the error is about no expired batches found
+      if (errorMessage.toLowerCase().includes('no expired batches found')) {
+        setIsExportExpiredModalOpen(false)
+        setIsNoExpiredBatchesModalOpen(true)
+      } else {
+        setExportExpiredError(errorMessage)
+      }
+    } finally {
+      setIsExportingExpired(false)
+    }
+  }
+
   const handleUpdateMinStock = async () => {
     if (!minStockEditingId) return
 
@@ -202,13 +276,26 @@ export default function WarehouseManagerInventoryPage() {
           <h1 className="text-3xl font-bold text-gray-900">Quản lý tồn kho</h1>
           <p className="text-gray-600 mt-1">Quản lý hàng tồn kho và mức tồn kho</p>
         </div>
-        <button
-          onClick={fetchInventory}
-          className="flex items-center gap-2 px-4 py-2 bg-[#2d6e3e] text-white rounded-lg hover:bg-[#1e4d2b] transition-colors"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Làm mới
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              setIsExportExpiredModalOpen(true)
+              setExportExpiredError(null)
+              setExportExpiredSuccess(null)
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+          >
+            <Package2 className="w-4 h-4" />
+            Xuất lô hết hạn
+          </button>
+          <button
+            onClick={fetchInventory}
+            className="flex items-center gap-2 px-4 py-2 bg-[#2d6e3e] text-white rounded-lg hover:bg-[#1e4d2b] transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Làm mới
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -531,6 +618,104 @@ export default function WarehouseManagerInventoryPage() {
           <p className="text-sm text-gray-500">
             Giá trị này xác định khi nào hàng tồn kho được coi là thấp.
           </p>
+        </div>
+      </Modal>
+
+      {/* Export Expired Batches Modal */}
+      <Modal
+        isOpen={isExportExpiredModalOpen}
+        onClose={() => !isExportingExpired && setIsExportExpiredModalOpen(false)}
+        title="Xuất lô hàng hết hạn"
+        size="sm"
+        footer={
+          <div className="flex flex-col gap-3">
+            {exportExpiredError && (
+              <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+                {exportExpiredError}
+              </div>
+            )}
+            {exportExpiredSuccess && (
+              <div className="rounded-md bg-green-50 p-3 text-sm text-green-700">
+                {exportExpiredSuccess}
+              </div>
+            )}
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setIsExportExpiredModalOpen(false)}
+                disabled={isExportingExpired}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleExportExpiredBatches}
+                disabled={isExportingExpired}
+                className="px-4 py-2 rounded-lg bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isExportingExpired ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Đang xử lý...
+                  </>
+                ) : (
+                  <>
+                    <Package2 className="w-4 h-4" />
+                    Xuất ngay
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-gray-700">
+            Bạn có chắc chắn muốn xuất tất cả các lô hàng hết hạn khỏi kho?
+          </p>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-900">
+              ⓘ Hệ thống sẽ tạo phiếu xuất kho (outbound) cho tất cả các lô hàng có ngày hết hạn đã qua.
+            </p>
+          </div>
+        </div>
+      </Modal>
+
+      {/* No Expired Batches Found Modal */}
+      <Modal
+        isOpen={isNoExpiredBatchesModalOpen}
+        onClose={() => setIsNoExpiredBatchesModalOpen(false)}
+        title="Không có lô hàng hết hạn"
+        size="sm"
+        footer={
+          <div className="flex justify-end">
+            <button
+              onClick={() => setIsNoExpiredBatchesModalOpen(false)}
+              className="px-4 py-2 rounded-lg bg-[#2d6e3e] text-white hover:bg-[#1e4d2b]"
+            >
+              OK
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+          <div className="text-center space-y-2">
+            <p className="text-lg font-semibold text-gray-900">Không có lô hàng hết hạn</p>
+            <p className="text-gray-600">
+              Hiện tại tất cả các lô hàng trong kho của bạn đều còn hạn sử dụng. Không cần xuất kho lúc này.
+            </p>
+          </div>
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <p className="text-sm text-green-900">
+              ✓ Tồn kho của bạn đang ở trạng thái tốt!
+            </p>
+          </div>
         </div>
       </Modal>
     </div>
