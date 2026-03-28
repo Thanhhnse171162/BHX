@@ -10,8 +10,6 @@ import {
   SquareArrowOutUpRight,
   Truck,
   Warehouse,
-  Boxes,
-  PackageSearch,
   Zap,
 } from 'lucide-react'
 

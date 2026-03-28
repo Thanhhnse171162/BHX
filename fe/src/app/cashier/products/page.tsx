@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import {
   Search,
   SlidersHorizontal,
@@ -288,7 +288,7 @@ export default function CashierProductsPage() {
   const { user, hydrated } = useAuthStore()
 
   // Fetch data helper function
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     console.log('Fetching inventory and product data...')
 
     if (!user?.workplaceType || !user?.workplaceId) {
@@ -332,7 +332,7 @@ export default function CashierProductsPage() {
         return mapInventoryToProduct(item)
       }
     })
-  }
+  }, [user?.workplaceType, user?.workplaceId])
 
   // Fetch products from API
   useEffect(() => {
@@ -357,7 +357,7 @@ export default function CashierProductsPage() {
       })
     
     return () => { cancelled = true }
-  }, [hydrated, user?.workplaceType, user?.workplaceId])
+  }, [hydrated, fetchData])
 
   // Close filter panel on outside click
   useEffect(() => {

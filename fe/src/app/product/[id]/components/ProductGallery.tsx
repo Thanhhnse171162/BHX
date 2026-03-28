@@ -11,7 +11,10 @@ export const ProductGallery = memo(function ProductGallery({ images, productName
   const [activeIndex, setActiveIndex] = useState(0)
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
+    <div
+      className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200"
+      aria-label={productName ? `Ảnh sản phẩm: ${productName}` : 'Ảnh sản phẩm'}
+    >
       {/* Main Image */}
       <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden mb-4 flex items-center justify-center">
         <div className="text-9xl">{images[activeIndex]}</div>

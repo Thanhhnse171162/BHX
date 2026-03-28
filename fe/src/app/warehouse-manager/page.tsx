@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/shared/hooks/useAuth'
 import { InventoryAPIService } from '@/services/inventory-api.service'
@@ -19,7 +19,7 @@ export default function WarehouseManagerDashboard() {
   const [loading, setLoading] = useState(true)
 
   // Fetch inventory data
-  const fetchInventory = async () => {
+  const fetchInventory = useCallback(async () => {
     if (!user?.workplaceId) return
 
     try {
@@ -31,11 +31,11 @@ export default function WarehouseManagerDashboard() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user?.workplaceId])
 
   useEffect(() => {
-    fetchInventory()
-  }, [user?.workplaceId])
+    void fetchInventory()
+  }, [fetchInventory])
 
   // Calculate metrics from real data
   const totalProducts = inventory.length

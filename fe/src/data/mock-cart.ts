@@ -35,12 +35,19 @@ export const MOCK_CART_ITEMS = [
 ]
 
 // Function to populate cart with mock data (for testing)
-export function populateMockCart() {
+export async function populateMockCart() {
   if (typeof window === 'undefined') return
   
-  const { addItem } = require('@/store/cart.store').useCartStore.getState()
-  
-  MOCK_CART_ITEMS.forEach(item => {
-    addItem(item)
-  })
+  // Import dynamically to avoid SSR issues
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { useCartStore } = require('@/store/cart.store') as typeof import('@/store/cart.store')
+    const { addItem } = useCartStore.getState()
+    
+    MOCK_CART_ITEMS.forEach(item => {
+      addItem(item)
+    })
+  } catch (error) {
+    console.error('Failed to populate mock cart:', error)
+  }
 }

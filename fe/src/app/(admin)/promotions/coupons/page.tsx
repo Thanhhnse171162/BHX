@@ -229,7 +229,7 @@ export default function CouponsPage() {
   }
 
   const handleToggleStatus = (id: string) => {
-    const next = coupons.map((c) =>
+    const next: Coupon[] = coupons.map((c) =>
       c.id === id
         ? {
             ...c,

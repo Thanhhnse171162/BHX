@@ -70,11 +70,6 @@ export default function UsersPage() {
     loadRoles()
   }, [])
 
-  // Helper: sync state
-  const syncUsers = (next: User[]) => {
-    setUsers(next)
-  }
-
   // Validate password
   const validatePassword = (pwd: string): string => {
     if (!pwd) return 'Mật khẩu là bắt buộc'

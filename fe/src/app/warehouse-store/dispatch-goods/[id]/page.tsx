@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Download, Send, X, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Download, Send, Plus, Trash2 } from 'lucide-react'
 
 interface DispatchItem {
   id: string

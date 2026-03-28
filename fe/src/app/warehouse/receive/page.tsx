@@ -1,7 +1,7 @@
 
 "use client";
 import React, { useRef, useState } from "react";
-import { PlusIcon, QrCodeIcon, DocumentArrowUpIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
 
 const initialProducts = [
   {
@@ -35,14 +35,9 @@ export default function ReceiveWarehousePage() {
   // Summary
   const totalSKU = products.length;
   const totalQty = products.reduce((sum, p) => sum + p.request, 0);
-  const totalReceived = products.reduce((sum, p) => sum + p.received, 0);
+  // const totalReceived = products.reduce((sum, p) => sum + p.received, 0);
 
   // Handlers
-  const handleReceivedChange = (id: number, value: number) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, received: value } : p))
-    );
-  };
   const handleDelete = (id: number) => {
     setProducts((prev) => prev.filter((p) => p.id !== id));
   };

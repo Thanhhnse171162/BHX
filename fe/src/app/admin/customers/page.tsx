@@ -23,11 +23,6 @@ interface CustomerRow {
   createdAt: string
 }
 
-const statusColors: Record<CustomerStatus, string> = {
-  ACTIVE: 'bg-green-100 text-green-800',
-  INACTIVE: 'bg-gray-100 text-gray-800',
-}
-
 export default function AdminCustomersPage() {
   const [customers, setCustomers] = useState<CustomerRow[]>([])
   const [query, setQuery] = useState('')
@@ -247,7 +242,7 @@ export default function AdminCustomersPage() {
               {
                 key: 'status',
                 label: 'Status',
-                render: (v, item) => {
+                render: (_v, item) => {
                   const c = item as CustomerRow
                   return (
                     <select

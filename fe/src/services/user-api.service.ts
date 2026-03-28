@@ -116,7 +116,7 @@ export class UserAPIService {
       if (Array.isArray(payload)) return payload as UserInfoFromAPI[]
       if (payload?.data && Array.isArray(payload.data)) return payload.data as UserInfoFromAPI[]
       return []
-    } catch (error) {
+    } catch {
       // Silently return empty array on any error
       return []
     }

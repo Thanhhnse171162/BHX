@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/store/auth.store'
 import { PageHeader } from '@/shared/ui/PageHeader'
 import { Button } from '@/shared/ui/Button'
@@ -8,7 +8,6 @@ import { EmptyState } from '@/shared/ui/EmptyState'
 import { Input } from '@/shared/ui/Input'
 import { DataTable } from '@/shared/ui/DataTable'
 import Modal from '@/shared/ui/Modal'
-import { FilterBar } from '@/shared/ui/FilterBar'
 import { Toast } from '@/shared/ui/Toast'
 import type { 
   AdminWarehouse, 
@@ -70,7 +69,7 @@ export default function WarehousesAdminPage() {
   const [availableWarehouses, setAvailableWarehouses] = useState<AdminWarehouse[]>([])
 
   // Filter state
-  const [filters, setFilters] = useState<AdminWarehouseFilters>({
+  const [filters] = useState<AdminWarehouseFilters>({
     id: '',
     name: '',
     location: '',
@@ -91,8 +90,13 @@ export default function WarehousesAdminPage() {
     }))
   }
 
+  const showToast = useCallback((message: string, type: 'success' | 'error') => {
+    setToast({ show: true, message, type })
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000)
+  }, [])
+
   // Fetch warehouses
-  const fetchWarehouses = async () => {
+  const fetchWarehouses = useCallback(async () => {
     setLoading(true)
     setCurrentPage(1) // Reset to page 1 when fetching new data
     try {
@@ -130,16 +134,11 @@ export default function WarehousesAdminPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [token, filters, showToast])
 
   useEffect(() => {
-    fetchWarehouses()
-  }, []) // Initial load
-
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ show: true, message, type })
-    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000)
-  }
+    void fetchWarehouses()
+  }, [fetchWarehouses])
 
   // Fetch all warehouses for parent selection dropdown
   const fetchAllWarehousesForParent = async () => {
@@ -227,7 +226,7 @@ export default function WarehousesAdminPage() {
         try {
           const data = await response.json()
           errorMessage = data.message || errorMessage
-        } catch (e) {
+        } catch (_e) {
           const text = await response.text()
           console.log('Response text:', text)
         }
@@ -281,7 +280,7 @@ export default function WarehousesAdminPage() {
           try {
             const data = await response.json()
             errorMessage = data.message || errorMessage
-          } catch (e) {
+          } catch (_e) {
             const text = await response.text()
             console.log('Response text:', text)
           }
@@ -317,7 +316,7 @@ export default function WarehousesAdminPage() {
           try {
             const data = await response.json()
             errorMessage = data.message || errorMessage
-          } catch (e) {
+          } catch (_e) {
             const text = await response.text()
             console.log('Response text:', text)
           }
@@ -328,31 +327,6 @@ export default function WarehousesAdminPage() {
       console.error('Error submitting form:', error)
       showToast('An error occurred', 'error')
     }
-  }
-
-  const handleFilterChange = (field: string, value: string) => {
-    setFilters(prev => ({ ...prev, [field]: value }))
-  }
-
-  const handleApplyFilters = () => {
-    fetchWarehouses()
-  }
-
-  const handleResetFilters = () => {
-    setFilters({
-      id: '',
-      name: '',
-      location: '',
-      capacityMin: '',
-      capacityMax: '',
-      status: '',
-      isDeleted: '0',
-      createdAtFrom: '',
-      createdAtTo: '',
-      createdBy: '',
-    })
-    // Fetch will be triggered by useEffect or you can call it directly
-    setTimeout(() => fetchWarehouses(), 100)
   }
 
   const formatDate = (dateString: unknown) => {

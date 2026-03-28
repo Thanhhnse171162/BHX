@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Search, Package, TrendingUp, AlertTriangle, XCircle, ChevronLeft, ChevronRight, Edit2 } from 'lucide-react'
 import { Button } from '@/shared/ui/Button'
 import { Input } from '@/shared/ui/Input'
@@ -56,12 +56,7 @@ export default function InventoryPage() {
     ? (warehouseNames[user.workplaceId.toLowerCase()] || warehouseNames[user.workplaceId] || 'Địa điểm chưa xác định')
     : 'Địa điểm chưa xác định'
 
-  useEffect(() => {
-    if (!hydrated) return
-    fetchData()
-  }, [hydrated, user?.workplaceType, user?.workplaceId])
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setIsLoading(true)
       setError(null)
@@ -112,7 +107,12 @@ export default function InventoryPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [user?.workplaceType, user?.workplaceId, locationName])
+
+  useEffect(() => {
+    if (!hydrated) return
+    void fetchData()
+  }, [hydrated, fetchData])
 
   // Calculate stats (from all inventory items)
   const stats = useMemo(() => {
@@ -153,7 +153,7 @@ export default function InventoryPage() {
   const totalPages = Math.ceil(filteredData.length / itemsPerPage)
 
   // Reset to page 1 when filters change
-  useMemo(() => {
+  useEffect(() => {
     setCurrentPage(1)
   }, [searchTerm, filterTab])
 

@@ -8,7 +8,6 @@ import {
   Circle,
   MessageSquare,
   Wrench,
-  Plus,
   X,
   Search,
   Filter,

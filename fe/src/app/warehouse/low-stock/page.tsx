@@ -36,7 +36,7 @@ export default function LowStockPage() {
   // Filter and sort items
   const filteredAndSortedItems = useMemo(() => {
     // Filter by search query
-    let filtered = lowStockItems.filter(item => 
+    const filtered = lowStockItems.filter(item => 
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.category.toLowerCase().includes(searchQuery.toLowerCase())

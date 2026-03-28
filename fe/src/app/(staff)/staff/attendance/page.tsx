@@ -1,6 +1,5 @@
 'use client'
 
-import { useAuthStore } from '@/store/auth.store'
 import { useState } from 'react'
 
 interface AttendanceRecord {
@@ -22,7 +21,6 @@ const mockAttendance: AttendanceRecord[] = [
 ]
 
 export default function AttendancePage() {
-  const { user } = useAuthStore()
   const [isCheckedIn, setIsCheckedIn] = useState(false)
   const currentTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
 

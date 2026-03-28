@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { PageHeader } from '@/shared/ui/PageHeader'
 import { Button } from '@/shared/ui/Button'
 import { EmptyState } from '@/shared/ui/EmptyState'
@@ -37,6 +38,32 @@ interface OrderItem {
 }
 
 const DEFAULT_IMAGE = 'https://placehold.co/48x48?text=No+Image'
+
+function PosItemThumb({
+  src,
+  alt,
+  className,
+}: {
+  src: string
+  alt: string
+  className?: string
+}) {
+  const [url, setUrl] = useState(src)
+  useEffect(() => {
+    setUrl(src)
+  }, [src])
+  return (
+    <Image
+      src={url}
+      alt={alt}
+      width={40}
+      height={40}
+      className={className}
+      unoptimized
+      onError={() => setUrl(DEFAULT_IMAGE)}
+    />
+  )
+}
 
 const statusLabels = {
   COMPLETED: 'Completed',
@@ -351,14 +378,10 @@ export default function AdminPOSOrdersPage() {
                     key={idx}
                     className="flex items-center gap-2 bg-white rounded-lg px-2 py-2 shadow-sm"
                   >
-                    <img
+                    <PosItemThumb
                       src={imgUrl}
                       alt={it.productName}
                       className="w-10 h-10 rounded object-cover border flex-shrink-0 bg-gray-100"
-                      onError={(e) => {
-                        const img = e.currentTarget as HTMLImageElement
-                        if (img.src !== DEFAULT_IMAGE) img.src = DEFAULT_IMAGE
-                      }}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-gray-900 text-sm truncate">
@@ -428,14 +451,10 @@ export default function AdminPOSOrdersPage() {
                       key={idx}
                       className="flex items-center gap-3 text-sm"
                     >
-                      <img
+                      <PosItemThumb
                         src={imgUrl}
                         alt={it.productName}
                         className="w-10 h-10 rounded object-cover border flex-shrink-0 bg-gray-100"
-                        onError={(e) => {
-                          const img = e.currentTarget as HTMLImageElement
-                          if (img.src !== DEFAULT_IMAGE) img.src = DEFAULT_IMAGE
-                        }}
                       />
                       <div className="flex-1 text-gray-900">
                         <span className="font-medium">{it.productName}</span>{' '}

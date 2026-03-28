@@ -1,8 +1,5 @@
 'use client'
 
-import { useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { useUIStore } from '@/store/ui.store'
 import { getAdminNavigation } from '@/shared/config/nav'
@@ -11,8 +8,7 @@ import { LogoutButton } from '@/shared/ui/LogoutButton'
 import { AdminSidebar } from '@/shared/ui/Sidebar/AdminSidebar'
 
 function AdminShell({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
-  const { user, logout } = useAuthStore()
+  const { user } = useAuthStore()
   const { sidebarOpen, toggleSidebar } = useUIStore()
 
   const navGroups = getAdminNavigation()

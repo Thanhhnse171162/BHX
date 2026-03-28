@@ -165,7 +165,7 @@ export default function PurchaseRequestsPage() {
       setLoadError(null)
 
       // Load products to map productId → name
-      let productMap: Record<string, string> = {}
+      const productMap: Record<string, string> = {}
       try {
         const products = await ProductAPIService.getAllProducts()
         for (const p of products) {
@@ -176,7 +176,7 @@ export default function PurchaseRequestsPage() {
       }
 
       // Load users to map userId → userName
-      let userMap: Record<string, string> = {}
+      const userMap: Record<string, string> = {}
       try {
         const users = await UserAPIService.getAll()
         for (const u of users) {

@@ -8,7 +8,6 @@ import { DataTable } from '@/shared/ui/DataTable'
 import { EmptyState } from '@/shared/ui/EmptyState'
 
 type TransactionType = 'REVENUE' | 'COGS' | 'OPERATING_EXPENSE' | 'OTHER_INCOME' | 'OTHER_EXPENSE'
-type PeriodType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY'
 
 interface FinancialTransaction extends Record<string, unknown> {
   id: string

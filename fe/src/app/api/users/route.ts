@@ -3,7 +3,7 @@ import { executeQuery } from '@/lib/db/config'
 import bcrypt from 'bcryptjs'
 
 // GET /api/users - List all users
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const query = `
       SELECT 

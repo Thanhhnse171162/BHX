@@ -1,6 +1,6 @@
  'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
 import { InventoryAPIService, InventoryItem } from '@/services/inventory-api.service'
 import { CategoryAPIService, CategoryFromAPI } from '@/services/category-api.service'
@@ -116,13 +116,7 @@ export default function ProductsPage() {
   }, [products.length])
 
   // Fetch products từ API backend
-  useEffect(() => {
-    fetchProducts()
-    fetchCategories()
-    fetchSuppliers()
-  }, [])
-
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       const data = await CategoryAPIService.getAllCategories()
       const activeCategories = data.filter((c) => {
@@ -144,9 +138,9 @@ export default function ProductsPage() {
     } catch (err) {
       console.error('Error loading categories:', err)
     }
-  }
+  }, [])
 
-  const fetchSuppliers = async () => {
+  const fetchSuppliers = useCallback(async () => {
     try {
       const data = await supplierService.getSuppliers()
       const activeSuppliers = data.filter((s) => {
@@ -158,9 +152,9 @@ export default function ProductsPage() {
     } catch (err) {
       console.error('Error loading suppliers:', err)
     }
-  }
+  }, [])
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       setIsLoading(true)
       setError(null)
@@ -240,7 +234,13 @@ export default function ProductsPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    void fetchProducts()
+    void fetchCategories()
+    void fetchSuppliers()
+  }, [fetchProducts, fetchCategories, fetchSuppliers])
 
   const handleOpenCreate = () => {
     setMode('create')

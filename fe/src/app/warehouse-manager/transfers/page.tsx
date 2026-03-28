@@ -864,7 +864,7 @@ export default function WarehouseManagerTransfersPage() {
     const storeCandidates = candidates.filter((c: { id: string; name: string }) => normalizeId(c.id).startsWith('b'))
     const finalOptions = (storeCandidates.length > 0 ? storeCandidates : candidates).sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, 'vi'))
     setStoreOptions(finalOptions)
-  }, [token, normalizedCurrentWarehouseId, currentWarehouseId])
+  }, [token, normalizedCurrentWarehouseId])
 
   const loadTransfers = useCallback(async () => {
     if (!token) return

@@ -76,7 +76,6 @@ export function getRedirectPath(role: UserRole): string {
     WAREHOUSE_STAFF: '/warehouse-store',
     STAFF: '/cashier',                 // Store Staff (role 4) → cashier portal
     CUSTOMER: '/customer',
-      WAREHOUSE_STAFF: '/warehouse-store', // Restore old path for Warehouse Staff
   }
   return paths[role] || '/'
 }

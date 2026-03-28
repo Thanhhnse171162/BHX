@@ -391,7 +391,7 @@ export default function CreateDispatchPage() {
               <li>• Chọn kho nguồn và cửa hàng đích</li>
               <li>• Thêm các sản phẩm cần xuất</li>
               <li>• Kiểm tra vị trí kho chính xác</li>
-              <li>• Nhấn "Lưu phiếu" để hoàn tất</li>
+              <li>• Nhấn &quot;Lưu phiếu&quot; để hoàn tất</li>
             </ul>
           </div>
         </div>

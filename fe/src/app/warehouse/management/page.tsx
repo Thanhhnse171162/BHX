@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/store/auth.store'
 import { PageHeader } from '@/shared/ui/PageHeader'
 import { Button } from '@/shared/ui/Button'
@@ -160,7 +160,7 @@ export default function WarehouseManagementPage() {
   }
 
   // Fetch sub-warehouses for the current user's workplace
-  const fetchSubWarehouses = async () => {
+  const fetchSubWarehouses = useCallback(async () => {
     if (!user?.workplaceId) {
       setError('Unable to determine your warehouse location')
       setWarehouses([])
@@ -203,11 +203,11 @@ export default function WarehouseManagementPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user?.workplaceId, token])
 
   useEffect(() => {
-    fetchSubWarehouses()
-  }, [user?.workplaceId, token])
+    void fetchSubWarehouses()
+  }, [fetchSubWarehouses])
 
   const statusLabels: Record<string, string> = {
     ACTIVE: 'Active',

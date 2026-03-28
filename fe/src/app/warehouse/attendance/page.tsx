@@ -153,7 +153,7 @@ export default function AttendancePage() {
       {/* Attendance Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-6 border-b border-gray-200 bg-gray-50">
-          <h2 className="text-lg font-bold text-gray-900">Today's Attendance</h2>
+          <h2 className="text-lg font-bold text-gray-900">Today&apos;s Attendance</h2>
         </div>
 
         <div className="overflow-x-auto">

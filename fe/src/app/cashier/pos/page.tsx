@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import {
   Search, Scan, Plus, Minus, Trash2, CreditCard,
   Banknote, Wallet, X, ChevronRight, Package,
@@ -153,19 +154,26 @@ const fmt = (n: number) =>
 
 // ✅ ProductImage — tự fallback, tránh onError loop
 function ProductImage({
-  src, alt, className,
+  src,
+  alt,
+  className,
+  size = 56,
 }: {
   src?: string | null
   alt: string
   className?: string
+  size?: number
 }) {
   const [errored, setErrored] = useState(false)
   const imgSrc = !src || errored ? DEFAULT_IMAGE : src
   return (
-    <img
+    <Image
       src={imgSrc}
       alt={alt}
+      width={size}
+      height={size}
       className={className}
+      unoptimized
       onError={() => setErrored(true)}
     />
   )
@@ -547,6 +555,7 @@ export default function POSPage() {
                     <ProductImage
                       src={item.imageUrl}
                       alt={item.name}
+                      size={40}
                       className="w-10 h-10 rounded-lg object-cover border border-gray-100 bg-gray-50"
                     />
                   </div>

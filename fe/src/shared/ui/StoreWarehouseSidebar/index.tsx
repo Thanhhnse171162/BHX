@@ -6,7 +6,6 @@ import {
   LayoutDashboard, 
   Warehouse,
   PlusSquare,
-  ArrowLeftRight,
   BarChart3,
   Archive,
   Boxes,

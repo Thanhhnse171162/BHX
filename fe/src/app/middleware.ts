@@ -4,6 +4,7 @@ import type { NextRequest } from 'next/server'
 // Middleware is disabled because auth is now handled client-side only (in-memory, no persistence)
 // Client-side RouteGuard components handle route protection
 export function middleware(request: NextRequest) {
+  void request
   return NextResponse.next()
 }
 

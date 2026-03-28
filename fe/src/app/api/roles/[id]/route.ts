@@ -103,8 +103,8 @@ export async function PUT(
  * Backend chưa có endpoint này
  */
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  _request: NextRequest,
+  _context: { params: { id: string } }
 ) {
   return NextResponse.json(
     { 

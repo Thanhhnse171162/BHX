@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   Calendar,
@@ -78,7 +78,7 @@ export default function CashierInventoryCheckPage() {
   const [detailsData, setDetailsData] = useState<InventoryCheckDto | null>(null)
   const [detailProductNameMap, setDetailProductNameMap] = useState<Map<string, string>>(new Map())
 
-  const loadChecks = async () => {
+  const loadChecks = useCallback(async () => {
     if (!hydrated || !user?.workplaceId) {
       setChecks([])
       return
@@ -100,11 +100,11 @@ export default function CashierInventoryCheckPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [hydrated, user?.workplaceId])
 
   useEffect(() => {
-    loadChecks()
-  }, [hydrated, user?.workplaceId])
+    void loadChecks()
+  }, [loadChecks])
 
   const filteredChecks = useMemo(() => {
     const keyword = search.trim().toLowerCase()

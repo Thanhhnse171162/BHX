@@ -3,7 +3,7 @@
 import { useAuth } from '@/shared/hooks/useAuth'
 import { LogoutButton } from '@/shared/ui/LogoutButton'
 import { Avatar } from '@/shared/ui/Avatar'
-import { User, LogOut, ChevronDown } from 'lucide-react'
+import { User, ChevronDown } from 'lucide-react'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 

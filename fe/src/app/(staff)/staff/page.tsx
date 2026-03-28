@@ -2,7 +2,7 @@
 
 import { useAuthStore } from '@/store/auth.store'
 import Link from 'next/link'
-import { Clock, CheckSquare, Calendar, Edit2, BarChart2, ThumbsUp, Star, Award, Building2 } from 'lucide-react'
+import { Clock, CheckSquare, Calendar } from 'lucide-react'
 
 export default function StaffDashboard() {
   const { user } = useAuthStore()

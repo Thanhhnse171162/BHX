@@ -372,7 +372,11 @@ export default function WarehouseRequestsPage() {
         } catch { /* ignore */ }
       }
       setRequests(data)
-      if (data.length > 0 && !selectedRequest) setSelectedRequest(data[0])
+      setSelectedRequest((prev) => {
+        if (data.length === 0) return null
+        if (prev && data.some((r) => r.id === prev.id)) return prev
+        return data[0]
+      })
     } catch {
       setError('Không thể tải danh sách yêu cầu. Vui lòng thử lại.')
     } finally {
@@ -426,7 +430,7 @@ export default function WarehouseRequestsPage() {
     }
     fetchProducts()
     fetchWarehouses()
-  }, [token, workplaceId, isWarehouseAdmin])
+  }, [token, workplaceId, isWarehouseAdmin, fetchRequests, fetchTransfers])
 
   // ── Resolve user names ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -451,6 +455,7 @@ export default function WarehouseRequestsPage() {
       })
     })()
     return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- userNameMap omitted: only to skip resolved ids
   }, [token, requests, user?.id])
 
   // ── Resolve warehouse names ────────────────────────────────────────────────
@@ -481,6 +486,7 @@ export default function WarehouseRequestsPage() {
       })
     })()
     return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- warehouseNameMap omitted: only to skip resolved ids
   }, [token, requests])
 
   // ── Load batches for transfer modal ───────────────────────────────────────
@@ -522,7 +528,7 @@ export default function WarehouseRequestsPage() {
     } else {
       setTransferSourceRequest(null)
     }
-  }, [transferRestockRequestId, showTransferModal, requests])
+  }, [transferRestockRequestId, showTransferModal, requests, user?.id])
 
   // ── Filters ────────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -557,8 +563,13 @@ export default function WarehouseRequestsPage() {
   const reqPagination = usePagination(filtered, 10)
   const trPagination = usePagination(filteredTransfers, 10)
 
-  useEffect(() => { reqPagination.reset() }, [search, statusFilter, priorityFilter])
-  useEffect(() => { trPagination.reset() }, [transferSearch, transferStatusFilter])
+  useEffect(() => {
+    reqPagination.reset()
+  }, [search, statusFilter, priorityFilter, reqPagination.reset]) // eslint-disable-line react-hooks/exhaustive-deps -- reset only on filter change
+
+  useEffect(() => {
+    trPagination.reset()
+  }, [transferSearch, transferStatusFilter, trPagination.reset]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!selectedRequest) return
@@ -566,7 +577,7 @@ export default function WarehouseRequestsPage() {
     if (!isVisible && reqPagination.paginated.length > 0) {
       setSelectedRequest(reqPagination.paginated[0])
     }
-  }, [reqPagination.paginated])
+  }, [reqPagination.paginated, selectedRequest])
 
   // ── Transfer request options ───────────────────────────────────────────────
   const transferRequestOptions = useMemo(

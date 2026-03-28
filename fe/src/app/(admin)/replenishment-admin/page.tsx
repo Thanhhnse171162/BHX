@@ -271,7 +271,7 @@ export default function ReplenishmentAdminRequestsPage() {
     } finally {
       setLoading(false)
     }
-  }, [token, user?.warehouseId, user?.workplaceId])
+  }, [token, user?.warehouseId, user?.workplaceId, user?.roleId])
 
   useEffect(() => {
     if (!token) return
@@ -367,6 +367,7 @@ export default function ReplenishmentAdminRequestsPage() {
     warehouseNameMap,
     userNameMap,
     resolvedParentWarehouseId,
+    parentWarehouseName,
   ])
 
   const getCreatorLabel = (id?: string | null) => {

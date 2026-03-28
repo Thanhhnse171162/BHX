@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useRef } from 'react'
+import Image from 'next/image'
 import { Camera } from 'lucide-react'
 
 interface AvatarProps {
@@ -79,6 +80,7 @@ export const Avatar = ({
     <div className={`relative inline-block ${className}`}>
       <div
         className={`
+          relative
           ${sizeClasses[size]}
           rounded-full overflow-hidden
           ${editable ? 'cursor-pointer' : ''}
@@ -90,7 +92,18 @@ export const Avatar = ({
         onClick={handleClick}
       >
         {imageSrc ? (
-          <img src={imageSrc} alt={name} className="w-full h-full object-cover" />
+          <Image
+            src={imageSrc}
+            alt={name || 'Avatar'}
+            fill
+            sizes="(max-width: 768px) 128px, 128px"
+            className="object-cover"
+            unoptimized={
+              imageSrc.startsWith('data:') ||
+              imageSrc.startsWith('blob:') ||
+              !/^https?:\/\//i.test(imageSrc)
+            }
+          />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center font-semibold">
             {getInitials(name)}

@@ -18,7 +18,7 @@ export default function OutOfStockPage() {
 
   // Filter và sort items
   const filteredItems = useMemo(() => {
-    let filtered = outOfStockItems.filter(item => {
+    const filtered = outOfStockItems.filter(item => {
       const searchLower = searchQuery.toLowerCase()
       return (
         item.name.toLowerCase().includes(searchLower) ||

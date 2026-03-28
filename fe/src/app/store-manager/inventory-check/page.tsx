@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Download, Eye, Filter, Loader2, Plus, Search, X } from 'lucide-react'
 import {
   createInventoryCheck,
@@ -53,7 +53,7 @@ export default function StoreManagerInventoryCheckPage() {
     notes: '',
   })
 
-  const loadChecks = async () => {
+  const loadChecks = useCallback(async () => {
     if (!hydrated || !user?.workplaceId) {
       setItems([])
       return
@@ -75,11 +75,11 @@ export default function StoreManagerInventoryCheckPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [hydrated, user?.workplaceId])
 
   useEffect(() => {
-    loadChecks()
-  }, [hydrated, user?.workplaceId])
+    void loadChecks()
+  }, [loadChecks])
 
   useEffect(() => {
     if (!hydrated || !user?.workplaceId) return

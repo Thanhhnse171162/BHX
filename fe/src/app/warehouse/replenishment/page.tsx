@@ -666,7 +666,7 @@ function CreateRequestModal({
                     <Package size={20} className="text-gray-400" />
                   </div>
                   <p className="text-sm font-semibold text-gray-500">Chưa có sản phẩm</p>
-                  <p className="text-xs text-gray-400 mt-1">Nhấn "Thêm sản phẩm" để chọn từ Kho Tổng</p>
+                  <p className="text-xs text-gray-400 mt-1">Nhấn &quot;Thêm sản phẩm&quot; để chọn từ Kho Tổng</p>
                 </div>
               ) : items.map(item => (
                 <div

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { DamageReportAPIService, DamageReportFromAPI } from '@/services/damage-report-api.service'
 import { ProductAPIService } from '@/services/product-api.service'
@@ -293,12 +294,15 @@ export default function DamageReportDetailPage({ params }: DamageReportDetailPag
                         href={photo}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="relative group rounded-lg overflow-hidden bg-gray-100 border border-gray-200"
+                        className="relative block h-32 w-full group rounded-lg overflow-hidden bg-gray-100 border border-gray-200"
                       >
-                        <img
+                        <Image
                           src={photo}
                           alt={`Hình ảnh ${idx + 1}`}
-                          className="w-full h-32 object-cover group-hover:opacity-75 transition-opacity"
+                          fill
+                          sizes="(max-width: 640px) 50vw, 25vw"
+                          className="object-cover group-hover:opacity-75 transition-opacity"
+                          unoptimized
                         />
                       </a>
                     ))}

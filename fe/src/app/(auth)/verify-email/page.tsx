@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -10,8 +10,6 @@ import { Button } from '@/shared/ui/Button'
 import { Input } from '@/shared/ui/Input'
 import { authService } from '@/services/auth.service'
 import { getErrorMessage } from '@/shared/api/errors'
-import { useEffect } from 'react'
-
 const verifyEmailSchema = z.object({
   email: z.string().min(1, 'Vui lòng nhập email').email('Email không hợp lệ'),
   otp: z.string().min(6, 'Vui lòng nhập mã OTP 6 số').max(6, 'Mã OTP phải có 6 số'),
@@ -19,7 +17,7 @@ const verifyEmailSchema = z.object({
 
 type VerifyEmailForm = z.infer<typeof verifyEmailSchema>
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [error, setError] = useState('')
@@ -219,5 +217,19 @@ export default function VerifyEmailPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-600">
+          Đang tải...
+        </div>
+      }
+    >
+      <VerifyEmailContent />
+    </Suspense>
   )
 }

@@ -1,22 +1,10 @@
 import { NextResponse } from 'next/server'
-import sql from 'mssql'
 
 const INVENTORY_SERVICE_URL =
   process.env.INVENTORY_URL ||
   process.env.NEXT_PUBLIC_INVENTORY_URL ||
   process.env.NEXT_PUBLIC_INVENTORY_API_URL ||
   'http://localhost:5003'
-
-const config = {
-  user: process.env.DB_USER || '',
-  password: process.env.DB_PASSWORD || '',
-  server: process.env.DB_SERVER || '',
-  database: process.env.DB_NAME || '',
-  options: {
-    encrypt: true,
-    trustServerCertificate: true,
-  },
-}
 
 export async function GET(request: Request) {
   try {

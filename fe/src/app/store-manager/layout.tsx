@@ -12,7 +12,6 @@ import {
   Warehouse,
   ArrowLeftRight,
   ClipboardCheck,
-  ClipboardList,
   AlertTriangle,
   Users,
   LogOut,

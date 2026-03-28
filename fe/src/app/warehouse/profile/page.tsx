@@ -16,7 +16,7 @@ export default function WarehouseProfilePage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
+  const [, _setIsSaving] = useState(false)
 
   // Profile form state
   const [profileForm, setProfileForm] = useState({
@@ -54,7 +54,7 @@ export default function WarehouseProfilePage() {
     setErrors(newErrors)
 
     if (Object.keys(newErrors).length === 0) {
-      setIsSaving(true)
+      _setIsSaving(true)
       try {
         const response = await authService.updateProfile({
           name: profileForm.name,
@@ -77,7 +77,7 @@ export default function WarehouseProfilePage() {
       } catch (error: any) {
         alert(error.message || 'Có lỗi xảy ra. Vui lòng thử lại!')
       } finally {
-        setIsSaving(false)
+        _setIsSaving(false)
       }
     }
   }

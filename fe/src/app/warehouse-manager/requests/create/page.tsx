@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Plus, Trash2, Save, Loader2, AlertCircle } from 'lucide-react'
-import { TransferAPIService, CreateTransferDTO, TransferFromAPI } from '@/services/transfer-api.service'
+import { TransferAPIService, CreateTransferDTO } from '@/services/transfer-api.service'
 import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
 import { useAuthStore } from '@/store/auth.store'
 
@@ -600,7 +600,7 @@ export default function CreateTransferOrderPage() {
               <li>✓ Thêm sản phẩm từ danh sách hàng</li>
               <li>✓ Nhập số lượng và lô hàng (nếu cần)</li>
               <li>✓ Xem tóm lược bên cạnh</li>
-              <li>✓ Nhấn "Lưu" để tạo đơn</li>
+              <li>✓ Nhấn &quot;Lưu&quot; để tạo đơn</li>
             </ul>
           </div>
 

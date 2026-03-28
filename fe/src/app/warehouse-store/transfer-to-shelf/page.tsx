@@ -290,8 +290,8 @@ export default function TransferToShelfPage() {
             <ul className="text-sm text-blue-800 space-y-1">
               <li>• Chọn sản phẩm cần xuất từ kho ra quầy bán</li>
               <li>• Nhập số lượng cần xuất (không vượt quá số lượng trong kho)</li>
-              <li>• Sản phẩm có cảnh báo "Quầy sắp hết" cần ưu tiên bổ sung</li>
-              <li>• Nhấn "Đề xuất" để hệ thống tự động tính số lượng nên xuất</li>
+              <li>• Sản phẩm có cảnh báo &quot;Quầy sắp hết&quot; cần ưu tiên bổ sung</li>
+              <li>• Nhấn &quot;Đề xuất&quot; để hệ thống tự động tính số lượng nên xuất</li>
               <li>• Xác nhận xuất hàng - hệ thống sẽ cập nhật tồn kho tự động</li>
             </ul>
           </div>

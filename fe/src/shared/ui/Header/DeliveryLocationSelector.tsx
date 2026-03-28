@@ -37,7 +37,7 @@ export function DeliveryLocationSelector() {
       try {
         const parsed = JSON.parse(saved)
         setSelectedLocation(parsed)
-      } catch (e) {
+      } catch {
         console.error('Failed to parse saved location')
       }
     }

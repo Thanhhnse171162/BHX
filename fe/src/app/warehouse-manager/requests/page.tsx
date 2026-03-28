@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo, useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   CirclePlus,
   Download,
@@ -180,7 +179,6 @@ function getIncomingTransferUIStatus(apiStatus: string): {
 }
 
 export default function WarehouseManagerRequestsPage() {
-  const router = useRouter()
   const user = useAuthStore((s) => s.user)
   const [requests, setRequests] = useState<RequestItem[]>([])
   const [activeTab, setActiveTab] = useState<RequestType>('store')
@@ -196,7 +194,7 @@ export default function WarehouseManagerRequestsPage() {
   const [locations, setLocations] = useState<WarehouseOption[]>([])
   const [productsForItems, setProductsForItems] = useState<ProductOption[]>([])
   const [items, setItems] = useState<FormItem[]>([])
-  const [loadingLocations, setLoadingLocations] = useState(false)
+  const [_loadingLocations, setLoadingLocations] = useState(false)
   const [loadingProducts, setLoadingProducts] = useState(false)
   const [batchesById, setBatchesById] = useState<Record<string, ProductBatchFromAPI>>({})
   const [batchesLoading, setBatchesLoading] = useState(false)
@@ -264,7 +262,7 @@ export default function WarehouseManagerRequestsPage() {
         return
       }
 
-      let productMap: Record<string, string> = {}
+      const productMap: Record<string, string> = {}
       try {
         const products = await ProductAPIService.getAllProducts()
         for (const p of products) {
@@ -272,10 +270,8 @@ export default function WarehouseManagerRequestsPage() {
         }
       } catch {}
 
-      let userMap: Record<string, string> = {}
-      const managerWorkplaceId = String(user?.workplaceId ?? '').trim()
-      const managerWorkplaceKey = String(managerWorkplaceId ?? '').trim().toLowerCase()
-      
+      const userMap: Record<string, string> = {}
+
       try {
         const allUsers = await UserAPIService.getAll()
         
@@ -472,9 +468,6 @@ export default function WarehouseManagerRequestsPage() {
     (loc) => normalizeId(loc.id) === normalizedFromId,
   )
 
-  const managedChildren = locations.filter(
-    (loc) => normalizeId(loc.parentId ?? loc.parent_id) === normalizedFromId,
-  )
   const parentWarehouse =
     currentWarehouseRecord &&
     locations.find(

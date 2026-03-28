@@ -1,7 +1,4 @@
 import Link from 'next/link'
-import { PageHeader } from '@/shared/ui/PageHeader'
-import { Button } from '@/shared/ui/Button'
-import { EmptyState } from '@/shared/ui/EmptyState'
 import { Header } from '@/shared/ui/Header'
 import { HeroBanner } from '@/features/promotions/components/HeroBanner'
 import { CategoryGrid } from '@/features/catalog/components/CategoryGrid'

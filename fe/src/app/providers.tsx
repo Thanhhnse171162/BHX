@@ -2,7 +2,6 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactNode, useState, useEffect, useRef } from 'react'
-import { useAuthStore } from '@/store/auth.store'
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(

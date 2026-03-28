@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import axios from 'axios'
 import { useAuth } from '@/shared/hooks/useAuth'
 import { InventoryAPIService, InventoryItem } from '@/services/inventory-api.service'
@@ -46,7 +46,7 @@ export default function WarehouseManagerInventoryPage() {
   const [exportExpiredSuccess, setExportExpiredSuccess] = useState<string | null>(null)
   const [isNoExpiredBatchesModalOpen, setIsNoExpiredBatchesModalOpen] = useState(false)
 
-  const fetchInventory = async () => {
+  const fetchInventory = useCallback(async () => {
     if (!user?.workplaceId) {
       setError('Không tìm thấy thông tin kho')
       setLoading(false)
@@ -79,11 +79,11 @@ export default function WarehouseManagerInventoryPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user?.workplaceId])
 
   useEffect(() => {
-    fetchInventory()
-  }, [user?.workplaceId])
+    void fetchInventory()
+  }, [fetchInventory])
 
   // Filter inventory
   const filteredInventory = inventory.filter((item) => {

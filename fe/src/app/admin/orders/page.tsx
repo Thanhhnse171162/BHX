@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { PageHeader } from '@/shared/ui/PageHeader'
 import { EmptyState } from '@/shared/ui/EmptyState'
 import { Input } from '@/shared/ui/Input'
@@ -31,6 +32,34 @@ interface OrderRow {
 }
 
 const DEFAULT_IMAGE = 'https://placehold.co/48x48?text=No+Image'
+
+function OrderItemThumb({
+  imageUrl,
+  name,
+  size,
+  className,
+}: {
+  imageUrl?: string
+  name: string
+  size: number
+  className?: string
+}) {
+  const [src, setSrc] = useState(imageUrl || DEFAULT_IMAGE)
+  useEffect(() => {
+    setSrc(imageUrl || DEFAULT_IMAGE)
+  }, [imageUrl])
+  return (
+    <Image
+      src={src}
+      alt={name}
+      width={size}
+      height={size}
+      className={className}
+      unoptimized
+      onError={() => setSrc(DEFAULT_IMAGE)}
+    />
+  )
+}
 
 const statusLabels: Record<string, string> = {
   PENDING: 'Pending',
@@ -291,14 +320,11 @@ export default function AdminOrderStatusPage() {
                     <div className="flex items-center gap-1">
                       {preview.map((it, idx) => (
                         <div key={idx} className="relative group">
-                          <img
-                            src={it.imageUrl || DEFAULT_IMAGE}
-                            alt={it.name}
+                          <OrderItemThumb
+                            imageUrl={it.imageUrl}
+                            name={it.name}
+                            size={36}
                             className="w-9 h-9 rounded-md object-cover border border-gray-200 bg-gray-50"
-                            onError={(e) => {
-                              ;(e.currentTarget as HTMLImageElement).src =
-                                DEFAULT_IMAGE
-                            }}
                           />
                           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10 pointer-events-none">
                             <div className="bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap max-w-[140px] truncate shadow-lg">
@@ -422,14 +448,11 @@ export default function AdminOrderStatusPage() {
                       key={idx}
                       className="flex items-center gap-3 p-2 rounded-lg border border-gray-100 bg-white"
                     >
-                      <img
-                        src={it.imageUrl || DEFAULT_IMAGE}
-                        alt={it.name}
+                      <OrderItemThumb
+                        imageUrl={it.imageUrl}
+                        name={it.name}
+                        size={48}
                         className="w-12 h-12 rounded-md object-cover border border-gray-200 bg-gray-50 flex-shrink-0"
-                        onError={(e) => {
-                          ;(e.currentTarget as HTMLImageElement).src =
-                            DEFAULT_IMAGE
-                        }}
                       />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-gray-900 truncate">

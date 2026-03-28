@@ -2,14 +2,14 @@
 
 import React, { ReactNode } from 'react'
 
-interface Column<T extends Record<string, unknown>> {
+interface Column<T extends object> {
   key: keyof T
   label: string
   render?: (value: T[keyof T], item: T) => ReactNode
   width?: string
 }
 
-interface DataTableProps<T extends Record<string, unknown>> {
+interface DataTableProps<T extends object> {
   data: T[]
   columns: Column<T>[]
   loading?: boolean
@@ -17,7 +17,7 @@ interface DataTableProps<T extends Record<string, unknown>> {
   className?: string
 }
 
-function DataTableInner<T extends Record<string, unknown>>(
+function DataTableInner<T extends object>(
   { data, columns, loading = false, onRowClick, className = '' }: DataTableProps<T>,
   ref: React.Ref<HTMLTableElement>
 ) {
@@ -78,7 +78,7 @@ function DataTableInner<T extends Record<string, unknown>>(
 const DataTableComponent = React.forwardRef(DataTableInner)
 DataTableComponent.displayName = 'DataTable'
 
-export const DataTable = DataTableComponent as <T extends Record<string, unknown>>(
+export const DataTable = DataTableComponent as <T extends object>(
   props: DataTableProps<T> & { ref?: React.Ref<HTMLTableElement> }
 ) => React.ReactElement | null
 

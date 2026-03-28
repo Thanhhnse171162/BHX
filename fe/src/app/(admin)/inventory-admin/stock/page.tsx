@@ -8,7 +8,7 @@ import { Input } from '@/shared/ui/Input'
 import { DataTable } from '@/shared/ui/DataTable'
 import Modal from '@/shared/ui/Modal'
 
-interface StockItem {
+interface StockItem extends Record<string, unknown> {
   id: string
   sku: string
   productName: string
@@ -303,11 +303,11 @@ export default function ItemStockPage() {
               {
                 key: 'sku',
                 label: 'SKU',
-                render: (value, item) => {
+                render: (value: unknown, item: unknown) => {
                   const stock = item as StockItem
                   return (
                     <div>
-                      <div className="font-semibold text-gray-900">{value}</div>
+                      <div className="font-semibold text-gray-900">{value as string}</div>
                       <div className="text-xs text-gray-500">{stock.category}</div>
                     </div>
                   )
@@ -320,7 +320,7 @@ export default function ItemStockPage() {
               {
                 key: 'currentStock',
                 label: 'Stock Levels',
-                render: (value, item) => {
+                render: (_value: unknown, item: unknown) => {
                   const stock = item as StockItem
                   return (
                     <div className="space-y-1">

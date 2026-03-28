@@ -526,7 +526,7 @@ export default function CashierIncidentsPage() {
     }
 
     loadInitialData()
-  }, [locationId])
+  }, [locationId, locationType])
 
   const filtered = incidents.filter(i => {
     if (activeFilter !== 'all' && i.status !== activeFilter) return false
@@ -726,7 +726,7 @@ export default function CashierIncidentsPage() {
                   <div className="flex flex-col items-center text-slate-300">
                     <AlertTriangle className="w-10 h-10 mb-3" />
                     <p className="text-sm font-medium text-slate-400">Không có sự cố nào</p>
-                    <p className="text-xs text-slate-300 mt-1">Nhấn "Tạo báo cáo mới" để thêm sự cố</p>
+                    <p className="text-xs text-slate-300 mt-1">Nhấn &quot;Tạo báo cáo mới&quot; để thêm sự cố</p>
                   </div>
                 </td>
               </tr>

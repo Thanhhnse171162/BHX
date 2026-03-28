@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { Search, SlidersHorizontal, Star, Eye, X, Phone, UserPlus, Bell, ChevronLeft, ChevronRight, MapPin, User, Store, Calendar, Gem } from 'lucide-react'
 
 interface Customer {
@@ -221,31 +221,34 @@ export default function CustomersPage() {
     return () => document.removeEventListener('mousedown', handler)
   }, [showFilterPanel])
 
-  const applyDateFilter = (c: Customer): boolean => {
-    if (!dateFilter) return true
-    const days = getDaysAgo(c.lastPurchase)
-    if (days === null) return false
-    if (dateFilter === 'today') return days === 0
-    if (dateFilter === '7days') return days <= 7
-    if (dateFilter === '30days') return days <= 30
-    if (dateFilter === 'custom' && customFrom && customTo) {
-      const [fd, fm, fy] = customFrom.split('-').reverse()
-      const [td2, tm, ty] = customTo.split('-').reverse()
-      const from = new Date(+fy, +fm - 1, +fd)
-      const to = new Date(+ty, +tm - 1, +td2)
-      const lastDate = new Date(Date.now() - days * 86400000)
-      return lastDate >= from && lastDate <= to
-    }
-    return true
-  }
+  const applyDateFilter = useCallback(
+    (c: Customer): boolean => {
+      if (!dateFilter) return true
+      const days = getDaysAgo(c.lastPurchase)
+      if (days === null) return false
+      if (dateFilter === 'today') return days === 0
+      if (dateFilter === '7days') return days <= 7
+      if (dateFilter === '30days') return days <= 30
+      if (dateFilter === 'custom' && customFrom && customTo) {
+        const [fd, fm, fy] = customFrom.split('-').reverse()
+        const [td2, tm, ty] = customTo.split('-').reverse()
+        const from = new Date(+fy, +fm - 1, +fd)
+        const to = new Date(+ty, +tm - 1, +td2)
+        const lastDate = new Date(Date.now() - days * 86400000)
+        return lastDate >= from && lastDate <= to
+      }
+      return true
+    },
+    [dateFilter, customFrom, customTo],
+  )
 
-  const applyPointsFilter = (c: Customer): boolean => {
+  const applyPointsFilter = useCallback((c: Customer): boolean => {
     if (!pointsFilter) return true
     if (pointsFilter === 'lt500') return c.loyaltyPoints < 500
     if (pointsFilter === '500to2000') return c.loyaltyPoints >= 500 && c.loyaltyPoints <= 2000
     if (pointsFilter === 'gt2000') return c.loyaltyPoints > 2000
     return true
-  }
+  }, [pointsFilter])
 
   const activeFilterCount = (dateFilter ? 1 : 0) + (pointsFilter ? 1 : 0)
 
@@ -266,7 +269,7 @@ export default function CustomersPage() {
       list.sort((a, b) => a.fullName.localeCompare(b.fullName, 'en', { sensitivity: 'base' }))
     }
     return list
-  }, [search, filterPoints, dateFilter, pointsFilter, customFrom, customTo])
+  }, [search, filterPoints, applyDateFilter, applyPointsFilter])
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -280,7 +283,7 @@ export default function CustomersPage() {
     setSelectedCustomer(prev => prev?.id === c.id ? null : c)
   }
 
-  const handleCreateAccount = (phone: string, address: string) => {
+  const handleCreateAccount = (_phone: string, _address: string) => {
     // TODO: call API to create customer
     setShowCreateModal(false)
   }
@@ -467,7 +470,7 @@ export default function CustomersPage() {
                     <td colSpan={5} className="text-center py-16 text-gray-400">Không tìm thấy khách hàng</td>
                   </tr>
                 ) : (
-                  paginated.map((c, i) => {
+                  paginated.map((c, _i) => {
                     const isSelected = selectedCustomer?.id === c.id
                     return (
                       <tr
