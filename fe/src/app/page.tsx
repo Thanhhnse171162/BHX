@@ -14,6 +14,7 @@ export default function Home() {
     
     const portalMap: Partial<Record<typeof user.role, string>> = {
       ADMIN: '/admin/dashboard',
+      CUSTOMER: '/customer',
       STORE_MANAGER: '/store-manager',
       WAREHOUSE_MANAGER: '/warehouse-manager',
       WAREHOUSE_ADMIN: '/warehouse',
