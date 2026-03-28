@@ -201,6 +201,7 @@ export default function WarehouseManagerRequestsPage() {
   const [batchesById, setBatchesById] = useState<Record<string, ProductBatchFromAPI>>({})
   const [batchesLoading, setBatchesLoading] = useState(false)
   const [availableQtyByProductId, setAvailableQtyByProductId] = useState<Record<string, number>>({})
+  const [userMap, setUserMap] = useState<Record<string, string>>({})
 
   // Dùng chung logic với loadRequests() để tránh lệch id "kho" theo dữ liệu user.
   const currentWarehouseId = String(user?.warehouseId ?? user?.storeId ?? user?.workplaceId ?? '').trim()
@@ -220,6 +221,14 @@ export default function WarehouseManagerRequestsPage() {
   // Action states for approve/reject
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null)
+
+  // Detail modal state
+  const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const [selectedRequest, setSelectedRequest] = useState<RequestItem | null>(null)
+
+  // Inventory Check Detail Modal
+  const [isInventoryCheckDetailOpen, setIsInventoryCheckDetailOpen] = useState(false)
+  const [selectedInventoryCheck, setSelectedInventoryCheck] = useState<InventoryCheckListDto | null>(null)
 
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const pushToast = useCallback((toast: Omit<ToastItem, 'id' | 'onClose'>) => {
@@ -268,22 +277,17 @@ export default function WarehouseManagerRequestsPage() {
       const managerWorkplaceKey = String(managerWorkplaceId ?? '').trim().toLowerCase()
       
       try {
-        const users = await UserAPIService.getAll()
-        // Filter để chỉ hiển thị staff mà manager hiện tại quản lý
-        const managedStaff = users.filter((u) => {
-          const roleName = String(u.role?.name || '').trim().toLowerCase()
-          const userWorkplaceId = String(u.workplaceId ?? u.workplace_id ?? u.workplace?.id ?? '').trim().toLowerCase()
-          const isActive = String(u.status || 'ACTIVE').toUpperCase() === 'ACTIVE'
-          
-          // Chỉ lấy staff của kho này và đang ACTIVE
-          return roleName === 'warehouse staff' && userWorkplaceId === managerWorkplaceKey && isActive
-        })
+        const allUsers = await UserAPIService.getAll()
         
-        for (const u of managedStaff) {
+        // Map tất cả users để hiển thị tên của requestedBy
+        for (const u of allUsers) {
           const userName = u.full_name || u.fullName || u.name || u.email || u.id
           userMap[u.id] = userName
         }
-      } catch {}
+        setUserMap(userMap)
+      } catch {
+        setUserMap({})
+      }
 
       // Tab "Yêu cầu từ Cửa hàng" - GET /api/restock-requests/by-parent-warehouse/{parentWarehouseId}
       let storeRequests: RestockRequestFromAPI[] = []
@@ -327,7 +331,14 @@ export default function WarehouseManagerRequestsPage() {
         })
 
       const warehouseItems: RequestItem[] = warehouseRequests
-        .filter((req) => String(req.fromWarehouseId ?? '').trim().toLowerCase() === String(warehouseId ?? '').trim().toLowerCase())
+        .filter((req) => {
+          const normalizedFromId = String(req.fromWarehouseId ?? '').trim().toLowerCase()
+          const normalizedToId = String(req.toWarehouseId ?? '').trim().toLowerCase()
+          const normalizedCurrentId = String(warehouseId ?? '').trim().toLowerCase()
+          
+          // Show requests where current warehouse is EITHER sender OR recipient
+          return normalizedFromId === normalizedCurrentId || normalizedToId === normalizedCurrentId
+        })
         .map((req) => {
           const productNames = req.items?.map((item) => item.productName || productMap[item.productId] || '--').join(', ') || '--'
           const userName = userMap[req.requestedBy] || req.requestedBy || '--'
@@ -1055,10 +1066,16 @@ export default function WarehouseManagerRequestsPage() {
                                 {actionLoadingId === row.uniqueId && actionType === 'reject' ? '...' : 'Từ chối'}
                               </button>
                             </>
-                          ) : (
+                          ) : activeTab === 'warehouse' ? null : (
                             <span className={actionButtonClass(row.actionLabel)}>{row.actionLabel}</span>
                           )}
-                          <button className="text-gray-400 hover:text-gray-600">
+                          <button 
+                            onClick={() => {
+                              setSelectedRequest(row)
+                              setIsDetailOpen(true)
+                            }}
+                            className="text-gray-400 hover:text-gray-600"
+                          >
                             <Eye className="w-4 h-4" />
                           </button>
                         </div>
@@ -1440,7 +1457,14 @@ export default function WarehouseManagerRequestsPage() {
                         <td className="px-5 py-4 text-gray-700 font-semibold">{check.totalDiscrepancies || 0}</td>
                         <td className="px-5 py-4 text-gray-500 whitespace-nowrap">{formatDateVI(check.createdAt)}</td>
                         <td className="px-5 py-4">
-                          <button className="text-gray-400 hover:text-gray-700 p-1.5 rounded-lg hover:bg-gray-100 transition-colors" title="Xem chi tiết">
+                          <button 
+                            onClick={() => {
+                              setSelectedInventoryCheck(check)
+                              setIsInventoryCheckDetailOpen(true)
+                            }}
+                            className="text-gray-400 hover:text-gray-700 p-1.5 rounded-lg hover:bg-gray-100 transition-colors" 
+                            title="Xem chi tiết"
+                          >
                             <Eye className="w-4 h-4" />
                           </button>
                         </td>
@@ -1924,6 +1948,168 @@ export default function WarehouseManagerRequestsPage() {
               </div>
             </form>
           </section>
+        </div>
+      )}
+
+      {isDetailOpen && selectedRequest && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-800">Chi tiết yêu cầu</h2>
+              <button
+                onClick={() => {
+                  setIsDetailOpen(false)
+                  setSelectedRequest(null)
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold">Mã yêu cầu</p>
+                  <p className="text-lg font-bold text-[#ea580c]">#{selectedRequest.id}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold">Trạng thái</p>
+                  <p className="mt-1">{renderStatus(selectedRequest.status)}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold">Độ ưu tiên</p>
+                  <p className="mt-1">{renderPriority(selectedRequest.priority)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold">Ngày tạo</p>
+                  <p className="text-sm font-medium text-gray-700">{selectedRequest.createdAt}</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-500 uppercase font-semibold">Nguồn / Người yêu cầu</p>
+                <p className="text-sm font-medium text-gray-700">{selectedRequest.source}</p>
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-500 uppercase font-semibold">Sản phẩm</p>
+                <p className="text-sm font-medium text-gray-700">{selectedRequest.productSummary}</p>
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-500 uppercase font-semibold">Loại yêu cầu</p>
+                <p className="text-sm font-medium text-gray-700">
+                  {selectedRequest.type === 'store' 
+                    ? 'Yêu cầu từ Cửa hàng'
+                    : selectedRequest.type === 'warehouse'
+                    ? 'Đơn yêu cầu'
+                    : selectedRequest.type === 'incoming-transfer'
+                    ? 'Kiểm tra giao hàng'
+                    : 'Kiểm tra Inventory'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-200">
+              <button
+                onClick={() => {
+                  setIsDetailOpen(false)
+                  setSelectedRequest(null)
+                }}
+                className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-semibold"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isInventoryCheckDetailOpen && selectedInventoryCheck && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-800">Chi tiết phiếu kiểm kê</h2>
+              <button
+                onClick={() => {
+                  setIsInventoryCheckDetailOpen(false)
+                  setSelectedInventoryCheck(null)
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold">Mã phiếu</p>
+                  <p className="text-lg font-bold text-[#059669]">#{selectedInventoryCheck.checkNumber || selectedInventoryCheck.id}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold">Trạng thái</p>
+                  <p className="mt-1">
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                      selectedInventoryCheck.status === 'COMPLETED' || selectedInventoryCheck.status === 'APPROVED'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : selectedInventoryCheck.status === 'PENDING'
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {selectedInventoryCheck.status === 'COMPLETED' || selectedInventoryCheck.status === 'APPROVED' ? 'Hoàn thành' : selectedInventoryCheck.status === 'PENDING' ? 'Chờ xử lý' : selectedInventoryCheck.status}
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold">Loại kiểm kê</p>
+                  <p className="text-sm font-medium text-gray-700">
+                    {selectedInventoryCheck.checkType === 'FULL' ? 'Toàn bộ' : 'Cục bộ'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold">Ngày tạo</p>
+                  <p className="text-sm font-medium text-gray-700">{formatDateVI(selectedInventoryCheck.createdAt)}</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-500 uppercase font-semibold">Kho / Cửa hàng</p>
+                <p className="text-sm font-medium text-gray-700">
+                  {getLocationName(selectedInventoryCheck.locationId)} ({selectedInventoryCheck.locationType})
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-500 uppercase font-semibold">Người kiểm kê</p>
+                <p className="text-sm font-medium text-gray-700">{userMap[selectedInventoryCheck.checkedBy] || selectedInventoryCheck.checkedBy || '—'}</p>
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-500 uppercase font-semibold">Tổng số lệch</p>
+                <p className="text-sm font-medium text-gray-700">{selectedInventoryCheck.totalDiscrepancies || 0}</p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-200">
+              <button
+                onClick={() => {
+                  setIsInventoryCheckDetailOpen(false)
+                  setSelectedInventoryCheck(null)
+                }}
+                className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-semibold"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

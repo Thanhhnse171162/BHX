@@ -40,6 +40,7 @@ export default function BackroomStockPage() {
   const [splitNotes, setSplitNotes] = useState('')
   const [toast, setToast] = useState('')
   const [exporting, setExporting] = useState(false)
+  const [isExportConfirmOpen, setIsExportConfirmOpen] = useState(false)
   const [errorModal, setErrorModal] = useState<{ title: string; message: string; details?: string } | null>(null)
 
   const workplaceId =
@@ -197,7 +198,11 @@ export default function BackroomStockPage() {
     setTimeout(() => setToast(''), 3000)
   }
 
-  const handleExportExpiredBatches = async () => {
+  const handleExportExpiredBatches = () => {
+    setIsExportConfirmOpen(true)
+  }
+
+  const confirmExportExpiredBatches = async () => {
     if (!token || !workplaceId) {
       showToast('Vui lòng đảm bảo bạn đã đăng nhập và được gán kho.')
       return
@@ -245,6 +250,7 @@ export default function BackroomStockPage() {
           message: errorMessage,
           details: errorDetails || undefined,
         })
+        setIsExportConfirmOpen(false)
         setExporting(false)
         return
       }
@@ -259,6 +265,7 @@ export default function BackroomStockPage() {
         details: `Tổng số lượng: ${totalQty} đơn vị`,
       })
       
+      setIsExportConfirmOpen(false)
       setTimeout(() => setErrorModal(null), 2000)
       await fetchData()
     } catch (err) {
@@ -266,6 +273,7 @@ export default function BackroomStockPage() {
         title: 'Lỗi kết nối',
         message: err instanceof Error ? err.message : 'Không thể kết nối đến server',
       })
+      setIsExportConfirmOpen(false)
     } finally {
       setExporting(false)
     }
@@ -628,6 +636,53 @@ export default function BackroomStockPage() {
               </Button>
             </div>
           </form>
+        </div>
+      )}
+
+      {isExportConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 space-y-4 shadow-lg">
+            <div className="flex items-start justify-between">
+              <h3 className="text-xl font-bold text-gray-900">Xuất lô hàng hết hạn</h3>
+              <button 
+                onClick={() => setIsExportConfirmOpen(false)}
+                disabled={exporting}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ×
+              </button>
+            </div>
+            
+            <p className="text-sm text-gray-700">
+              Bạn có chắc chắn muốn xuất tất cả các lô hàng hết hạn khỏi kho?
+            </p>
+
+            <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
+              <p className="text-sm text-blue-900">
+                ⓘ Hệ thống sẽ tạo phiếu xuất kho (outbound) cho tất cả các lô hàng có ngày hết hạn đã qua.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsExportConfirmOpen(false)}
+                disabled={exporting}
+                className="text-gray-700"
+              >
+                Hủy
+              </Button>
+              <button
+                onClick={confirmExportExpiredBatches}
+                disabled={exporting}
+                className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {exporting && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                {!exporting && <Download size={16} />}
+                {exporting ? 'Đang xử lý...' : 'Xuất ngay'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
