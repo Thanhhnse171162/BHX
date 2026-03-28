@@ -36,6 +36,8 @@ Thumbs.db
 # Logs
 logs/
 *.log
+build.txt
+build.exit
 
 # Runtime data
 pids/
