@@ -32,49 +32,4 @@ export default function Home() {
       </div>
     </div>
   )
-
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white mt-12">
-        <div className="max-w-7xl mx-auto px-4 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div>
-              <h4 className="font-bold text-lg mb-4">Về chúng tôi</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><a href="#" className="hover:text-white">Giới thiệu</a></li>
-                <li><a href="#" className="hover:text-white">Liên hệ</a></li>
-                <li><a href="#" className="hover:text-white">Tuyển dụng</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-bold text-lg mb-4">Chính sách</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><a href="#" className="hover:text-white">Chính sách đổi trả</a></li>
-                <li><a href="#" className="hover:text-white">Chính sách bảo mật</a></li>
-                <li><a href="#" className="hover:text-white">Điều khoản sử dụng</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-bold text-lg mb-4">Hỗ trợ</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><a href="#" className="hover:text-white">Câu hỏi thường gặp</a></li>
-                <li><a href="#" className="hover:text-white">Hướng dẫn mua hàng</a></li>
-                <li><a href="#" className="hover:text-white">Tra cứu đơn hàng</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-bold text-lg mb-4">Liên hệ</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li>Hotline: 1900-9999</li>
-                <li>Email: support@bachhoa.vn</li>
-                <li>Giờ làm việc: 7:00 - 21:00</li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
-            <p>&copy; 2026 Bách Hóa Xanh. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
-    </div>
-  )
 }
