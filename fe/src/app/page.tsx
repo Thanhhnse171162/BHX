@@ -10,7 +10,10 @@ export default function Home() {
 
   useEffect(() => {
     if (!hydrated) return
-    if (!isAuthenticated || !user) return
+    if (!isAuthenticated || !user) {
+      router.replace('/login')
+      return
+    }
     
     const portalMap: Partial<Record<typeof user.role, string>> = {
       ADMIN: '/admin/dashboard',
@@ -22,7 +25,7 @@ export default function Home() {
       STAFF: '/cashier',
     }
     const portal = portalMap[user.role]
-    if (portal) router.replace(portal)
+    router.replace(portal ?? '/customer')
   }, [hydrated, isAuthenticated, user, router])
 
   return (
