@@ -1,5 +1,25 @@
 import sql from 'mssql'
 
+function getHostFromUrl(value?: string): string | undefined {
+  if (!value) return undefined
+
+  try {
+    return new URL(value).hostname
+  } catch {
+    return undefined
+  }
+}
+
+const inferredServer =
+  process.env.DB_SERVER ||
+  getHostFromUrl(process.env.IAM_URL) ||
+  getHostFromUrl(process.env.NEXT_PUBLIC_IAM_URL) ||
+  getHostFromUrl(process.env.NEXT_PUBLIC_API_BASE_URL)
+
+if (process.env.NODE_ENV === 'production' && !inferredServer) {
+  throw new Error('Missing DB server configuration: set DB_SERVER for production runtime.')
+}
+
 // Debug: Log environment variables
 console.log('🔧 DB Config:', {
   user: process.env.DB_USER,
@@ -13,7 +33,7 @@ console.log('🔧 DB Config:', {
 const config: sql.config = {
   user: process.env.DB_USER || 'sa',
   password: process.env.DB_PASSWORD || '',
-  server: process.env.DB_SERVER || 'localhost',
+  server: inferredServer || 'localhost',
   database: process.env.DB_NAME || 'IdentityDB',
   options: {
     encrypt: process.env.DB_ENCRYPT === 'true', // Use true for Azure

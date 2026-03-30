@@ -1,5 +1,25 @@
 import sql from 'mssql'
 
+function getHostFromUrl(value?: string): string | undefined {
+  if (!value) return undefined
+
+  try {
+    return new URL(value).hostname
+  } catch {
+    return undefined
+  }
+}
+
+const inferredProductServer =
+  process.env.PRODUCT_DB_SERVER ||
+  getHostFromUrl(process.env.CATALOG_URL) ||
+  getHostFromUrl(process.env.NEXT_PUBLIC_CATALOG_URL) ||
+  getHostFromUrl(process.env.NEXT_PUBLIC_API_BASE_URL)
+
+if (process.env.NODE_ENV === 'production' && !inferredProductServer) {
+  throw new Error('Missing ProductDB server configuration: set PRODUCT_DB_SERVER for production runtime.')
+}
+
 /**
  * ProductDB Connection Configuration
  * Separate connection pool for ProductDB (Catalog & Products)
@@ -18,7 +38,7 @@ console.log('🛒 ProductDB Config:', {
 const productDbConfig: sql.config = {
   user: process.env.PRODUCT_DB_USER || 'sa',
   password: process.env.PRODUCT_DB_PASSWORD || '',
-  server: process.env.PRODUCT_DB_SERVER || 'localhost',
+  server: inferredProductServer || 'localhost',
   database: process.env.PRODUCT_DB_NAME || 'ProductDB',
   options: {
     encrypt: process.env.PRODUCT_DB_ENCRYPT === 'true',
