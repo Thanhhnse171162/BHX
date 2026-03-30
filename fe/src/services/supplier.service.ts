@@ -5,13 +5,25 @@ import type {
   UpdateSupplierPayload,
 } from '@/types/supplier.types'
 
+const DEFAULT_CATALOG_BASE_URL = 'http://13.229.29.52:5001'
+
+function normalizeBaseUrl(value?: string): string {
+  return String(value || '').trim().replace(/\/+$/, '')
+}
+
 function getApiBaseUrl(): string {
   // Supplier API currently belongs to Catalog service.
   // Prefer catalog URL, fallback to gateway URL when needed.
-  const baseUrl = process.env.NEXT_PUBLIC_CATALOG_URL || process.env.NEXT_PUBLIC_API_BASE_URL
-  if (!baseUrl) {
-    throw new Error('NEXT_PUBLIC_CATALOG_URL or NEXT_PUBLIC_API_BASE_URL is not configured')
+  const catalogUrl = normalizeBaseUrl(process.env.NEXT_PUBLIC_CATALOG_URL)
+  const apiGatewayUrl = normalizeBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL)
+  const baseUrl = catalogUrl || apiGatewayUrl || DEFAULT_CATALOG_BASE_URL
+
+  if (!catalogUrl && !apiGatewayUrl && process.env.NODE_ENV !== 'development') {
+    console.warn(
+      '[supplier.service] NEXT_PUBLIC_CATALOG_URL and NEXT_PUBLIC_API_BASE_URL are missing. Falling back to default Catalog URL.'
+    )
   }
+
   return baseUrl
 }
 

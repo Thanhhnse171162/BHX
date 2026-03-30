@@ -7,6 +7,7 @@ import { EmptyState } from '@/shared/ui/EmptyState'
 import { Input } from '@/shared/ui/Input'
 import { DataTable } from '@/shared/ui/DataTable'
 import Modal from '@/shared/ui/Modal'
+import { useAuthStore } from '@/store/auth.store'
 
 type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'
 
@@ -20,7 +21,25 @@ interface User {
   createdAt: string
 }
 
+function mapApiUserToUi(raw: any): User {
+  const roleName =
+    (typeof raw?.role === 'object' && raw?.role?.name) ||
+    raw?.roleName ||
+    raw?.role ||
+    'STAFF'
+
+  return {
+    id: String(raw?.id ?? raw?.userId ?? ''),
+    name: String(raw?.name ?? raw?.full_name ?? raw?.fullName ?? ''),
+    email: String(raw?.email ?? ''),
+    role: String(roleName),
+    status: String(raw?.status ?? 'ACTIVE').toUpperCase() as UserStatus,
+    createdAt: String(raw?.createdAt ?? raw?.created_at ?? new Date().toISOString()),
+  }
+}
+
 export default function UsersPage() {
+  const token = useAuthStore((state) => state.token)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [mode, setMode] = useState<'create' | 'edit'>('create')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -37,13 +56,29 @@ export default function UsersPage() {
   const loadUsers = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/users')
+      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
+
+      // Prefer IAM-proxied list endpoint for cloud deployments.
+      let response = await fetch('/api/users/list', { headers })
+      if (!response.ok) {
+        // Fallback to local DB-backed route for local/dev compatibility.
+        response = await fetch('/api/users', { headers })
+      }
+
       if (response.ok) {
-        const data = await response.json()
-        setUsers(data)
+        const payload = await response.json()
+        const data = Array.isArray(payload) ? payload : payload?.data
+        if (Array.isArray(data)) {
+          setUsers(data.map(mapApiUserToUi))
+        } else {
+          setUsers([])
+        }
+      } else {
+        setUsers([])
       }
     } catch (error) {
       console.error('Failed to load users:', error)
+      setUsers([])
     } finally {
       setLoading(false)
     }
@@ -52,7 +87,8 @@ export default function UsersPage() {
   // Load roles từ database
   const loadRoles = async () => {
     try {
-      const response = await fetch('/api/roles')
+      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
+      const response = await fetch('/api/roles', { headers })
       if (response.ok) {
         const data = await response.json()
         setRoles(data)
@@ -68,7 +104,7 @@ export default function UsersPage() {
   useEffect(() => {
     loadUsers()
     loadRoles()
-  }, [])
+  }, [token])
 
   // Validate password
   const validatePassword = (pwd: string): string => {
