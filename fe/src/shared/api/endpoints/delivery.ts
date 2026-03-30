@@ -1,5 +1,5 @@
 const SERVICE_URLS = {
-  DELIVERY: process.env.NEXT_PUBLIC_DELIVERY_URL || 'http://localhost:3008',
+  DELIVERY: process.env.NEXT_PUBLIC_DELIVERY_URL || 'http://13.229.29.52:3008',
 }
 
 export const deliveryEndpoints = {

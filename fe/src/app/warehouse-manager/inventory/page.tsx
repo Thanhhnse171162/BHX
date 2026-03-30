@@ -157,7 +157,7 @@ export default function WarehouseManagerInventoryPage() {
     try {
       const token = useAuthStore.getState().token
       const response = await axios.post(
-        'http://localhost:5003/api/ProductBatch/expired-batches/create-outbound',
+        'http://13.229.29.52:5003/api/ProductBatch/expired-batches/create-outbound',
         {
           warehouseId: user.workplaceId,
           locationType: 'WAREHOUSE',

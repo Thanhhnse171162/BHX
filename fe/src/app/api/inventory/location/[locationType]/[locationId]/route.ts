@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import axios from 'axios'
 
 // Proxy to backend: GET /api/Inventory/location/{locationType}/{locationId}
-const INVENTORY_SERVICE_URL = process.env.INVENTORY_URL || process.env.NEXT_PUBLIC_INVENTORY_URL || 'http://localhost:5003'
+const INVENTORY_SERVICE_URL = process.env.INVENTORY_URL || process.env.NEXT_PUBLIC_INVENTORY_URL || 'http://13.229.29.52:5003'
 
 export async function GET(
   request: NextRequest,
@@ -36,4 +36,3 @@ export async function GET(
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 })
   }
 }
-

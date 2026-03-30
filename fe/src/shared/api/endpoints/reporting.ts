@@ -1,5 +1,5 @@
 const SERVICE_URLS = {
-  REPORTING: process.env.NEXT_PUBLIC_REPORTING_URL || 'http://localhost:3011',
+  REPORTING: process.env.NEXT_PUBLIC_REPORTING_URL || 'http://13.229.29.52:3011',
 }
 
 export const reportingEndpoints = {

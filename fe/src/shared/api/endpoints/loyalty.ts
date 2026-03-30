@@ -1,5 +1,5 @@
 const SERVICE_URLS = {
-  LOYALTY: process.env.NEXT_PUBLIC_LOYALTY_URL || 'http://localhost:3007',
+  LOYALTY: process.env.NEXT_PUBLIC_LOYALTY_URL || 'http://13.229.29.52:3007',
 }
 
 export const loyaltyEndpoints = {

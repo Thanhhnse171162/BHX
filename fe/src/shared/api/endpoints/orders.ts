@@ -1,5 +1,5 @@
 const SERVICE_URLS = {
-  ORDER: process.env.NEXT_PUBLIC_ORDER_URL || 'http://localhost:3003',
+  ORDER: process.env.NEXT_PUBLIC_ORDER_URL || 'http://13.229.29.52:3003',
 }
 
 export const ordersEndpoints = {

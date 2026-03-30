@@ -4,7 +4,7 @@ import axios from 'axios'
 const INVENTORY_SERVICE_URL =
   process.env.INVENTORY_URL ||
   process.env.NEXT_PUBLIC_INVENTORY_URL ||
-  'http://localhost:5003'
+  'http://13.229.29.52:5003'
 
 export async function PUT(
   request: NextRequest,
@@ -42,4 +42,3 @@ export async function PUT(
     )
   }
 }
-

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 const DAMAGE_REPORT_SERVICE_URL =
   process.env.INVENTORY_URL ||
   process.env.NEXT_PUBLIC_INVENTORY_URL ||
-  'http://localhost:5003'
+  'http://13.229.29.52:5003'
 
 async function parseResponseBody(response: Response) {
   const raw = await response.text()

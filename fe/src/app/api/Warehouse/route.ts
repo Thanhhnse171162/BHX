@@ -5,7 +5,7 @@ const INVENTORY_SERVICE_URL =
   process.env.INVENTORY_URL ||
   process.env.NEXT_PUBLIC_INVENTORY_URL ||
   process.env.NEXT_PUBLIC_INVENTORY_API_URL ||
-  'http://localhost:5003'
+  'http://13.229.29.52:5003'
 
 function getAuthorization(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
@@ -41,4 +41,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 })
   }
 }
-

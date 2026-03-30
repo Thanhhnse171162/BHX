@@ -1,5 +1,5 @@
 const SERVICE_URLS = {
-  SHIFT: process.env.NEXT_PUBLIC_SHIFT_URL || 'http://localhost:3009',
+  SHIFT: process.env.NEXT_PUBLIC_SHIFT_URL || 'http://13.229.29.52:3009',
 }
 
 export const shiftEndpoints = {

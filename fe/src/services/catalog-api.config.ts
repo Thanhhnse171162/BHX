@@ -5,7 +5,7 @@ import { useAuthStore } from '@/store/auth.store'
  * Catalog Service Client
  * Kết nối trực tiếp đến Product Service (Port 5001)
  */
-const CATALOG_SERVICE_URL = process.env.NEXT_PUBLIC_CATALOG_URL || 'http://localhost:5001'
+const CATALOG_SERVICE_URL = process.env.NEXT_PUBLIC_CATALOG_URL || 'http://13.229.29.52:5001'
 
 export const catalogClient: AxiosInstance = axios.create({
   baseURL: CATALOG_SERVICE_URL,

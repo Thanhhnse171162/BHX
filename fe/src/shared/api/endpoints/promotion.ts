@@ -1,5 +1,5 @@
 const SERVICE_URLS = {
-  PROMOTION: process.env.NEXT_PUBLIC_PROMOTION_URL || 'http://localhost:3006',
+  PROMOTION: process.env.NEXT_PUBLIC_PROMOTION_URL || 'http://13.229.29.52:3006',
 }
 
 export const promotionEndpoints = {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const IAM_SERVICE_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://localhost:5000'
+const IAM_SERVICE_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://13.229.29.52:5000'
 
 export async function GET(request: NextRequest) {
   try {

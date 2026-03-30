@@ -5,7 +5,7 @@ interface LoginRequest {
   password: string
 }
 
-const IDENTITY_SERVICE_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://127.0.0.1:5000'
+const IDENTITY_SERVICE_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://13.229.29.52:5000'
 
 export async function POST(request: NextRequest) {
   try {

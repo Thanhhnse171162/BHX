@@ -37,16 +37,16 @@ export const endpoints = {
 
 // Export SERVICE_URLS object for backward compatibility
 export const SERVICE_URLS = {
-  IAM: process.env.NEXT_PUBLIC_IAM_URL || 'http://localhost:3002',
-  ORDER: process.env.NEXT_PUBLIC_ORDER_URL || 'http://localhost:3003',
-  INVENTORY: process.env.NEXT_PUBLIC_INVENTORY_URL || 'http://localhost:3004',
-  CATALOG: process.env.NEXT_PUBLIC_CATALOG_URL || 'http://localhost:3005',
-  PROMOTION: process.env.NEXT_PUBLIC_PROMOTION_URL || 'http://localhost:3006',
-  LOYALTY: process.env.NEXT_PUBLIC_LOYALTY_URL || 'http://localhost:3007',
-  DELIVERY: process.env.NEXT_PUBLIC_DELIVERY_URL || 'http://localhost:3008',
-  SHIFT: process.env.NEXT_PUBLIC_SHIFT_URL || 'http://localhost:3009',
-  CUSTOMER: process.env.NEXT_PUBLIC_CUSTOMER_URL || 'http://localhost:3010',
-  REPORTING: process.env.NEXT_PUBLIC_REPORTING_URL || 'http://localhost:3011',
+  IAM: process.env.NEXT_PUBLIC_IAM_URL || 'http://13.229.29.52:5000',
+  ORDER: process.env.NEXT_PUBLIC_ORDER_URL || 'http://13.229.29.52:3003',
+  INVENTORY: process.env.NEXT_PUBLIC_INVENTORY_URL || 'http://13.229.29.52:5003',
+  CATALOG: process.env.NEXT_PUBLIC_CATALOG_URL || 'http://13.229.29.52:5001',
+  PROMOTION: process.env.NEXT_PUBLIC_PROMOTION_URL || 'http://13.229.29.52:3006',
+  LOYALTY: process.env.NEXT_PUBLIC_LOYALTY_URL || 'http://13.229.29.52:3007',
+  DELIVERY: process.env.NEXT_PUBLIC_DELIVERY_URL || 'http://13.229.29.52:3008',
+  SHIFT: process.env.NEXT_PUBLIC_SHIFT_URL || 'http://13.229.29.52:3009',
+  CUSTOMER: process.env.NEXT_PUBLIC_CUSTOMER_URL || 'http://13.229.29.52:3010',
+  REPORTING: process.env.NEXT_PUBLIC_REPORTING_URL || 'http://13.229.29.52:3011',
 }
 
 export default SERVICE_URLS

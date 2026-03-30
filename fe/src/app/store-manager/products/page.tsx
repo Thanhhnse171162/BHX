@@ -238,7 +238,7 @@ export default function StoreManagerProductsPage() {
 
     setExporting(true)
     try {
-      const response = await fetch('http://localhost:5003/api/ProductBatch/expired-batches/create-outbound', {
+      const response = await fetch('http://13.229.29.52:5003/api/ProductBatch/expired-batches/create-outbound', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

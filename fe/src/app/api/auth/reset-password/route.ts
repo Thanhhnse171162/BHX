@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const IDENTITY_SERVICE_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://localhost:5000'
+const IDENTITY_SERVICE_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://13.229.29.52:5000'
 
 export async function POST(request: NextRequest) {
   try {

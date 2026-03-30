@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const CATALOG_SERVICE_URL = process.env.NEXT_PUBLIC_CATALOG_URL || 'http://localhost:5001'
+const CATALOG_SERVICE_URL = process.env.NEXT_PUBLIC_CATALOG_URL || 'http://13.229.29.52:5001'
 
 function getAuthHeader(request: NextRequest) {
   return request.headers.get('authorization') || ''
@@ -46,4 +46,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

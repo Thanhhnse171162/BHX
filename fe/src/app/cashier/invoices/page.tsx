@@ -501,7 +501,7 @@ export default function InvoicesPage() {
 
   const handlePrintInvoice = async (order: Order) => {
     try {
-      const res = await fetch(`http://localhost:5006/api/sales/${order.id}`, {
+      const res = await fetch(`http://13.229.29.52:5006/api/sales/${order.id}`, {
         headers: {
           accept: 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -530,9 +530,9 @@ export default function InvoicesPage() {
       try {
         const storeId = user?.workplaceType === 'STORE' ? user?.workplaceId : user?.storeId
         const urls = [
-          storeId ? `http://localhost:5006/api/sales?storeId=${encodeURIComponent(storeId)}` : null,
-          storeId ? `http://localhost:5006/api/sales/store/${encodeURIComponent(storeId)}` : null,
-          'http://localhost:5006/api/sales',
+          storeId ? `http://13.229.29.52:5006/api/sales?storeId=${encodeURIComponent(storeId)}` : null,
+          storeId ? `http://13.229.29.52:5006/api/sales/store/${encodeURIComponent(storeId)}` : null,
+          'http://13.229.29.52:5006/api/sales',
         ].filter(Boolean) as string[]
 
         let sales: SaleFromApi[] = []
@@ -592,7 +592,7 @@ export default function InvoicesPage() {
     setLoadingDetail(true)
 
     try {
-      const res = await fetch(`http://localhost:5006/api/sales/${order.id}`, {
+      const res = await fetch(`http://13.229.29.52:5006/api/sales/${order.id}`, {
         headers: {
           accept: 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),

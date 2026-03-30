@@ -1,5 +1,5 @@
 const SERVICE_URLS = {
-  INVENTORY: process.env.NEXT_PUBLIC_INVENTORY_URL || 'http://localhost:3004',
+  INVENTORY: process.env.NEXT_PUBLIC_INVENTORY_URL || 'http://13.229.29.52:5003',
 }
 
 export const inventoryEndpoints = {

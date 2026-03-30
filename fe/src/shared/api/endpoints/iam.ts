@@ -1,5 +1,5 @@
 const SERVICE_URLS = {
-  IAM: process.env.NEXT_PUBLIC_IAM_URL || 'http://localhost:3002',
+  IAM: process.env.NEXT_PUBLIC_IAM_URL || 'http://13.229.29.52:5000',
 }
 
 export const iamEndpoints = {

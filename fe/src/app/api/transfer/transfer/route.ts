@@ -4,7 +4,7 @@ import axios from 'axios'
 const INVENTORY_SERVICE_URL =
   process.env.INVENTORY_URL ||
   process.env.NEXT_PUBLIC_INVENTORY_URL ||
-  'http://localhost:5003'
+  'http://13.229.29.52:5003'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 

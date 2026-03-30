@@ -1,5 +1,5 @@
 const SERVICE_URLS = {
-  CUSTOMER: process.env.NEXT_PUBLIC_CUSTOMER_URL || 'http://localhost:3010',
+  CUSTOMER: process.env.NEXT_PUBLIC_CUSTOMER_URL || 'http://13.229.29.52:3010',
 }
 
 export const customerEndpoints = {

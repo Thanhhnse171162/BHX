@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import axios from 'axios'
 
 // URL của Inventory Backend Service (server-side không cần NEXT_PUBLIC_)
-const INVENTORY_SERVICE_URL = process.env.INVENTORY_URL || process.env.NEXT_PUBLIC_INVENTORY_URL || 'http://localhost:5003'
+const INVENTORY_SERVICE_URL = process.env.INVENTORY_URL || process.env.NEXT_PUBLIC_INVENTORY_URL || 'http://13.229.29.52:5003'
 
 /**
  * GET /api/inventory - Lấy tất cả inventory items

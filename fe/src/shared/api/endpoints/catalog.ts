@@ -1,5 +1,5 @@
 const SERVICE_URLS = {
-  CATALOG: process.env.NEXT_PUBLIC_CATALOG_URL || 'http://localhost:3005',
+  CATALOG: process.env.NEXT_PUBLIC_CATALOG_URL || 'http://13.229.29.52:5001',
 }
 
 export const catalogEndpoints = {
