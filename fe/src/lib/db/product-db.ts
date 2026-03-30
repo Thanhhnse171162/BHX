@@ -10,14 +10,33 @@ function getHostFromUrl(value?: string): string | undefined {
   }
 }
 
-const inferredProductServer =
-  process.env.PRODUCT_DB_SERVER ||
-  getHostFromUrl(process.env.CATALOG_URL) ||
-  getHostFromUrl(process.env.NEXT_PUBLIC_CATALOG_URL) ||
-  getHostFromUrl(process.env.NEXT_PUBLIC_API_BASE_URL)
+function createProductDbConfig(): sql.config {
+  const inferredProductServer =
+    process.env.PRODUCT_DB_SERVER ||
+    getHostFromUrl(process.env.CATALOG_URL) ||
+    getHostFromUrl(process.env.NEXT_PUBLIC_CATALOG_URL) ||
+    getHostFromUrl(process.env.NEXT_PUBLIC_API_BASE_URL)
 
-if (process.env.NODE_ENV === 'production' && !inferredProductServer) {
-  throw new Error('Missing ProductDB server configuration: set PRODUCT_DB_SERVER for production runtime.')
+  if (process.env.NODE_ENV === 'production' && !inferredProductServer) {
+    throw new Error('Missing ProductDB server configuration: set PRODUCT_DB_SERVER for production runtime.')
+  }
+
+  return {
+    user: process.env.PRODUCT_DB_USER || 'sa',
+    password: process.env.PRODUCT_DB_PASSWORD || '12345',
+    server: inferredProductServer || 'localhost',
+    database: process.env.PRODUCT_DB_NAME || 'ProductDB',
+    options: {
+      encrypt: process.env.PRODUCT_DB_ENCRYPT === 'true',
+      trustServerCertificate: process.env.PRODUCT_DB_TRUST_CERT === 'true',
+      enableArithAbort: true,
+    },
+    pool: {
+      max: 10,
+      min: 0,
+      idleTimeoutMillis: 30000,
+    },
+  }
 }
 
 /**
@@ -35,23 +54,6 @@ console.log('🛒 ProductDB Config:', {
   trustCert: process.env.PRODUCT_DB_TRUST_CERT,
 })
 
-const productDbConfig: sql.config = {
-  user: process.env.PRODUCT_DB_USER || 'sa',
-  password: process.env.PRODUCT_DB_PASSWORD || '',
-  server: inferredProductServer || 'localhost',
-  database: process.env.PRODUCT_DB_NAME || 'ProductDB',
-  options: {
-    encrypt: process.env.PRODUCT_DB_ENCRYPT === 'true',
-    trustServerCertificate: process.env.PRODUCT_DB_TRUST_CERT === 'true',
-    enableArithAbort: true,
-  },
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000,
-  },
-}
-
 let productPool: sql.ConnectionPool | null = null
 
 /**
@@ -63,6 +65,7 @@ export async function getProductDbConnection(): Promise<sql.ConnectionPool> {
   }
 
   try {
+    const productDbConfig = createProductDbConfig()
     productPool = await sql.connect(productDbConfig)
     console.log('✅ ProductDB connected successfully')
     return productPool

@@ -10,14 +10,33 @@ function getHostFromUrl(value?: string): string | undefined {
   }
 }
 
-const inferredServer =
-  process.env.DB_SERVER ||
-  getHostFromUrl(process.env.IAM_URL) ||
-  getHostFromUrl(process.env.NEXT_PUBLIC_IAM_URL) ||
-  getHostFromUrl(process.env.NEXT_PUBLIC_API_BASE_URL)
+function createDbConfig(): sql.config {
+  const inferredServer =
+    process.env.DB_SERVER ||
+    getHostFromUrl(process.env.IAM_URL) ||
+    getHostFromUrl(process.env.NEXT_PUBLIC_IAM_URL) ||
+    getHostFromUrl(process.env.NEXT_PUBLIC_API_BASE_URL)
 
-if (process.env.NODE_ENV === 'production' && !inferredServer) {
-  throw new Error('Missing DB server configuration: set DB_SERVER for production runtime.')
+  if (process.env.NODE_ENV === 'production' && !inferredServer) {
+    throw new Error('Missing DB server configuration: set DB_SERVER for production runtime.')
+  }
+
+  return {
+    user: process.env.DB_USER || 'sa',
+    password: process.env.DB_PASSWORD || '12345',
+    server: inferredServer || 'localhost',
+    database: process.env.DB_NAME || 'IdentityDB',
+    options: {
+      encrypt: process.env.DB_ENCRYPT === 'true', // Use true for Azure
+      trustServerCertificate: process.env.DB_TRUST_CERT === 'true', // Use true for local dev
+      enableArithAbort: true,
+    },
+    pool: {
+      max: 10,
+      min: 0,
+      idleTimeoutMillis: 30000,
+    },
+  }
 }
 
 // Debug: Log environment variables
@@ -30,23 +49,6 @@ console.log('🔧 DB Config:', {
   trustCert: process.env.DB_TRUST_CERT,
 })
 
-const config: sql.config = {
-  user: process.env.DB_USER || 'sa',
-  password: process.env.DB_PASSWORD || '',
-  server: inferredServer || 'localhost',
-  database: process.env.DB_NAME || 'IdentityDB',
-  options: {
-    encrypt: process.env.DB_ENCRYPT === 'true', // Use true for Azure
-    trustServerCertificate: process.env.DB_TRUST_CERT === 'true', // Use true for local dev
-    enableArithAbort: true,
-  },
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000,
-  },
-}
-
 let pool: sql.ConnectionPool | null = null
 
 export async function getDbConnection(): Promise<sql.ConnectionPool> {
@@ -55,6 +57,7 @@ export async function getDbConnection(): Promise<sql.ConnectionPool> {
   }
 
   try {
+    const config = createDbConfig()
     pool = await sql.connect(config)
     console.log('Database connected successfully')
     return pool
