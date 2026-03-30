@@ -501,7 +501,7 @@ export default function InvoicesPage() {
 
   const handlePrintInvoice = async (order: Order) => {
     try {
-      const res = await fetch(`http://13.229.29.52:5006/api/sales/${order.id}`, {
+      const res = await fetch(`/api/sales/${order.id}`, {
         headers: {
           accept: 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -529,36 +529,18 @@ export default function InvoicesPage() {
 
       try {
         const storeId = user?.workplaceType === 'STORE' ? user?.workplaceId : user?.storeId
-        const urls = [
-          storeId ? `http://13.229.29.52:5006/api/sales?storeId=${encodeURIComponent(storeId)}` : null,
-          storeId ? `http://13.229.29.52:5006/api/sales/store/${encodeURIComponent(storeId)}` : null,
-          'http://13.229.29.52:5006/api/sales',
-        ].filter(Boolean) as string[]
+        const query = storeId ? `?storeId=${encodeURIComponent(String(storeId))}` : ''
+        const res = await fetch(`/api/sales${query}`, {
+          headers: {
+            accept: 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          cache: 'no-store',
+        })
 
-        let sales: SaleFromApi[] = []
-        let lastErr = 'Không thể tải lịch sử đơn hàng'
-
-        for (const url of urls) {
-          const res = await fetch(url, {
-            headers: {
-              accept: 'application/json',
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            cache: 'no-store',
-          })
-
-          const body = await res.json().catch(() => null)
-          if (!res.ok) {
-            lastErr = body?.message || body?.error || `API lỗi ${res.status}`
-            continue
-          }
-
-          const list = extractSalesArray(body)
-          if (list.length > 0 || Array.isArray(body)) {
-            sales = list
-            break
-          }
-        }
+        const body = await res.json().catch(() => null)
+        const sales = res.ok ? extractSalesArray(body) : []
+        const lastErr = body?.message || body?.error || `API lỗi ${res.status}`
 
         if (sales.length === 0) {
           if (cancelled) return
@@ -592,7 +574,7 @@ export default function InvoicesPage() {
     setLoadingDetail(true)
 
     try {
-      const res = await fetch(`http://13.229.29.52:5006/api/sales/${order.id}`, {
+      const res = await fetch(`/api/sales/${order.id}`, {
         headers: {
           accept: 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
