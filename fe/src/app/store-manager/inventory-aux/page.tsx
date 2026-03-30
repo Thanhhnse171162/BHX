@@ -13,9 +13,9 @@ function normalizeId(value?: string | null): string {
   return String(value || '').trim().toLowerCase()
 }
 
-type BatchStatusFilter = 'Tất cả' | 'AVAILABLE' | 'NEAR_EXPIRY' | 'EXPIRED' | 'OUT_OF_STOCK'
+type BatchStatusFilter = 'Tất cả' | 'AVAILABLE' | 'NEAR_EXPIRY' | 'EXPIRED' | 'OUT_OF_STOCK' | 'SOLD'
 
-const STATUS_OPTIONS: BatchStatusFilter[] = ['Tất cả', 'AVAILABLE', 'NEAR_EXPIRY', 'EXPIRED', 'OUT_OF_STOCK']
+const STATUS_OPTIONS: BatchStatusFilter[] = ['Tất cả', 'AVAILABLE', 'NEAR_EXPIRY', 'EXPIRED', 'OUT_OF_STOCK', 'SOLD']
 const PAGE_SIZE = 10
 
 function statusLabel(status?: string) {
@@ -23,7 +23,23 @@ function statusLabel(status?: string) {
   if (normalized === 'NEAR_EXPIRY') return 'Cận date'
   if (normalized === 'EXPIRED') return 'Hết hạn'
   if (normalized === 'OUT_OF_STOCK') return 'Hết tồn'
+  if (normalized === 'SOLD') return 'Đã bán hết'
   return 'Còn hàng'
+}
+
+function resolveDisplayStatus(row: ProductBatchFromAPI): string {
+  const normalized = String(row.status || '').toUpperCase()
+
+  if (['AVAILABLE', 'NEAR_EXPIRY', 'EXPIRED', 'OUT_OF_STOCK', 'SOLD'].includes(normalized)) {
+    return normalized
+  }
+
+  // Fallback: if backend omits/changes status but quantity is depleted, show as sold out.
+  if (Math.max(0, Number(row.quantity || 0)) === 0) {
+    return 'SOLD'
+  }
+
+  return 'AVAILABLE'
 }
 
 function resolveBatchUnit(row: ProductBatchFromAPI, product?: ProductFromAPI): string {
@@ -126,7 +142,7 @@ export default function InventoryAuxPage() {
     const q = search.trim().toLowerCase()
 
     return rows.filter((row) => {
-      const status = String(row.status || '').toUpperCase()
+      const status = resolveDisplayStatus(row)
       const product = productMap[normalizeId(row.productId)]
       const productName = String(product?.name || '').toLowerCase()
       const sku = String(product?.sku || '').toLowerCase()
@@ -305,7 +321,7 @@ export default function InventoryAuxPage() {
               ) : (
                 paged.map((row) => {
                   const product = productMap[normalizeId(row.productId)]
-                  const status = String(row.status || '').toUpperCase()
+                  const status = resolveDisplayStatus(row)
                   const unit = resolveBatchUnit(row, product)
 
                   return (
@@ -337,7 +353,7 @@ export default function InventoryAuxPage() {
                               ? 'bg-red-100 text-red-700'
                               : status === 'NEAR_EXPIRY'
                                 ? 'bg-amber-100 text-amber-700'
-                                : status === 'OUT_OF_STOCK'
+                                : status === 'OUT_OF_STOCK' || status === 'SOLD'
                                   ? 'bg-slate-200 text-slate-700'
                                   : 'bg-green-100 text-green-700'
                           }`}
