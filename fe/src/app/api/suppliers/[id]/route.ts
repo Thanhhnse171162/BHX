@@ -1,0 +1,114 @@
+import { NextRequest, NextResponse } from 'next/server'
+
+const CATALOG_SERVICE_URL = process.env.NEXT_PUBLIC_CATALOG_URL || 'http://13.229.29.52:5001'
+
+function buildForwardHeaders(request: NextRequest): HeadersInit {
+  const authHeader = request.headers.get('authorization')
+  const cookieToken = request.cookies.get('auth_token')?.value
+
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    Accept: '*/*',
+  }
+
+  if (authHeader) {
+    headers.Authorization = authHeader
+  } else if (cookieToken) {
+    headers.Authorization = `Bearer ${cookieToken}`
+  }
+
+  return headers
+}
+
+async function parseResponseBody(response: Response): Promise<unknown> {
+  const raw = await response.text()
+  if (!raw || !raw.trim()) return null
+
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return raw
+  }
+}
+
+// GET /api/suppliers/[id]
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Supplier/suppliers/${params.id}`, {
+      method: 'GET',
+      headers: buildForwardHeaders(request),
+      cache: 'no-store',
+    })
+
+    const payload = await parseResponseBody(response)
+    if (!response.ok) {
+      return NextResponse.json(payload ?? { error: 'Failed to fetch supplier' }, { status: response.status })
+    }
+
+    return NextResponse.json(payload ?? {}, { status: response.status })
+  } catch (error: any) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Không thể lấy chi tiết nhà cung cấp',
+        details: error?.message,
+      },
+      { status: 500 }
+    )
+  }
+}
+
+// PATCH /api/suppliers/[id]
+export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const body = await request.json()
+
+    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Supplier/suppliers/${params.id}`, {
+      method: 'PATCH',
+      headers: buildForwardHeaders(request),
+      body: JSON.stringify(body),
+    })
+
+    const payload = await parseResponseBody(response)
+    if (!response.ok) {
+      return NextResponse.json(payload ?? { error: 'Failed to update supplier' }, { status: response.status })
+    }
+
+    return NextResponse.json(payload ?? {}, { status: response.status })
+  } catch (error: any) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Không thể cập nhật nhà cung cấp',
+        details: error?.message,
+      },
+      { status: 500 }
+    )
+  }
+}
+
+// DELETE /api/suppliers/[id]
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Supplier/suppliers/${params.id}`, {
+      method: 'DELETE',
+      headers: buildForwardHeaders(request),
+    })
+
+    const payload = await parseResponseBody(response)
+    if (!response.ok) {
+      return NextResponse.json(payload ?? { error: 'Failed to delete supplier' }, { status: response.status })
+    }
+
+    return NextResponse.json(payload ?? { success: true }, { status: response.status })
+  } catch (error: any) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Không thể xóa nhà cung cấp',
+        details: error?.message,
+      },
+      { status: 500 }
+    )
+  }
+}

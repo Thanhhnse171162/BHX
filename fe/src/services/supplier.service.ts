@@ -5,26 +5,9 @@ import type {
   UpdateSupplierPayload,
 } from '@/types/supplier.types'
 
-const DEFAULT_CATALOG_BASE_URL = 'http://13.229.29.52:5001'
-
-function normalizeBaseUrl(value?: string): string {
-  return String(value || '').trim().replace(/\/+$/, '')
-}
-
 function getApiBaseUrl(): string {
-  // Supplier API currently belongs to Catalog service.
-  // Prefer catalog URL, fallback to gateway URL when needed.
-  const catalogUrl = normalizeBaseUrl(process.env.NEXT_PUBLIC_CATALOG_URL)
-  const apiGatewayUrl = normalizeBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL)
-  const baseUrl = catalogUrl || apiGatewayUrl || DEFAULT_CATALOG_BASE_URL
-
-  if (!catalogUrl && !apiGatewayUrl && process.env.NODE_ENV !== 'development') {
-    console.warn(
-      '[supplier.service] NEXT_PUBLIC_CATALOG_URL and NEXT_PUBLIC_API_BASE_URL are missing. Falling back to default Catalog URL.'
-    )
-  }
-
-  return baseUrl
+  // Always call same-origin Next.js API proxy to avoid browser mixed-content/CORS issues.
+  return '/api/suppliers'
 }
 
 interface SupplierApiRaw {
@@ -91,7 +74,7 @@ function normalizeSupplier(raw: SupplierApiRaw): SupplierListItem {
 
 export const supplierService = {
   async getSuppliers(): Promise<SupplierListItem[]> {
-    const res = await fetch(`${getApiBaseUrl()}/api/Supplier/suppliers`, {
+    const res = await fetch(`${getApiBaseUrl()}`, {
       method: 'GET',
       headers: buildHeaders(),
     })
@@ -101,7 +84,7 @@ export const supplierService = {
   },
 
   async getSupplierById(id: string): Promise<SupplierListItem> {
-    const res = await fetch(`${getApiBaseUrl()}/api/Supplier/suppliers/${id}`, {
+    const res = await fetch(`${getApiBaseUrl()}/${id}`, {
       method: 'GET',
       headers: buildHeaders(),
     })
@@ -110,7 +93,7 @@ export const supplierService = {
   },
 
   async createSupplier(payload: CreateSupplierPayload): Promise<SupplierListItem> {
-    const res = await fetch(`${getApiBaseUrl()}/api/Supplier/suppliers/add`, {
+    const res = await fetch(`${getApiBaseUrl()}`, {
       method: 'POST',
       headers: buildHeaders(),
       body: JSON.stringify(payload),
@@ -120,7 +103,7 @@ export const supplierService = {
   },
 
   async updateSupplier(id: string, payload: UpdateSupplierPayload): Promise<SupplierListItem> {
-    const res = await fetch(`${getApiBaseUrl()}/api/Supplier/suppliers/${id}`, {
+    const res = await fetch(`${getApiBaseUrl()}/${id}`, {
       method: 'PATCH',
       headers: buildHeaders(),
       body: JSON.stringify(payload),
@@ -130,7 +113,7 @@ export const supplierService = {
   },
 
   async deleteSupplier(id: string): Promise<void> {
-    const res = await fetch(`${getApiBaseUrl()}/api/Supplier/suppliers/${id}`, {
+    const res = await fetch(`${getApiBaseUrl()}/${id}`, {
       method: 'DELETE',
       headers: buildHeaders(),
     })
