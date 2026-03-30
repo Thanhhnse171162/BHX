@@ -39,6 +39,7 @@ function mapApiUserToUi(raw: any): User {
 }
 
 export default function UsersPage() {
+  const ITEMS_PER_PAGE = 10
   const token = useAuthStore((state) => state.token)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [mode, setMode] = useState<'create' | 'edit'>('create')
@@ -49,8 +50,14 @@ export default function UsersPage() {
   const [passwordError, setPasswordError] = useState('')
   const [role, setRole] = useState('STAFF')
   const [users, setUsers] = useState<User[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [roles, setRoles] = useState<Array<{ id: number; name: string }>>([])
+
+  const totalPages = Math.max(1, Math.ceil(users.length / ITEMS_PER_PAGE))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE
+  const paginatedUsers = users.slice(startIndex, startIndex + ITEMS_PER_PAGE)
 
   // Load users từ database
   const loadUsers = async () => {
@@ -105,6 +112,10 @@ export default function UsersPage() {
     loadUsers()
     loadRoles()
   }, [token])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [users.length])
 
   // Validate password
   const validatePassword = (pwd: string): string => {
@@ -296,8 +307,9 @@ export default function UsersPage() {
             action={createUserButton}
           />
         ) : (
-          <DataTable
-            data={users}
+          <>
+            <DataTable
+              data={paginatedUsers}
             columns={[
               {
                 key: 'name',
@@ -391,8 +403,38 @@ export default function UsersPage() {
                   )
                 },
               },
-            ]}
-          />
+              ]}
+            />
+
+            {users.length > ITEMS_PER_PAGE && (
+              <div className="mt-4 flex items-center justify-between">
+                <p className="text-sm text-gray-600">
+                  Hiển thị {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, users.length)} / {users.length} users
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    disabled={safeCurrentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm text-gray-700">
+                    Page {safeCurrentPage}/{totalPages}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    disabled={safeCurrentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
