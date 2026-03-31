@@ -196,21 +196,6 @@ export const getAdminNavigation = (): NavGroup[] => {
         },
       ],
     },
-    {
-      label: 'Hệ thống',
-      items: [
-        {
-          label: 'Configuration',
-          href: '/admin/system/config',
-          icon: 'Settings',
-        },
-        {
-          label: 'Security',
-          href: '/admin/system/security',
-          icon: 'Lock',
-        },
-      ],
-    },
   ]
 }
 
