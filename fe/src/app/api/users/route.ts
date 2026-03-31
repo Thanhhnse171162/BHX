@@ -1,125 +1,70 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { executeQuery } from '@/lib/db/config'
-import bcrypt from 'bcryptjs'
 
-// GET /api/users - List all users
-export async function GET(_request: NextRequest) {
+const IAM_SERVICE_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://localhost:5000'
+
+// GET /api/users - Proxy to IAM service
+export async function GET(request: NextRequest) {
   try {
-    const query = `
-      SELECT 
-        u.id,
-        u.email,
-        u.full_name as name,
-        u.phone,
-        u.status,
-        r.name as role,
-        u.role_id,
-        GETDATE() as createdAt
-      FROM users u
-      LEFT JOIN roles r ON u.role_id = r.id
-      WHERE u.role_id != 1
-      ORDER BY u.id DESC
-    `
+    const authHeader = request.headers.get('authorization')
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    }
+    if (authHeader) {
+      headers['Authorization'] = authHeader
+    }
 
-    const users = await executeQuery(query)
+    const response = await fetch(`${IAM_SERVICE_URL}/api/users`, {
+      method: 'GET',
+      headers,
+      cache: 'no-store',
+    })
 
-    return NextResponse.json(users)
-  } catch (error) {
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      return NextResponse.json(errorData, { status: response.status })
+    }
+
+    const result = await response.json()
+    return NextResponse.json(result, { status: 200 })
+  } catch (error: any) {
     console.error('Get users error:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch users' },
+      { error: `Failed to fetch users: ${error.message}` },
       { status: 500 }
     )
   }
 }
 
-// POST /api/users - Create new user
+// POST /api/users - Proxy to IAM service
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, email, password, role } = body
 
-    if (!name || !email || !password || !role) {
-      return NextResponse.json(
-        { error: 'Name, email, password, and role are required' },
-        { status: 400 }
-      )
+    const authHeader = request.headers.get('authorization')
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    }
+    if (authHeader) {
+      headers['Authorization'] = authHeader
     }
 
-    // Get role_id from role name
-    const roleQuery = `SELECT id FROM roles WHERE name = @role`
-    const roles = await executeQuery<{ id: string }>(roleQuery, { role })
-    
-    if (roles.length === 0) {
-      console.error('Role not found:', role)
-      return NextResponse.json(
-        { error: `Role "${role}" not found in database` },
-        { status: 400 }
-      )
-    }
-
-    const roleId = roles[0].id
-
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10)
-
-    // Insert user with IdentityDB structure
-    const insertQuery = `
-      INSERT INTO users (id, email, password_hash, full_name, role_id, status, email_verified)
-      OUTPUT INSERTED.id, INSERTED.email, INSERTED.full_name, INSERTED.status
-      VALUES (NEWID(), @email, @password_hash, @name, @role_id, 'ACTIVE', 0)
-    `
-
-    const result = await executeQuery<{
-      id: string
-      email: string
-      full_name: string
-      status: string
-    }>(insertQuery, {
-      email,
-      password_hash: passwordHash,
-      name,
-      role_id: roleId,
+    const response = await fetch(`${IAM_SERVICE_URL}/api/users`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
     })
 
-    if (result.length === 0) {
-      console.error('Insert returned no result')
-      return NextResponse.json(
-        { error: 'Failed to create user - insert returned no result' },
-        { status: 500 }
-      )
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      return NextResponse.json(errorData, { status: response.status })
     }
 
-    const newUser = result[0]
-
-    return NextResponse.json({
-      id: newUser.id,
-      name: newUser.full_name,
-      email: newUser.email,
-      role,
-      status: newUser.status,
-    }, { status: 201 })
+    const result = await response.json()
+    return NextResponse.json(result, { status: response.status })
   } catch (error: any) {
     console.error('Create user error:', error)
-    
-    // Handle duplicate email error
-    if (error.number === 2627 || error.message?.includes('UNIQUE')) {
-      return NextResponse.json(
-        { error: 'Email already exists' },
-        { status: 409 }
-      )
-    }
-
-    // Handle specific database errors
-    if (error.message?.includes('Cannot insert')) {
-      return NextResponse.json(
-        { error: `Database error: ${error.message}` },
-        { status: 400 }
-      )
-    }
-
     return NextResponse.json(
-      { error: `Failed to create user: ${error.message || 'Unknown error'}` },
+      { error: `Failed to create user: ${error.message}` },
       { status: 500 }
     )
   }
