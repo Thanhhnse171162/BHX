@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Download, Eye, Filter, Loader2, Plus, Search, X } from 'lucide-react'
+import { AlertTriangle, Eye, Filter, Loader2, Plus, Search, X } from 'lucide-react'
 import {
   createInventoryCheck,
   getInventoryCheckById,
@@ -252,10 +252,6 @@ export default function StoreManagerInventoryCheckPage() {
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Filter className="w-4 h-4" />}
             Làm mới
-          </button>
-          <button className="px-4 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors inline-flex items-center gap-2">
-            <Download className="w-4 h-4" />
-            Xuất Excel
           </button>
         </div>
       </div>

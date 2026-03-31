@@ -15,7 +15,6 @@ import {
   LogOut,
   Bell,
   PackagePlus,
-  BadgePercent,
 } from 'lucide-react'
 
 interface StoreManagerLayoutProps {
@@ -24,7 +23,6 @@ interface StoreManagerLayoutProps {
 
 const PRIMARY_NAV = [
   { href: '/store-manager',                          label: 'Tổng quan',            icon: LayoutDashboard, exact: true  },
-  { href: '/store-manager/discounts',                label: 'Giảm giá',             icon: BadgePercent,    exact: false },
   { href: '/store-manager/products',                 label: 'Sản phẩm',            icon: Archive,         exact: false },
   // { href: '/store-manager/inventory',                label: 'Tồn kho kệ hàng',     icon: Archive,         exact: false },
   { href: '/store-manager/inventory-aux',            label: 'Tồn kho kho phụ',     icon: Warehouse,       exact: false },
@@ -35,6 +33,8 @@ const PRIMARY_NAV = [
 ]
 
 const MANAGEMENT_NAV: any[] = []
+
+const HIDDEN_SIDEBAR_LABELS = new Set(['Doanh thu', 'Quản lý đơn hàng', 'Quản lý khách hàng'])
 
 function getPageTitle(pathname: string): string {
   if (pathname === '/store-manager') return 'Tổng Quan'
@@ -109,6 +109,8 @@ export default function StoreManagerLayout({ children }: StoreManagerLayoutProps
   const displayName = user.name || 'Alex Rivera'
   const pageTitle   = getPageTitle(pathname)
   const headerDate  = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const visiblePrimaryNav = PRIMARY_NAV.filter((item) => !HIDDEN_SIDEBAR_LABELS.has(item.label))
+  const visibleManagementNav = MANAGEMENT_NAV.filter((item) => !HIDDEN_SIDEBAR_LABELS.has(item.label))
 
   return (
     <div className="min-h-screen bg-[#F4F6F9] flex font-sans">
@@ -131,7 +133,7 @@ export default function StoreManagerLayout({ children }: StoreManagerLayoutProps
 
         {/* Navigation – primary items */}
         <nav className="flex-1 overflow-y-auto py-4 px-3">
-          {PRIMARY_NAV.map((item) => {
+          {visiblePrimaryNav.map((item) => {
             const Icon = item.icon
             const isActive = item.exact
               ? pathname === item.href
@@ -163,10 +165,12 @@ export default function StoreManagerLayout({ children }: StoreManagerLayoutProps
           })}
 
           {/* Management section */}
-          <p className="text-[10px] font-semibold text-gray-400 tracking-widest px-3 mt-5 mb-2 uppercase">
-            Quản lý
-          </p>
-          {MANAGEMENT_NAV.map((item) => {
+          {visibleManagementNav.length > 0 && (
+            <p className="text-[10px] font-semibold text-gray-400 tracking-widest px-3 mt-5 mb-2 uppercase">
+              Quản lý
+            </p>
+          )}
+          {visibleManagementNav.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
             return (

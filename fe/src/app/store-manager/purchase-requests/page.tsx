@@ -44,10 +44,29 @@ function mapStatus(status: string): RequestStatus {
   return 'Chờ duyệt'
 }
 
+function getRequesterDisplayName(req: RestockRequestFromAPI, userMap: Record<string, string>): string {
+  const raw = req as RestockRequestFromAPI & {
+    requestedByName?: string
+    requesterName?: string
+    requesterFullName?: string
+    requestedByFullName?: string
+  }
+
+  return (
+    raw.requestedByName ||
+    raw.requesterName ||
+    raw.requesterFullName ||
+    raw.requestedByFullName ||
+    userMap[req.requestedBy] ||
+    req.requestedBy ||
+    '--'
+  )
+}
+
 function mapToRows(req: RestockRequestFromAPI, productMap: Record<string, string>, userMap: Record<string, string>): PurchaseRequest[] {
   // If no items, create one row with request-level info
   if (!req.items || req.items.length === 0) {
-    const userName = userMap[req.requestedBy] || req.requestedBy || '--'
+    const userName = getRequesterDisplayName(req, userMap)
     return [{
       id: req.requestNumber || req.id,
       product: 'Không có sản phẩm',
@@ -65,7 +84,7 @@ function mapToRows(req: RestockRequestFromAPI, productMap: Record<string, string
   // Create one row per item, each with the request number but different product details
   return req.items.map((item, idx) => {
     const productName = item.productName || productMap[item.productId] || '--'
-    const userName = userMap[req.requestedBy] || req.requestedBy || '--'
+    const userName = getRequesterDisplayName(req, userMap)
     
     return {
       id: req.requestNumber || req.id,
@@ -231,6 +250,25 @@ export default function PurchaseRequestsPage() {
       } catch {
         // Ignore if getAll is forbidden for current role.
       }
+
+      // Resolve missing requester names by user id one-by-one.
+      const unresolvedRequesterIds = Array.from(new Set(
+        merged
+          .map((r) => r.requestedBy)
+          .filter((id) => !!id && !userMap[id])
+      ))
+
+      await Promise.all(
+        unresolvedRequesterIds.map(async (id) => {
+          try {
+            const u = await UserAPIService.getById(id)
+            const userName = u?.full_name || u?.fullName || u?.name || u?.email || ''
+            if (userName) userMap[id] = userName
+          } catch {
+            // Ignore per-user lookup failure and keep fallback display.
+          }
+        })
+      )
 
       setRequests(merged.flatMap((req) => mapToRows(req, productMap, userMap)))
       setPage(1)
