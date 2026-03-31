@@ -184,11 +184,7 @@ export const getAdminNavigation = (): NavGroup[] => {
           href: '/admin/reports/inventory',
           icon: 'PackageOpen',
         },
-        {
-          label: 'Profit & Loss',
-          href: '/admin/reports/finance',
-          icon: 'DollarSign',
-        },
+        // Đã xóa mục 'Profit & Loss' khỏi sidebar
         {
           label: 'Báo cáo hư hại',
           href: '/admin/reports',
