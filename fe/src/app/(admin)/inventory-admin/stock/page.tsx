@@ -244,20 +244,20 @@ export default function ItemStockPage() {
       syncStockItems([...stockItems, newItem])
       handleOpenEdit(newItem)
     }}>
-      Add Stock Item
+      Thêm mặt hàng tồn kho
     </Button>
   )
 
   return (
     <div className="p-6">
       <PageHeader
-        title="Item Stock"
-        subtitle="Manage stock levels, reorder points, and inventory thresholds"
+        title="Tồn kho mặt hàng"
+        subtitle="Quản lý số lượng tồn, điểm đặt lại và ngưỡng tồn kho"
         actions={addButton}
         breadcrumbs={[
-          { label: 'Admin', href: '/admin' },
+          { label: 'Quản trị', href: '/admin' },
           { label: 'Kho & Tồn kho', href: '/admin/inventory' },
-          { label: 'Item Stock', href: '/admin/inventory/stock' },
+          { label: 'Tồn kho mặt hàng', href: '/admin/inventory/stock' },
         ]}
       />
 
@@ -266,7 +266,7 @@ export default function ItemStockPage() {
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
             <Input
-              placeholder="Search by SKU, product name, or category..."
+              placeholder="Tìm theo SKU, tên sản phẩm hoặc danh mục..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -277,11 +277,11 @@ export default function ItemStockPage() {
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
             >
-              <option value="all">All Status</option>
-              <option value="IN_STOCK">In Stock</option>
-              <option value="LOW_STOCK">Low Stock</option>
-              <option value="REORDER">Need Reorder</option>
-              <option value="OUT_OF_STOCK">Out of Stock</option>
+              <option value="all">Tất cả trạng thái</option>
+              <option value="IN_STOCK">Còn hàng</option>
+              <option value="LOW_STOCK">Sắp hết hàng</option>
+              <option value="REORDER">Cần nhập thêm</option>
+              <option value="OUT_OF_STOCK">Hết hàng</option>
             </select>
           </div>
         </div>
@@ -290,10 +290,10 @@ export default function ItemStockPage() {
       <div className="card">
         {filteredItems.length === 0 ? (
           <EmptyState
-            title="No Stock Items"
+            title="Không có mặt hàng tồn kho"
             description={searchQuery || filterStatus !== 'all' 
-              ? "No items match your search criteria"
-              : "Start adding stock items to track inventory"}
+              ? 'Không có mặt hàng phù hợp tiêu chí tìm kiếm'
+              : 'Bắt đầu thêm mặt hàng để theo dõi tồn kho'}
             action={!searchQuery && filterStatus === 'all' ? addButton : undefined}
           />
         ) : (
@@ -315,11 +315,11 @@ export default function ItemStockPage() {
               },
               {
                 key: 'productName',
-                label: 'Product Name',
+                label: 'Tên sản phẩm',
               },
               {
                 key: 'currentStock',
-                label: 'Stock Levels',
+                label: 'Mức tồn kho',
                 render: (_value: unknown, item: unknown) => {
                   const stock = item as StockItem
                   return (
@@ -330,12 +330,12 @@ export default function ItemStockPage() {
                         </span>
                         {stock.reservedStock > 0 && (
                           <span className="text-xs text-gray-500">
-                            ({stock.reservedStock} reserved)
+                            ({stock.reservedStock} đã giữ)
                           </span>
                         )}
                       </div>
                       <div className="text-xs text-gray-500">
-                        Available: {stock.availableStock} {stock.unit}
+                        Khả dụng: {stock.availableStock} {stock.unit}
                       </div>
                     </div>
                   )
@@ -343,21 +343,21 @@ export default function ItemStockPage() {
               },
               {
                 key: 'reorderPoint',
-                label: 'Reorder Settings',
+                label: 'Thiết lập nhập hàng',
                 render: (_value, item) => {
                   const stock = item as StockItem
                   return (
                     <div className="text-sm">
-                      <div>Min: {stock.minStock} {stock.unit}</div>
-                      <div>Reorder: {stock.reorderPoint} {stock.unit}</div>
-                      <div>Max: {stock.maxStock} {stock.unit}</div>
+                      <div>Tối thiểu: {stock.minStock} {stock.unit}</div>
+                      <div>Đặt lại: {stock.reorderPoint} {stock.unit}</div>
+                      <div>Tối đa: {stock.maxStock} {stock.unit}</div>
                     </div>
                   )
                 },
               },
               {
                 key: 'status',
-                label: 'Status',
+                label: 'Trạng thái',
                 render: (value) => {
                   const status = value as StockItem['status']
                   return (
@@ -371,7 +371,7 @@ export default function ItemStockPage() {
               },
               {
                 key: 'lastUpdated',
-                label: 'Last Updated',
+                label: 'Cập nhật lần cuối',
                 render: (value) => {
                   return new Date(value as string).toLocaleDateString('vi-VN', {
                     year: 'numeric',
@@ -384,7 +384,7 @@ export default function ItemStockPage() {
               },
               {
                 key: 'id',
-                label: 'Actions',
+                label: 'Thao tác',
                 render: (_value, item) => {
                   const stock = item as StockItem
                   return (
@@ -397,7 +397,7 @@ export default function ItemStockPage() {
                           handleOpenAdjust(stock)
                         }}
                       >
-                        Adjust
+                        Điều chỉnh
                       </Button>
                       <Button
                         size="sm"
@@ -407,7 +407,7 @@ export default function ItemStockPage() {
                           handleOpenEdit(stock)
                         }}
                       >
-                        Edit
+                        Sửa
                       </Button>
                       <Button
                         size="sm"
@@ -417,7 +417,7 @@ export default function ItemStockPage() {
                           handleDeleteItem(stock.id)
                         }}
                       >
-                        Delete
+                        Xóa
                       </Button>
                     </div>
                   )
@@ -432,46 +432,46 @@ export default function ItemStockPage() {
       <Modal
         isOpen={isAdjustModalOpen}
         onClose={handleCloseAdjustModal}
-        title="Adjust Stock"
+        title="Điều chỉnh tồn kho"
         size="md"
         footer={
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={handleCloseAdjustModal}>
-              Cancel
+              Hủy
             </Button>
-            <Button onClick={handleAdjustStock}>Apply Adjustment</Button>
+            <Button onClick={handleAdjustStock}>Áp dụng điều chỉnh</Button>
           </div>
         }
       >
         {adjustingId && (
           <form className="space-y-4" onSubmit={handleAdjustStock}>
             <div className="p-3 bg-gray-50 rounded-lg">
-              <div className="text-sm text-gray-600">Product</div>
+              <div className="text-sm text-gray-600">Sản phẩm</div>
               <div className="font-semibold text-gray-900">
                 {stockItems.find((i) => i.id === adjustingId)?.productName} (
                 {stockItems.find((i) => i.id === adjustingId)?.sku})
               </div>
               <div className="text-sm text-gray-600 mt-1">
-                Current Stock: {stockItems.find((i) => i.id === adjustingId)?.currentStock}{' '}
+                Tồn kho hiện tại: {stockItems.find((i) => i.id === adjustingId)?.currentStock}{' '}
                 {stockItems.find((i) => i.id === adjustingId)?.unit}
               </div>
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-700">Adjustment Type</label>
+              <label className="text-sm font-medium text-gray-700">Loại điều chỉnh</label>
               <select
                 className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
                 value={adjustmentType}
                 onChange={(e) => setAdjustmentType(e.target.value as 'ADD' | 'SUBTRACT' | 'SET')}
               >
-                <option value="ADD">Add Stock</option>
-                <option value="SUBTRACT">Subtract Stock</option>
-                <option value="SET">Set Stock</option>
+                <option value="ADD">Cộng tồn</option>
+                <option value="SUBTRACT">Trừ tồn</option>
+                <option value="SET">Đặt lại tồn</option>
               </select>
             </div>
 
             <Input
-              label="Quantity"
+              label="Số lượng"
               type="number"
               value={adjustmentQuantity}
               onChange={(e) => setAdjustmentQuantity(Number(e.target.value))}
@@ -481,12 +481,12 @@ export default function ItemStockPage() {
             />
 
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-700">Reason *</label>
+              <label className="text-sm font-medium text-gray-700">Lý do *</label>
               <textarea
                 className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
                 value={adjustmentReason}
                 onChange={(e) => setAdjustmentReason(e.target.value)}
-                placeholder="Enter reason for stock adjustment..."
+                placeholder="Nhập lý do điều chỉnh tồn kho..."
                 rows={3}
                 required
               />
@@ -494,35 +494,35 @@ export default function ItemStockPage() {
 
             {adjustmentType === 'ADD' && (
               <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
-                New stock will be: {stockItems.find((i) => i.id === adjustingId)?.currentStock || 0} + {adjustmentQuantity} = {(stockItems.find((i) => i.id === adjustingId)?.currentStock || 0) + adjustmentQuantity}
+                Tồn kho mới sẽ là: {stockItems.find((i) => i.id === adjustingId)?.currentStock || 0} + {adjustmentQuantity} = {(stockItems.find((i) => i.id === adjustingId)?.currentStock || 0) + adjustmentQuantity}
               </div>
             )}
             {adjustmentType === 'SUBTRACT' && (
               <div className="p-3 bg-yellow-50 rounded-lg text-sm text-yellow-800">
-                New stock will be: {stockItems.find((i) => i.id === adjustingId)?.currentStock || 0} - {adjustmentQuantity} = {Math.max(0, (stockItems.find((i) => i.id === adjustingId)?.currentStock || 0) - adjustmentQuantity)}
+                Tồn kho mới sẽ là: {stockItems.find((i) => i.id === adjustingId)?.currentStock || 0} - {adjustmentQuantity} = {Math.max(0, (stockItems.find((i) => i.id === adjustingId)?.currentStock || 0) - adjustmentQuantity)}
               </div>
             )}
             {adjustmentType === 'SET' && (
               <div className="p-3 bg-green-50 rounded-lg text-sm text-green-800">
-                Stock will be set to: {adjustmentQuantity}
+                Tồn kho sẽ được đặt thành: {adjustmentQuantity}
               </div>
             )}
           </form>
         )}
       </Modal>
 
-      {/* Edit Stock Item Modal */}
+      {/* Modal sửa mặt hàng tồn kho */}
       <Modal
         isOpen={isEditModalOpen}
         onClose={handleCloseEditModal}
-        title={editingId ? 'Edit Stock Item' : 'Add Stock Item'}
+        title={editingId ? 'Sửa mặt hàng tồn kho' : 'Thêm mặt hàng tồn kho'}
         size="md"
         footer={
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={handleCloseEditModal}>
-              Cancel
+              Hủy
             </Button>
-            <Button onClick={handleEditStock}>Save</Button>
+            <Button onClick={handleEditStock}>Lưu</Button>
           </div>
         }
       >
@@ -535,22 +535,22 @@ export default function ItemStockPage() {
             required
           />
           <Input
-            label="Product Name"
+            label="Tên sản phẩm"
             value={productName}
             onChange={(e) => setProductName(e.target.value)}
-            placeholder="Product name"
+            placeholder="Tên sản phẩm"
             required
           />
           <Input
-            label="Category"
+            label="Danh mục"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            placeholder="Category"
+            placeholder="Danh mục"
             required
           />
           <div className="grid grid-cols-3 gap-4">
             <Input
-              label="Min Stock"
+              label="Tồn tối thiểu"
               type="number"
               value={minStock}
               onChange={(e) => setMinStock(Number(e.target.value))}
@@ -559,7 +559,7 @@ export default function ItemStockPage() {
               min={0}
             />
             <Input
-              label="Reorder Point"
+              label="Điểm đặt hàng lại"
               type="number"
               value={reorderPoint}
               onChange={(e) => setReorderPoint(Number(e.target.value))}
@@ -568,7 +568,7 @@ export default function ItemStockPage() {
               min={0}
             />
             <Input
-              label="Max Stock"
+              label="Tồn tối đa"
               type="number"
               value={maxStock}
               onChange={(e) => setMaxStock(Number(e.target.value))}
@@ -578,19 +578,19 @@ export default function ItemStockPage() {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-700">Unit</label>
+            <label className="text-sm font-medium text-gray-700">Đơn vị</label>
             <select
               className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
               value={unit}
               onChange={(e) => setUnit(e.target.value)}
             >
-              <option value="pcs">Pieces (pcs)</option>
-              <option value="kg">Kilograms (kg)</option>
-              <option value="g">Grams (g)</option>
-              <option value="l">Liters (l)</option>
-              <option value="ml">Milliliters (ml)</option>
+              <option value="pcs">Cái (pcs)</option>
+              <option value="kg">Kilôgam (kg)</option>
+              <option value="g">Gam (g)</option>
+              <option value="l">Lít (l)</option>
+              <option value="ml">Mililít (ml)</option>
               <option value="box">Box</option>
-              <option value="pack">Pack</option>
+              <option value="pack">Gói</option>
             </select>
           </div>
         </form>

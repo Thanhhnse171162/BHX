@@ -18,8 +18,8 @@ export default function AdminDashboard() {
       {/* Professional Page Header */}
       <div className="mb-8">
         <PageHeader
-          title="Admin Console"
-          subtitle="Quản trị hệ thống chuỗi bán lẻ - Enterprise Dashboard"
+          title="Bảng điều hành quản trị"
+          subtitle="Quản trị hệ thống chuỗi bán lẻ"
           actions={
             <span className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-medium shadow-sm">
               <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>

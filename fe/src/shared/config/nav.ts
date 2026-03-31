@@ -73,7 +73,7 @@ export const getAdminNavigation = (): NavGroup[] => {
       label: 'Tổng quan',
       items: [
         {
-          label: 'Dashboard',
+          label: 'Bảng điều khiển',
           href: '/admin/dashboard',
           icon: 'LayoutDashboard',
         },
@@ -83,12 +83,12 @@ export const getAdminNavigation = (): NavGroup[] => {
       label: 'Người dùng & Phân quyền',
       items: [
         {
-          label: 'Users Management',
+          label: 'Quản lý người dùng',
           href: '/admin/users',
           icon: 'Users',
         },
         {
-          label: 'Roles & Permissions',
+          label: 'Vai trò & quyền hạn',
           href: '/admin/users/roles',
           icon: 'ShieldCheck',
         },
@@ -98,12 +98,12 @@ export const getAdminNavigation = (): NavGroup[] => {
       label: 'Sản phẩm & Danh mục',
       items: [
         {
-          label: 'Products',
+          label: 'Sản phẩm',
           href: '/admin/catalog/products',
           icon: 'Package2',
         },
         {
-          label: 'Categories',
+          label: 'Danh mục',
           href: '/admin/catalog/categories',
           icon: 'FolderTree',
         },
@@ -123,7 +123,7 @@ export const getAdminNavigation = (): NavGroup[] => {
       label: 'Kho & Tồn kho',
       items: [
         {
-          label: 'Warehouse Management',
+          label: 'Quản lý kho',
           href: '/warehouses',
           icon: 'Building2',
         },
@@ -133,7 +133,7 @@ export const getAdminNavigation = (): NavGroup[] => {
           icon: 'Warehouse',
         },
         {
-          label: 'Item Stock',
+          label: 'Tồn kho mặt hàng',
           href: '/inventory-admin/stock',
           icon: 'PackageCheck',
         },
@@ -143,14 +143,9 @@ export const getAdminNavigation = (): NavGroup[] => {
           icon: 'PackageSearch',
         },
         {
-          label: 'Low-stock Alerts',
+          label: 'Cảnh báo tồn thấp',
           href: '/inventory-admin/alerts',
           icon: 'AlertTriangle',
-        },
-        {
-          label: 'Inventory Logs',
-          href: '/inventory-admin/logs',
-          icon: 'ScrollText',
         },
       ],
     },
@@ -159,12 +154,12 @@ export const getAdminNavigation = (): NavGroup[] => {
       items: [
         // Sales Reports entry removed
         {
-          label: 'Inventory Reports',
+          label: 'Báo cáo tồn kho',
           href: '/admin/reports/inventory',
           icon: 'PackageOpen',
         },
         {
-          label: 'Profit & Loss',
+          label: 'Lợi nhuận & thua lỗ',
           href: '/admin/reports/finance',
           icon: 'DollarSign',
         },

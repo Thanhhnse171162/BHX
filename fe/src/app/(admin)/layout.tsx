@@ -28,7 +28,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
         <header className="bg-white border-b border-gray-200 shadow-sm">
           <div className="px-6 py-4 flex justify-between items-center">
             <div className="flex items-center gap-4">
-              <h1 className="text-2xl font-bold text-slate-900">Admin Dashboard</h1>
+              <h1 className="text-2xl font-bold text-slate-900">Bảng điều khiển quản trị</h1>
               <span className="px-3 py-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full">
                 LIVE
               </span>

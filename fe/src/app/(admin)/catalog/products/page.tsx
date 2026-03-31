@@ -477,20 +477,20 @@ export default function ProductsPage() {
 
   const createProductButton = (
     <Button onClick={handleOpenCreate}>
-      Create Product
+      Tạo sản phẩm
     </Button>
   )
 
   return (
     <div className="p-6">
       <PageHeader
-        title="Products"
-        subtitle="Manage product catalog"
+        title="Sản phẩm"
+        subtitle="Quản lý danh mục sản phẩm"
         actions={createProductButton}
         breadcrumbs={[
-          { label: 'Admin', href: '/admin' },
-          { label: 'Catalog', href: '/admin/catalog' },
-          { label: 'Products', href: '/admin/catalog/products' },
+          { label: 'Quản trị', href: '/admin' },
+          { label: 'Danh mục', href: '/admin/catalog' },
+          { label: 'Sản phẩm', href: '/admin/catalog/products' },
         ]}
       />
 
@@ -519,8 +519,8 @@ export default function ProductsPage() {
         {/* Empty state */}
         {!isLoading && !error && products.length === 0 && (
           <EmptyState
-            title="No Products"
-            description="Add your first product to the catalog"
+            title="Không có sản phẩm"
+            description="Thêm sản phẩm đầu tiên vào danh mục"
             action={createProductButton}
           />
         )}
@@ -532,21 +532,21 @@ export default function ProductsPage() {
               data={paginatedProducts}
               columns={[
                 { key: 'sku', label: 'SKU' },
-                { key: 'name', label: 'Name' },
-                { key: 'category', label: 'Category' },
+                { key: 'name', label: 'Tên' },
+                { key: 'category', label: 'Danh mục' },
                 {
                   key: 'price',
-                  label: 'Price',
+                  label: 'Giá',
                   render: (value) =>
                     new Intl.NumberFormat('vi-VN', {
                       style: 'currency',
                       currency: 'VND',
                     }).format(value as number),
                 },
-                { key: 'unit', label: 'Unit' },
+                { key: 'unit', label: 'Đơn vị' },
                 {
                   key: 'totalQuantity',
-                  label: 'Total Stock',
+                  label: 'Tổng tồn',
                   render: (value) => (
                     <span className="font-medium">
                       {value !== undefined && value !== null ? String(value) : 'N/A'}
@@ -555,7 +555,7 @@ export default function ProductsPage() {
                 },
                 {
                   key: 'availableQuantity',
-                  label: 'Available',
+                  label: 'Khả dụng',
                   render: (value) => (
                     <span className="font-medium text-green-600">
                       {value !== undefined && value !== null ? String(value) : 'N/A'}
@@ -564,7 +564,7 @@ export default function ProductsPage() {
                 },
                 {
                   key: 'reservedQuantity',
-                  label: 'Reserved',
+                  label: 'Đã giữ',
                   render: (value) => (
                     <span className="font-medium text-orange-600">
                       {value !== undefined && value !== null ? String(value) : 'N/A'}
@@ -573,7 +573,7 @@ export default function ProductsPage() {
                 },
                 {
                   key: 'inventoryStatus',
-                  label: 'Stock Status',
+                  label: 'Trạng thái tồn kho',
                   render: (value) => {
                     const statusColors = {
                       IN_STOCK: 'bg-green-100 text-green-800',
@@ -581,9 +581,9 @@ export default function ProductsPage() {
                       OUT_OF_STOCK: 'bg-red-100 text-red-800',
                     }
                     const statusLabels = {
-                      IN_STOCK: 'In Stock',
-                      LOW_STOCK: 'Low Stock',
-                      OUT_OF_STOCK: 'Out of Stock',
+                      IN_STOCK: 'Còn hàng',
+                      LOW_STOCK: 'Sắp hết hàng',
+                      OUT_OF_STOCK: 'Hết hàng',
                     }
                     const status = value as 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'
                     return (
@@ -592,14 +592,14 @@ export default function ProductsPage() {
                           statusColors[status] || 'bg-gray-100 text-gray-700'
                         }`}
                       >
-                        {statusLabels[status] || 'Unknown'}
+                        {statusLabels[status] || 'Không xác định'}
                       </span>
                     )
                   },
                 },
                 {
                   key: 'status',
-                  label: 'Status',
+                  label: 'Trạng thái',
                   render: (value) => (
                     <span
                       className={`px-2 py-1 text-xs font-medium rounded-full ${
@@ -608,13 +608,13 @@ export default function ProductsPage() {
                           : 'bg-gray-100 text-gray-700'
                       }`}
                     >
-                      {value === 'ACTIVE' ? 'Active' : 'Inactive'}
+                      {value === 'ACTIVE' ? 'Hoạt động' : 'Không hoạt động'}
                     </span>
                   ),
                 },
                 {
                   key: 'createdAt',
-                  label: 'Created At',
+                  label: 'Ngày tạo',
                   render: (value) =>
                     new Date(value as string).toLocaleDateString('vi-VN', {
                       year: 'numeric',
@@ -624,7 +624,7 @@ export default function ProductsPage() {
                 },
                 {
                   key: 'id',
-                  label: 'Actions',
+                  label: 'Thao tác',
                   render: (_value, item) => {
                     const row = item as unknown as ProductRow
                     return (
@@ -637,7 +637,7 @@ export default function ProductsPage() {
                             handleEdit(row)
                           }}
                         >
-                          Edit
+                          Sửa
                         </Button>
                         <Button
                           size="sm"
@@ -647,7 +647,7 @@ export default function ProductsPage() {
                             handleDelete(row.id)
                           }}
                         >
-                          Delete
+                          Xóa
                         </Button>
                       </div>
                     )
@@ -689,15 +689,15 @@ export default function ProductsPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={handleClose}
-        title={mode === 'create' ? 'Create Product' : 'Edit Product'}
+        title={mode === 'create' ? 'Tạo sản phẩm' : 'Sửa sản phẩm'}
         size="md"
         footer={
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={handleClose}>
-              Cancel
+              Hủy
             </Button>
             <Button onClick={handleSubmit}>
-              Save
+              Lưu
             </Button>
           </div>
         }
@@ -712,7 +712,7 @@ export default function ProductsPage() {
             required
           />
           <Input
-            label="Name"
+            label="Tên"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Gạo thơm ST25"
@@ -720,7 +720,7 @@ export default function ProductsPage() {
           />
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-gray-700">
-              Category *
+              Danh mục *
             </label>
             <select
               className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
@@ -729,7 +729,7 @@ export default function ProductsPage() {
               required
             >
               <option value="" disabled>
-                {availableCategories.length > 0 ? 'Select category' : 'No category available'}
+                {availableCategories.length > 0 ? 'Chọn danh mục' : 'Không có danh mục'}
               </option>
               {availableCategories.map((cat) => {
                 const categoryId = cat.resolvedId
@@ -744,7 +744,7 @@ export default function ProductsPage() {
           {mode === 'create' && (
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-gray-700">
-                SupplierId *
+                Nhà cung cấp *
               </label>
               <select
                 className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
@@ -753,7 +753,7 @@ export default function ProductsPage() {
                 required
               >
                 <option value="" disabled>
-                  {suppliers.length > 0 ? 'Select supplier' : 'No supplier available'}
+                  {suppliers.length > 0 ? 'Chọn nhà cung cấp' : 'Không có nhà cung cấp'}
                 </option>
                 {suppliers.map((supplier) => (
                   <option key={supplier.id} value={supplier.id}>
@@ -764,14 +764,14 @@ export default function ProductsPage() {
             </div>
           )}
           <Input
-            label="Price"
+            label="Giá"
             type="number"
             value={price || ''}
             onChange={(e) => setPrice(parseNumberInput(e.target.value))}
             required
           />
           <Input
-            label="Unit"
+            label="Đơn vị"
             value={unit}
             onChange={(e) => setUnit(e.target.value)}
             placeholder="kg, gói, hộp, chai..."

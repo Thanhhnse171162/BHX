@@ -190,13 +190,13 @@ export default function CategoriesPage() {
   return (
     <div className="p-6">
       <PageHeader
-        title="Categories"
-        subtitle="Manage product categories"
-        actions={<Button onClick={handleOpenCreate}>Create Category</Button>}
+        title="Danh mục"
+        subtitle="Quản lý danh mục sản phẩm"
+        actions={<Button onClick={handleOpenCreate}>Tạo danh mục</Button>}
         breadcrumbs={[
-          { label: 'Admin', href: '/admin' },
-          { label: 'Catalog', href: '/admin/catalog' },
-          { label: 'Categories', href: '/admin/catalog/categories' },
+          { label: 'Quản trị', href: '/admin' },
+          { label: 'Danh mục', href: '/admin/catalog' },
+          { label: 'Danh mục', href: '/admin/catalog/categories' },
         ]}
       />
 
@@ -225,9 +225,9 @@ export default function CategoriesPage() {
         {/* Empty state */}
         {!isLoading && !error && categories.length === 0 && (
           <EmptyState
-            title="No Categories"
-            description="Create your first product category"
-            action={<Button onClick={handleOpenCreate}>Create Category</Button>}
+            title="Không có danh mục"
+            description="Tạo danh mục sản phẩm đầu tiên"
+            action={<Button onClick={handleOpenCreate}>Tạo danh mục</Button>}
           />
         )}
 
@@ -237,10 +237,10 @@ export default function CategoriesPage() {
             <DataTable
               data={paginatedCategories}
               columns={[
-                { key: 'name', label: 'Name' },
+                { key: 'name', label: 'Tên' },
                 {
                   key: 'status',
-                  label: 'Status',
+                  label: 'Trạng thái',
                   render: (value) => (
                     <span
                       className={`px-2 py-1 text-xs font-medium rounded-full ${
@@ -255,7 +255,7 @@ export default function CategoriesPage() {
                 },
                 {
                   key: 'createdAt',
-                  label: 'Created At',
+                  label: 'Ngày tạo',
                   render: (value) => {
                     const dateValue = value as string
                     if (!dateValue) return '-'
@@ -271,7 +271,7 @@ export default function CategoriesPage() {
                 },
                 {
                   key: 'updatedAt',
-                  label: 'Updated At',
+                  label: 'Ngày cập nhật',
                   render: (value) => {
                     if (!value) return '-'
                     const date = new Date(value as string)
@@ -286,7 +286,7 @@ export default function CategoriesPage() {
                 },
                 {
                   key: 'id',
-                  label: 'Actions',
+                  label: 'Thao tác',
                   render: (_value, item) => {
                     const row = item as unknown as CategoryRow
                     return (
@@ -299,7 +299,7 @@ export default function CategoriesPage() {
                             handleOpenEdit(row)
                           }}
                         >
-                          Edit
+                          Sửa
                         </Button>
                       </div>
                     )
@@ -310,7 +310,7 @@ export default function CategoriesPage() {
 
             <div className="mt-4 flex items-center justify-between px-1">
               <p className="text-sm text-gray-600">
-                Showing {startIndex + 1} - {Math.min(startIndex + PAGE_SIZE, categories.length)} of {categories.length}
+                Hiển thị {startIndex + 1} - {Math.min(startIndex + PAGE_SIZE, categories.length)} trên {categories.length}
               </p>
 
               <div className="flex items-center gap-2">
@@ -320,7 +320,7 @@ export default function CategoriesPage() {
                   onClick={() => handleChangePage(safeCurrentPage - 1)}
                   disabled={safeCurrentPage === 1}
                 >
-                  Prev
+                  Trước
                 </Button>
 
                 {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((page) => (
@@ -340,7 +340,7 @@ export default function CategoriesPage() {
                   onClick={() => handleChangePage(safeCurrentPage + 1)}
                   disabled={safeCurrentPage === totalPages}
                 >
-                  Next
+                  Sau
                 </Button>
               </div>
             </div>
@@ -351,27 +351,27 @@ export default function CategoriesPage() {
       <Modal
         isOpen={isCreateModalOpen}
         onClose={handleCloseCreate}
-        title="Create Category"
+        title="Tạo danh mục"
         size="md"
         footer={
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={handleCloseCreate} disabled={isCreating}>
-              Cancel
+              Hủy
             </Button>
             <Button onClick={handleCreateCategory} disabled={isCreating}>
-              {isCreating ? 'Creating...' : 'Create'}
+              {isCreating ? 'Đang tạo...' : 'Tạo'}
             </Button>
           </div>
         }
       >
         <div className="space-y-4">
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-700">Name</label>
+            <label className="text-sm font-medium text-gray-700">Tên</label>
             <input
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
               value={newCategoryName}
               onChange={(e) => setNewCategoryName(e.target.value)}
-              placeholder="Category name"
+              placeholder="Tên danh mục"
             />
           </div>
         </div>
@@ -380,32 +380,32 @@ export default function CategoriesPage() {
       <Modal
         isOpen={isEditModalOpen}
         onClose={handleCloseEdit}
-        title="Update Category"
+        title="Cập nhật danh mục"
         size="md"
         footer={
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={handleCloseEdit}>
-              Cancel
+              Hủy
             </Button>
             <Button onClick={handleUpdateCategory} disabled={isUpdating}>
-              {isUpdating ? 'Saving...' : 'Save'}
+              {isUpdating ? 'Đang lưu...' : 'Lưu'}
             </Button>
           </div>
         }
       >
         <div className="space-y-4">
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-700">Name</label>
+            <label className="text-sm font-medium text-gray-700">Tên</label>
             <input
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
               value={editingName}
               onChange={(e) => setEditingName(e.target.value)}
-              placeholder="Category name"
+              placeholder="Tên danh mục"
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-700">Status</label>
+            <label className="text-sm font-medium text-gray-700">Trạng thái</label>
             <select
               className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
               value={editingStatus}
@@ -422,7 +422,7 @@ export default function CategoriesPage() {
               checked={editingIsDeleted}
               onChange={(e) => setEditingIsDeleted(e.target.checked)}
             />
-            Is Deleted
+            Đã xóa
           </label>
         </div>
       </Modal>

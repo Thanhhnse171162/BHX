@@ -280,18 +280,18 @@ export default function UsersPage() {
   }
 
   const createUserButton = (
-    <Button onClick={handleOpenCreate}>Create User</Button>
+    <Button onClick={handleOpenCreate}>Tạo người dùng</Button>
   )
 
   return (
     <div className="p-6">
       <PageHeader
-        title="Users & Roles"
-        subtitle="Manage system users and their permissions"
+        title="Người dùng & vai trò"
+        subtitle="Quản lý người dùng hệ thống và quyền truy cập"
         actions={createUserButton}
         breadcrumbs={[
-          { label: 'Admin', href: '/admin' },
-          { label: 'Users', href: '/admin/users' },
+          { label: 'Quản trị', href: '/admin' },
+          { label: 'Người dùng', href: '/admin/users' },
         ]}
       />
 
@@ -302,8 +302,8 @@ export default function UsersPage() {
           </div>
         ) : users.length === 0 ? (
           <EmptyState
-            title="No Users"
-            description="Create your first user account"
+            title="Không có người dùng"
+            description="Tạo tài khoản người dùng đầu tiên"
             action={createUserButton}
           />
         ) : (
@@ -313,7 +313,7 @@ export default function UsersPage() {
             columns={[
               {
                 key: 'name',
-                label: 'Name',
+                label: 'Tên',
               },
               {
                 key: 'email',
@@ -321,17 +321,17 @@ export default function UsersPage() {
               },
               {
                 key: 'role',
-                label: 'Role',
+                label: 'Vai trò',
                 render: (value) => {
                   const roleLabels: Record<string, string> = {
-                    ADMIN: 'Admin',
-                    STORE_MANAGER: 'Store Manager',
-                    WAREHOUSE_MANAGER: 'Warehouse Manager',
-                    STAFF: 'Staff',
-                    CUSTOMER: 'Customer',
+                    ADMIN: 'Quản trị viên',
+                    STORE_MANAGER: 'Quản lý cửa hàng',
+                    WAREHOUSE_MANAGER: 'Quản lý kho',
+                    STAFF: 'Nhân viên',
+                    CUSTOMER: 'Khách hàng',
                     // Backend role names
-                    'Store Manager': 'Store Manager',
-                    'Warehouse Manager': 'Warehouse Manager',
+                    'Store Manager': 'Quản lý cửa hàng',
+                    'Warehouse Manager': 'Quản lý kho',
                   }
                   return (
                     <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
@@ -342,7 +342,7 @@ export default function UsersPage() {
               },
               {
                 key: 'status',
-                label: 'Status',
+                label: 'Trạng thái',
                 render: (value, item) => (
                   <select
                     className="px-2 py-1 text-xs border border-gray-300 rounded-md bg-white cursor-pointer hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -355,15 +355,15 @@ export default function UsersPage() {
                       )
                     }}
                   >
-                    <option value="ACTIVE">Active</option>
-                    <option value="INACTIVE">Inactive</option>
-                    <option value="SUSPENDED">Suspended</option>
+                    <option value="ACTIVE">Hoạt động</option>
+                    <option value="INACTIVE">Không hoạt động</option>
+                    <option value="SUSPENDED">Tạm khóa</option>
                   </select>
                 ),
               },
               {
                 key: 'createdAt',
-                label: 'Created At',
+                label: 'Ngày tạo',
                 render: (value) => {
                   return new Date(value as string).toLocaleDateString('vi-VN', {
                     year: 'numeric',
@@ -374,7 +374,7 @@ export default function UsersPage() {
               },
               {
                 key: 'id',
-                label: 'Actions',
+                label: 'Thao tác',
                 render: (_value, item) => {
                   const user = item as User
                   return (
@@ -387,7 +387,7 @@ export default function UsersPage() {
                           handleEditClick(user)
                         }}
                       >
-                        Edit
+                          Sửa
                       </Button>
                       <Button
                         size="sm"
@@ -397,7 +397,7 @@ export default function UsersPage() {
                           handleDeleteUser(user.id)
                         }}
                       >
-                        Delete
+                          Xóa
                       </Button>
                     </div>
                   )
@@ -409,7 +409,7 @@ export default function UsersPage() {
             {users.length > ITEMS_PER_PAGE && (
               <div className="mt-4 flex items-center justify-between">
                 <p className="text-sm text-gray-600">
-                  Hiển thị {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, users.length)} / {users.length} users
+                  Hiển thị {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, users.length)} / {users.length} người dùng
                 </p>
                 <div className="flex items-center gap-2">
                   <Button
@@ -418,10 +418,10 @@ export default function UsersPage() {
                     onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                     disabled={safeCurrentPage === 1}
                   >
-                    Previous
+                    Trước
                   </Button>
                   <span className="text-sm text-gray-700">
-                    Page {safeCurrentPage}/{totalPages}
+                    Trang {safeCurrentPage}/{totalPages}
                   </span>
                   <Button
                     size="sm"
@@ -429,7 +429,7 @@ export default function UsersPage() {
                     onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                     disabled={safeCurrentPage === totalPages}
                   >
-                    Next
+                    Sau
                   </Button>
                 </div>
               </div>
@@ -441,22 +441,22 @@ export default function UsersPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseCreate}
-        title={mode === 'create' ? 'Create User' : 'Edit User'}
+        title={mode === 'create' ? 'Tạo người dùng' : 'Sửa người dùng'}
         size="md"
         footer={(
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={handleCloseCreate}>
-              Cancel
+              Hủy
             </Button>
             <Button onClick={handleSubmitUser}>
-              Save
+              Lưu
             </Button>
           </div>
         )}
       >
         <form className="space-y-4" onSubmit={handleSubmitUser}>
           <Input
-            label="Full Name"
+            label="Họ và tên"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Nguyễn Văn A"
@@ -472,7 +472,7 @@ export default function UsersPage() {
           />
           <div>
             <Input
-              label={mode === 'create' ? 'Password' : 'New Password (optional)'}
+              label={mode === 'create' ? 'Mật khẩu' : 'Mật khẩu mới (không bắt buộc)'}
               type="password"
               value={password}
               onChange={(e) => {
@@ -481,7 +481,7 @@ export default function UsersPage() {
                   setPasswordError('')
                 }
               }}
-              placeholder={mode === 'create' ? '••••••••' : 'Leave blank to keep current password'}
+              placeholder={mode === 'create' ? '••••••••' : 'Để trống để giữ mật khẩu hiện tại'}
               required={mode === 'create'}
               className={passwordError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
             />

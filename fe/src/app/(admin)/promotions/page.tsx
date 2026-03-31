@@ -6,20 +6,20 @@ export default function PromotionsPage() {
   return (
     <div className="p-6">
       <PageHeader
-        title="Promotions"
-        subtitle="Create and manage promotional campaigns"
-        actions={<Button>Create Promotion</Button>}
+        title="Khuyến mãi"
+        subtitle="Tạo và quản lý chiến dịch khuyến mãi"
+        actions={<Button>Tạo khuyến mãi</Button>}
         breadcrumbs={[
-          { label: 'Admin', href: '/admin' },
-          { label: 'Promotions', href: '/admin/promotions' },
+          { label: 'Quản trị', href: '/admin' },
+          { label: 'Khuyến mãi', href: '/admin/promotions' },
         ]}
       />
 
       <div className="card">
         <EmptyState
-          title="No Promotions"
-          description="Create your first promotion campaign"
-          action={<Button>Create Promotion</Button>}
+          title="Không có khuyến mãi"
+          description="Tạo chiến dịch khuyến mãi đầu tiên"
+          action={<Button>Tạo khuyến mãi</Button>}
         />
       </div>
     </div>

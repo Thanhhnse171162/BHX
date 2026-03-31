@@ -262,12 +262,12 @@ export default function LowStockAlertsPage() {
   return (
     <div className="p-6">
       <PageHeader
-        title="Low-stock Alerts"
-        subtitle="Monitor and manage products with low inventory levels"
+        title="Cảnh báo tồn thấp"
+        subtitle="Theo dõi và xử lý sản phẩm có mức tồn kho thấp"
         breadcrumbs={[
-          { label: 'Admin', href: '/admin' },
+          { label: 'Quản trị', href: '/admin' },
           { label: 'Kho & Tồn kho', href: '/admin/inventory' },
-          { label: 'Low-stock Alerts', href: '/admin/inventory/alerts' },
+          { label: 'Cảnh báo tồn thấp', href: '/admin/inventory/alerts' },
         ]}
       />
 
@@ -276,7 +276,7 @@ export default function LowStockAlertsPage() {
         <div className="card p-4 border-l-4 border-red-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Critical Alerts</p>
+              <p className="text-sm text-gray-600">Cảnh báo nghiêm trọng</p>
               <p className="text-2xl font-bold text-red-600">{criticalCount}</p>
             </div>
             <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
@@ -290,7 +290,7 @@ export default function LowStockAlertsPage() {
         <div className="card p-4 border-l-4 border-orange-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Warning Alerts</p>
+              <p className="text-sm text-gray-600">Cảnh báo mức trung bình</p>
               <p className="text-2xl font-bold text-orange-600">{warningCount}</p>
             </div>
             <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
@@ -304,7 +304,7 @@ export default function LowStockAlertsPage() {
         <div className="card p-4 border-l-4 border-yellow-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Low Stock Items</p>
+              <p className="text-sm text-gray-600">Mặt hàng tồn thấp</p>
               <p className="text-2xl font-bold text-yellow-600">{infoCount}</p>
             </div>
             <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
@@ -321,7 +321,7 @@ export default function LowStockAlertsPage() {
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
             <Input
-              placeholder="Search by SKU, product name, or category..."
+              placeholder="Tìm theo SKU, tên sản phẩm hoặc danh mục..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -332,10 +332,10 @@ export default function LowStockAlertsPage() {
               value={filterLevel}
               onChange={(e) => setFilterLevel(e.target.value)}
             >
-              <option value="all">All Alert Levels</option>
-              <option value="CRITICAL">Critical</option>
-              <option value="WARNING">Warning</option>
-              <option value="INFO">Low Stock</option>
+              <option value="all">Tất cả mức cảnh báo</option>
+              <option value="CRITICAL">Nghiêm trọng</option>
+              <option value="WARNING">Cảnh báo</option>
+              <option value="INFO">Tồn thấp</option>
             </select>
           </div>
         </div>
@@ -345,10 +345,10 @@ export default function LowStockAlertsPage() {
       <div className="card">
         {sortedAlerts.length === 0 ? (
           <EmptyState
-            title="No Low Stock Alerts"
+            title="Không có cảnh báo tồn thấp"
             description={searchQuery || filterLevel !== 'all'
-              ? "No alerts match your search criteria"
-              : "All products are well stocked"}
+              ? 'Không có cảnh báo phù hợp tiêu chí tìm kiếm'
+              : 'Tất cả sản phẩm đang có tồn kho tốt'}
           />
         ) : (
           <DataTable
@@ -356,7 +356,7 @@ export default function LowStockAlertsPage() {
             columns={[
               {
                 key: 'alertLevel',
-                label: 'Alert Level',
+                label: 'Mức cảnh báo',
                 render: (value) => {
                   const level = value as LowStockAlert['alertLevel']
                   return (
@@ -383,11 +383,11 @@ export default function LowStockAlertsPage() {
               },
               {
                 key: 'productName',
-                label: 'Product Name',
+                label: 'Tên sản phẩm',
               },
               {
                 key: 'currentStock',
-                label: 'Stock Status',
+                label: 'Trạng thái tồn kho',
                 render: (_value, item) => {
                   const alert = item as LowStockAlert
                   const stockPercentage = (alert.currentStock / alert.maxStock) * 100
@@ -419,7 +419,7 @@ export default function LowStockAlertsPage() {
               },
               {
                 key: 'minStock',
-                label: 'Thresholds',
+                label: 'Ngưỡng cảnh báo',
                 render: (_value, item) => {
                   const alert = item as LowStockAlert
                   return (
@@ -432,28 +432,28 @@ export default function LowStockAlertsPage() {
               },
               {
                 key: 'daysUntilOutOfStock',
-                label: 'Est. Days Left',
+                label: 'Số ngày còn lại (ước tính)',
                 render: (value) => {
                   const days = value as number | null
                   if (days === null) return <span className="text-gray-400">-</span>
-                  if (days === 0) return <span className="text-red-600 font-semibold">Out of Stock</span>
+                  if (days === 0) return <span className="text-red-600 font-semibold">Hết hàng</span>
                   return (
                     <span className={days <= 7 ? 'text-red-600 font-semibold' : 'text-gray-700'}>
-                      {days} days
+                      {days} ngày
                     </span>
                   )
                 },
               },
               {
                 key: 'location',
-                label: 'Location',
+                label: 'Khu vực',
                 render: (value, item) => {
                   const alert = item as LowStockAlert
                   return (
                     <div>
                       <div className="text-sm font-medium text-gray-900">{value as string}</div>
                       <div className="text-xs text-gray-500">
-                        {alert.locationType === 'WAREHOUSE' ? 'Warehouse' : 'Store'}
+                        {alert.locationType === 'WAREHOUSE' ? 'Kho' : 'Cửa hàng'}
                       </div>
                     </div>
                   )
@@ -461,7 +461,7 @@ export default function LowStockAlertsPage() {
               },
               {
                 key: 'id',
-                label: 'Actions',
+                label: 'Thao tác',
                 render: (_value, item) => {
                   const alert = item as LowStockAlert
                   return (
@@ -474,7 +474,7 @@ export default function LowStockAlertsPage() {
                           handleOpenAdjust(alert)
                         }}
                       >
-                        Restock
+                        Nhập thêm
                       </Button>
                       <Button
                         size="sm"
@@ -484,7 +484,7 @@ export default function LowStockAlertsPage() {
                           handleOpenThreshold(alert)
                         }}
                       >
-                        Threshold
+                        Ngưỡng
                       </Button>
                     </div>
                   )
@@ -499,43 +499,43 @@ export default function LowStockAlertsPage() {
       <Modal
         isOpen={isAdjustModalOpen}
         onClose={handleCloseAdjustModal}
-        title="Restock Product"
+        title="Nhập thêm hàng"
         size="md"
         footer={
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={handleCloseAdjustModal}>
-              Cancel
+              Hủy
             </Button>
-            <Button onClick={handleAdjustStock}>Restock</Button>
+            <Button onClick={handleAdjustStock}>Nhập thêm</Button>
           </div>
         }
       >
         {selectedItem && (
           <form className="space-y-4" onSubmit={handleAdjustStock}>
             <div className="p-3 bg-gray-50 rounded-lg">
-              <div className="text-sm text-gray-600">Product</div>
+              <div className="text-sm text-gray-600">Sản phẩm</div>
               <div className="font-semibold text-gray-900">
                 {selectedItem.productName} ({selectedItem.sku})
               </div>
               <div className="text-sm text-gray-600 mt-1">
-                Current Stock: {selectedItem.currentStock} {selectedItem.unit}
+                Tồn kho hiện tại: {selectedItem.currentStock} {selectedItem.unit}
               </div>
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-700">Adjustment Type</label>
+              <label className="text-sm font-medium text-gray-700">Loại điều chỉnh</label>
               <select
                 className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
                 value={adjustmentType}
                 onChange={(e) => setAdjustmentType(e.target.value as 'ADD' | 'SET')}
               >
-                <option value="ADD">Add Stock</option>
-                <option value="SET">Set Stock</option>
+                <option value="ADD">Cộng tồn</option>
+                <option value="SET">Đặt lại tồn</option>
               </select>
             </div>
 
             <Input
-              label="Quantity"
+              label="Số lượng"
               type="number"
               value={adjustmentQuantity}
               onChange={(e) => setAdjustmentQuantity(Number(e.target.value))}
@@ -545,12 +545,12 @@ export default function LowStockAlertsPage() {
             />
 
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-700">Reason *</label>
+              <label className="text-sm font-medium text-gray-700">Lý do *</label>
               <textarea
                 className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
                 value={adjustmentReason}
                 onChange={(e) => setAdjustmentReason(e.target.value)}
-                placeholder="Enter reason for restocking..."
+                placeholder="Nhập lý do nhập thêm hàng..."
                 rows={3}
                 required
               />
@@ -558,12 +558,12 @@ export default function LowStockAlertsPage() {
 
             {adjustmentType === 'ADD' && (
               <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
-                New stock will be: {selectedItem.currentStock} + {adjustmentQuantity} = {selectedItem.currentStock + adjustmentQuantity} {selectedItem.unit}
+                Tồn kho mới sẽ là: {selectedItem.currentStock} + {adjustmentQuantity} = {selectedItem.currentStock + adjustmentQuantity} {selectedItem.unit}
               </div>
             )}
             {adjustmentType === 'SET' && (
               <div className="p-3 bg-green-50 rounded-lg text-sm text-green-800">
-                Stock will be set to: {adjustmentQuantity} {selectedItem.unit}
+                Tồn kho sẽ được đặt thành: {adjustmentQuantity} {selectedItem.unit}
               </div>
             )}
           </form>
@@ -574,28 +574,28 @@ export default function LowStockAlertsPage() {
       <Modal
         isOpen={isThresholdModalOpen}
         onClose={handleCloseThresholdModal}
-        title="Update Alert Thresholds"
+        title="Cập nhật ngưỡng cảnh báo"
         size="md"
         footer={
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={handleCloseThresholdModal}>
-              Cancel
+              Hủy
             </Button>
-            <Button onClick={handleUpdateThreshold}>Update</Button>
+            <Button onClick={handleUpdateThreshold}>Cập nhật</Button>
           </div>
         }
       >
         {selectedItem && (
           <form className="space-y-4" onSubmit={handleUpdateThreshold}>
             <div className="p-3 bg-gray-50 rounded-lg">
-              <div className="text-sm text-gray-600">Product</div>
+              <div className="text-sm text-gray-600">Sản phẩm</div>
               <div className="font-semibold text-gray-900">
                 {selectedItem.productName} ({selectedItem.sku})
               </div>
             </div>
 
             <Input
-              label="Minimum Stock"
+              label="Tồn tối thiểu"
               type="number"
               value={newMinStock}
               onChange={(e) => setNewMinStock(Number(e.target.value))}
@@ -605,7 +605,7 @@ export default function LowStockAlertsPage() {
             />
 
             <Input
-              label="Reorder Point"
+              label="Điểm đặt hàng lại"
               type="number"
               value={newReorderPoint}
               onChange={(e) => setNewReorderPoint(Number(e.target.value))}
@@ -615,11 +615,11 @@ export default function LowStockAlertsPage() {
             />
 
             <div className="p-3 bg-yellow-50 rounded-lg text-sm text-yellow-800">
-              <p className="font-medium mb-1">Alert Rules:</p>
+              <p className="font-medium mb-1">Quy tắc cảnh báo:</p>
               <ul className="list-disc list-inside space-y-0.5">
-                <li>When stock ≤ Reorder Point: Critical Alert</li>
-                <li>When stock ≤ Min Stock: Warning Alert</li>
-                <li>When stock &lt; Max Stock: Low Stock Info</li>
+                <li>Khi tồn kho ≤ Điểm đặt hàng lại: Cảnh báo nghiêm trọng</li>
+                <li>Khi tồn kho ≤ Tồn tối thiểu: Cảnh báo</li>
+                <li>Khi tồn kho &lt; Tồn tối đa: Thông tin tồn thấp</li>
               </ul>
             </div>
           </form>

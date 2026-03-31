@@ -243,12 +243,12 @@ export default function CouponsPage() {
   return (
     <div className="p-6">
       <PageHeader
-        title="Coupons"
+        title="Mã giảm giá"
         subtitle="Quản lý mã coupon giảm giá cho khách hàng"
         breadcrumbs={[
-          { label: 'Admin', href: '/admin' },
-          { label: 'Promotions', href: '/admin/promotions' },
-          { label: 'Coupons', href: '/admin/promotions/coupons' },
+          { label: 'Quản trị', href: '/admin' },
+          { label: 'Khuyến mãi', href: '/admin/promotions' },
+          { label: 'Mã giảm giá', href: '/admin/promotions/coupons' },
         ]}
         actions={
           <Button onClick={openCreate}>
@@ -403,23 +403,23 @@ export default function CouponsPage() {
               },
               {
                 key: 'id',
-                label: 'Actions',
+                label: 'Thao tác',
                 render: (_v, item) => {
                   const c = item as Coupon
                   return (
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" onClick={() => openEdit(c)}>
-                        Edit
+                        Sửa
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => handleToggleStatus(c.id)}
                       >
-                        {c.status === 'active' ? 'Disable' : 'Activate'}
+                        {c.status === 'active' ? 'Tạm ngừng' : 'Kích hoạt'}
                       </Button>
                       <Button size="sm" variant="danger" onClick={() => handleDelete(c.id)}>
-                        Delete
+                        Xóa
                       </Button>
                     </div>
                   )

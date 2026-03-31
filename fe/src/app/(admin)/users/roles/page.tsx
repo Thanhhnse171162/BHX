@@ -106,12 +106,12 @@ export default function RolesPage() {
     return (
       <div className="p-6">
         <PageHeader
-          title="Roles & Permissions"
-          subtitle="Manage system roles and their access permissions"
+          title="Vai trò & quyền hạn"
+          subtitle="Quản lý vai trò hệ thống và quyền truy cập"
           breadcrumbs={[
-            { label: 'Admin', href: '/admin' },
-            { label: 'Users', href: '/admin/users' },
-            { label: 'Roles', href: '/admin/users/roles' },
+            { label: 'Quản trị', href: '/admin' },
+            { label: 'Người dùng', href: '/admin/users' },
+            { label: 'Vai trò', href: '/admin/users/roles' },
           ]}
         />
         <div className="card">
@@ -128,12 +128,12 @@ export default function RolesPage() {
     return (
       <div className="p-6">
         <PageHeader
-          title="Roles & Permissions"
-          subtitle="Manage system roles and their access permissions"
+          title="Vai trò & quyền hạn"
+          subtitle="Quản lý vai trò hệ thống và quyền truy cập"
           breadcrumbs={[
-            { label: 'Admin', href: '/admin' },
-            { label: 'Users', href: '/admin/users' },
-            { label: 'Roles', href: '/admin/users/roles' },
+            { label: 'Quản trị', href: '/admin' },
+            { label: 'Người dùng', href: '/admin/users' },
+            { label: 'Vai trò', href: '/admin/users/roles' },
           ]}
         />
         <div className="card">
@@ -158,12 +158,12 @@ export default function RolesPage() {
   return (
     <div className="p-6">
       <PageHeader
-        title="Roles & Permissions"
-        subtitle="Manage system roles and their access permissions"
+        title="Vai trò & quyền hạn"
+        subtitle="Quản lý vai trò hệ thống và quyền truy cập"
         breadcrumbs={[
-          { label: 'Admin', href: '/admin' },
-          { label: 'Users', href: '/admin/users' },
-          { label: 'Roles', href: '/admin/users/roles' },
+          { label: 'Quản trị', href: '/admin' },
+          { label: 'Người dùng', href: '/admin/users' },
+          { label: 'Vai trò', href: '/admin/users/roles' },
         ]}
       />
 
@@ -180,7 +180,7 @@ export default function RolesPage() {
             },
             {
               key: 'name',
-              label: 'Role Name',
+              label: 'Tên vai trò',
               render: (value, item) => {
                 const role = item as Role
                 return (
@@ -189,7 +189,7 @@ export default function RolesPage() {
                       {value as string}
                       {role.is_system && (
                         <span className="px-2 py-0.5 text-xs font-medium rounded bg-gray-100 text-gray-600">
-                          System
+                          Hệ thống
                         </span>
                       )}
                     </div>
@@ -200,7 +200,7 @@ export default function RolesPage() {
             },
             {
               key: 'permissions',
-              label: 'Permissions',
+              label: 'Quyền',
               render: (value) => {
                 const perms = (value as Permission[]) || []
                 return (
@@ -215,7 +215,7 @@ export default function RolesPage() {
                         </span>
                       ))
                     ) : (
-                      <span className="text-sm text-gray-400">No permissions</span>
+                      <span className="text-sm text-gray-400">Không có quyền</span>
                     )}
                     {perms.length > 3 && (
                       <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
@@ -228,7 +228,7 @@ export default function RolesPage() {
             },
             {
               key: 'createdAt',
-              label: 'Created At',
+              label: 'Ngày tạo',
               render: (value) => {
                 const date = new Date(value as string)
                 return (
@@ -240,14 +240,14 @@ export default function RolesPage() {
             },
             {
               key: 'userCount',
-              label: 'Users',
+              label: 'Người dùng',
               render: (value) => (
                 <span className="text-sm font-medium text-gray-700">{(value as number) || 0}</span>
               ),
             },
             {
               key: 'id',
-              label: 'Actions',
+              label: 'Thao tác',
               render: (_value, item) => {
                 const role = item as Role
                 return (
@@ -256,9 +256,9 @@ export default function RolesPage() {
                     variant="outline"
                     onClick={() => handleEditRole(role)}
                     disabled={role.is_system}
-                    title={role.is_system ? 'System roles cannot be modified' : 'Edit permissions'}
+                    title={role.is_system ? 'Vai trò hệ thống không thể chỉnh sửa' : 'Sửa quyền'}
                   >
-                    Edit Permissions
+                    Sửa quyền
                   </Button>
                 )
               },
@@ -267,18 +267,18 @@ export default function RolesPage() {
         />
       </div>
 
-      {/* Edit Permissions Modal */}
+      {/* Modal sửa quyền */}
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        title={`Edit Permissions: ${editingRole ? roles.find(r => r.id === editingRole)?.name || '' : ''}`}
+        title={`Sửa quyền: ${editingRole ? roles.find(r => r.id === editingRole)?.name || '' : ''}`}
         size="lg"
         footer={
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={handleCloseModal}>
-              Cancel
+              Hủy
             </Button>
-            <Button onClick={handleSaveRole}>Save Changes</Button>
+            <Button onClick={handleSaveRole}>Lưu thay đổi</Button>
           </div>
         }
       >
@@ -286,7 +286,7 @@ export default function RolesPage() {
           <div className="space-y-6">
             <div>
               <p className="text-sm text-gray-600 mb-4">
-                Select the permissions for this role. Changes will affect all users with this role.
+                Chọn các quyền cho vai trò này. Thay đổi sẽ ảnh hưởng tới tất cả người dùng có vai trò tương ứng.
               </p>
             </div>
 
