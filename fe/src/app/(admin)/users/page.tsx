@@ -17,9 +17,49 @@ interface User {
   email: string
   role: string
   status: UserStatus
-  password?: string // demo only, không hiển thị ở UI
+  password?: string
   createdAt: string
 }
+
+interface Location {
+  id: number
+  name: string
+  location: string
+  status: string
+  isDeleted: boolean
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+const STORE_ROLES  = ['Store Manager', 'Store Staff']
+const WAREHOUSE_ROLES = ['Warehouse Manager', 'Warehouse Staff', 'Warehouse Admin']
+const ROLES_NEEDING_LOCATION = [...STORE_ROLES, ...WAREHOUSE_ROLES]
+// Roles ẩn khỏi dropdown (không cho tạo CUSTOMER)
+const HIDDEN_ROLES = ['CUSTOMER', 'Customer']
+
+function classifyLocations(raw: Location[]) {
+  const active = raw.filter((l) => l.status === 'ACTIVE' && l.isDeleted === false)
+  return {
+    stores:     active.filter((l) => l.name.startsWith('Cửa Hàng')),
+    warehouses: active.filter((l) => l.name.startsWith('Kho')),
+  }
+}
+
+function getLocationsForRole(
+  roleName: string,
+  stores: Location[],
+  warehouses: Location[]
+): Location[] {
+  if (STORE_ROLES.includes(roleName))     return stores
+  if (WAREHOUSE_ROLES.includes(roleName)) return warehouses
+  return []
+}
+
+function needsLocation(roleName: string): boolean {
+  return ROLES_NEEDING_LOCATION.includes(roleName)
+}
+
+// ── Mapper ───────────────────────────────────────────────────────────────────
 
 function mapApiUserToUi(raw: any): User {
   const roleName =
@@ -38,48 +78,56 @@ function mapApiUserToUi(raw: any): User {
   }
 }
 
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function UsersPage() {
   const ITEMS_PER_PAGE = 10
   const token = useAuthStore((state) => state.token)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [mode, setMode] = useState<'create' | 'edit'>('create')
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+
+  // ── Modal / form state ────────────────────────────────────────────────────
+  const [isModalOpen, setIsModalOpen]   = useState(false)
+  const [mode, setMode]                 = useState<'create' | 'edit'>('create')
+  const [editingId, setEditingId]       = useState<string | null>(null)
+  const [name, setName]                 = useState('')
+  const [email, setEmail]               = useState('')
+  const [password, setPassword]         = useState('')
   const [passwordError, setPasswordError] = useState('')
-  const [role, setRole] = useState('STAFF')
-  const [users, setUsers] = useState<User[]>([])
-  const [currentPage, setCurrentPage] = useState(1)
-  const [loading, setLoading] = useState(true)
-  const [roles, setRoles] = useState<Array<{ id: number; name: string }>>([])
+  const [role, setRole]                 = useState('')
+  const [locationId, setLocationId]     = useState<string>('')
+  const [locationError, setLocationError] = useState('')
 
-  const totalPages = Math.max(1, Math.ceil(users.length / ITEMS_PER_PAGE))
-  const safeCurrentPage = Math.min(currentPage, totalPages)
-  const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE
-  const paginatedUsers = users.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+  // ── Data state ────────────────────────────────────────────────────────────
+  const [users, setUsers]               = useState<User[]>([])
+  const [currentPage, setCurrentPage]   = useState(1)
+  const [loading, setLoading]           = useState(true)
+  const [roles, setRoles]               = useState<Array<{ id: number; name: string }>>([])
+  const [stores, setStores]             = useState<Location[]>([])
+  const [warehouses, setWarehouses]     = useState<Location[]>([])
 
-  // Load users từ database
+  // ── Derived ───────────────────────────────────────────────────────────────
+  const filteredRoles     = roles.filter((r) => !HIDDEN_ROLES.includes(r.name))
+  const locationOptions   = getLocationsForRole(role, stores, warehouses)
+  const showLocation      = needsLocation(role)
+
+  const totalPages        = Math.max(1, Math.ceil(users.length / ITEMS_PER_PAGE))
+  const safeCurrentPage   = Math.min(currentPage, totalPages)
+  const startIndex        = (safeCurrentPage - 1) * ITEMS_PER_PAGE
+  const paginatedUsers    = users.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+
+  // ── Loaders ───────────────────────────────────────────────────────────────
+
   const loadUsers = async () => {
     try {
       setLoading(true)
       const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
 
-      // Prefer IAM-proxied list endpoint for cloud deployments.
       let response = await fetch('/api/users/list', { headers })
-      if (!response.ok) {
-        // Fallback to local DB-backed route for local/dev compatibility.
-        response = await fetch('/api/users', { headers })
-      }
+      if (!response.ok) response = await fetch('/api/users', { headers })
 
       if (response.ok) {
         const payload = await response.json()
         const data = Array.isArray(payload) ? payload : payload?.data
-        if (Array.isArray(data)) {
-          setUsers(data.map(mapApiUserToUi))
-        } else {
-          setUsers([])
-        }
+        setUsers(Array.isArray(data) ? data.map(mapApiUserToUi) : [])
       } else {
         setUsers([])
       }
@@ -91,73 +139,88 @@ export default function UsersPage() {
     }
   }
 
-  // Load roles từ database
   const loadRoles = async () => {
     try {
       const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
       const response = await fetch('/api/roles', { headers })
       if (response.ok) {
-        const data = await response.json()
+        const data: Array<{ id: number; name: string }> = await response.json()
         setRoles(data)
-        if (data.length > 0) {
-          setRole(data[0].name)
-        }
+        // Set default role (skip hidden ones)
+        const firstVisible = data.find((r) => !HIDDEN_ROLES.includes(r.name))
+        if (firstVisible) setRole(firstVisible.name)
       }
     } catch (error) {
       console.error('Failed to load roles:', error)
     }
   }
 
+  const loadLocations = async () => {
+    try {
+      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
+      const response = await fetch('/api/Warehouse', { headers })
+      if (response.ok) {
+        const payload = await response.json()
+        const raw: Location[] = Array.isArray(payload) ? payload : payload?.data ?? []
+        const { stores: s, warehouses: w } = classifyLocations(raw)
+        setStores(s)
+        setWarehouses(w)
+      }
+    } catch (error) {
+      console.error('Failed to load locations:', error)
+    }
+  }
+
   useEffect(() => {
     loadUsers()
     loadRoles()
+    loadLocations()
   }, [token])
 
   useEffect(() => {
     setCurrentPage(1)
   }, [users.length])
 
-  // Validate password
+  // Reset locationId khi role thay đổi
+  useEffect(() => {
+    setLocationId('')
+    setLocationError('')
+  }, [role])
+
+  // ── Validation ────────────────────────────────────────────────────────────
+
   const validatePassword = (pwd: string): string => {
-    if (!pwd) return 'Mật khẩu là bắt buộc'
-    
-    if (pwd.length < 6) {
-      return 'Mật khẩu phải có ít nhất 6 ký tự'
-    }
-    
-    if (!/^[A-Z]/.test(pwd)) {
-      return 'Mật khẩu phải bắt đầu bằng chữ cái viết hoa'
-    }
-    
-    if (!/\d/.test(pwd)) {
-      return 'Mật khẩu phải chứa ít nhất 1 chữ số'
-    }
-    
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd)) {
-      return 'Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt'
-    }
-    
+    if (!pwd)                                                          return 'Mật khẩu là bắt buộc'
+    if (pwd.length < 6)                                               return 'Mật khẩu phải có ít nhất 6 ký tự'
+    if (!/^[A-Z]/.test(pwd))                                          return 'Mật khẩu phải bắt đầu bằng chữ cái viết hoa'
+    if (!/\d/.test(pwd))                                              return 'Mật khẩu phải chứa ít nhất 1 chữ số'
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd))          return 'Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt'
     return ''
+  }
+
+  // ── Modal helpers ─────────────────────────────────────────────────────────
+
+  const resetForm = () => {
+    setName('')
+    setEmail('')
+    setPassword('')
+    setPasswordError('')
+    setLocationId('')
+    setLocationError('')
+    const firstVisible = roles.find((r) => !HIDDEN_ROLES.includes(r.name))
+    setRole(firstVisible?.name ?? '')
   }
 
   const handleOpenCreate = () => {
     setMode('create')
     setEditingId(null)
-    setName('')
-    setEmail('')
-    setPassword('')
-    setPasswordError('')
-    setRole(roles.length > 0 ? roles[0].name : 'STAFF')
+    resetForm()
     setIsModalOpen(true)
   }
 
   const handleCloseCreate = () => {
     setIsModalOpen(false)
-    setName('')
-    setEmail('')
-    setPassword('')
-    setPasswordError('')
-    setRole('STAFF')
+    resetForm()
   }
 
   const handleEditClick = (user: User) => {
@@ -168,28 +231,24 @@ export default function UsersPage() {
     setPassword('')
     setPasswordError('')
     setRole(user.role)
+    setLocationId('')   // locationId không được trả về từ list API hiện tại → reset
+    setLocationError('')
     setIsModalOpen(true)
   }
 
+  // ── CRUD ──────────────────────────────────────────────────────────────────
+
   const handleStatusChange = async (id: string, status: UserStatus) => {
     try {
-      const user = users.find((u) => u.id === id)
-      if (!user) return
-
-      console.log('Changing status:', { id, status, user })
-
       const response = await fetch(`/api/users/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       })
-
       if (response.ok) {
         await loadUsers()
-        console.log('Status updated successfully')
       } else {
         const error = await response.json()
-        console.error('Status update failed:', error)
         alert('Không thể cập nhật status: ' + (error.error || 'Unknown error'))
       }
     } catch (error) {
@@ -200,17 +259,10 @@ export default function UsersPage() {
 
   const handleDeleteUser = async (id: string) => {
     if (!confirm('Bạn có chắc muốn xóa user này?')) return
-
     try {
-      const response = await fetch(`/api/users/${id}`, {
-        method: 'DELETE',
-      })
-
-      if (response.ok) {
-        await loadUsers()
-      } else {
-        alert('Xóa user thất bại')
-      }
+      const response = await fetch(`/api/users/${id}`, { method: 'DELETE' })
+      if (response.ok) await loadUsers()
+      else alert('Xóa user thất bại')
     } catch (error) {
       console.error('Delete user error:', error)
       alert('Có lỗi xảy ra')
@@ -223,31 +275,33 @@ export default function UsersPage() {
     // Validate password
     if (mode === 'create') {
       const pwdError = validatePassword(password)
-      if (pwdError) {
-        setPasswordError(pwdError)
-        return
-      }
+      if (pwdError) { setPasswordError(pwdError); return }
     } else if (mode === 'edit' && password) {
-      // Chỉ validate nếu có nhập password mới
       const pwdError = validatePassword(password)
-      if (pwdError) {
-        setPasswordError(pwdError)
-        return
-      }
+      if (pwdError) { setPasswordError(pwdError); return }
     }
-
     setPasswordError('')
+
+    // Validate location
+    if (showLocation && !locationId) {
+      setLocationError('Vui lòng chọn địa chỉ / chi nhánh cho vai trò này')
+      return
+    }
+    setLocationError('')
 
     try {
       if (mode === 'create') {
+        const payload: any = { name, email, password, role }
+        if (showLocation && locationId) payload.locationId = Number(locationId)
+
         const response = await fetch('/api/users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, password, role }),
+          body: JSON.stringify(payload),
         })
 
         if (response.ok) {
-          await loadUsers() // Reload users từ DB
+          await loadUsers()
         } else {
           const error = await response.json()
           alert(error.error || 'Tạo user thất bại')
@@ -256,6 +310,7 @@ export default function UsersPage() {
       } else if (mode === 'edit' && editingId) {
         const payload: any = { name, email, role }
         if (password) payload.password = password
+        if (showLocation && locationId) payload.locationId = Number(locationId)
 
         const response = await fetch(`/api/users/${editingId}`, {
           method: 'PUT',
@@ -264,7 +319,7 @@ export default function UsersPage() {
         })
 
         if (response.ok) {
-          await loadUsers() // Reload users từ DB
+          await loadUsers()
         } else {
           const error = await response.json()
           alert(error.error || 'Cập nhật user thất bại')
@@ -279,9 +334,9 @@ export default function UsersPage() {
     }
   }
 
-  const createUserButton = (
-    <Button onClick={handleOpenCreate}>Tạo người dùng</Button>
-  )
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  const createUserButton = <Button onClick={handleOpenCreate}>Tạo người dùng</Button>
 
   return (
     <div className="p-6">
@@ -309,100 +364,74 @@ export default function UsersPage() {
         ) : (
           <>
             <DataTable
-              data={paginatedUsers}
-            columns={[
-              {
-                key: 'name',
-                label: 'Tên',
-              },
-              {
-                key: 'email',
-                label: 'Email',
-              },
-              {
-                key: 'role',
-                label: 'Vai trò',
-                render: (value) => {
-                  const roleLabels: Record<string, string> = {
-                    ADMIN: 'Quản trị viên',
-                    STORE_MANAGER: 'Quản lý cửa hàng',
-                    WAREHOUSE_MANAGER: 'Quản lý kho',
-                    STAFF: 'Nhân viên',
-                    CUSTOMER: 'Khách hàng',
-                    // Backend role names
-                    'Store Manager': 'Quản lý cửa hàng',
-                    'Warehouse Manager': 'Quản lý kho',
-                  }
-                  return (
-                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                      {roleLabels[value as string] || value}
-                    </span>
-                  )
+              data={paginatedUsers as unknown as Record<string, unknown>[]}
+              columns={[
+                { key: 'name',  label: 'Tên'   },
+                { key: 'email', label: 'Email' },
+                {
+                  key: 'role',
+                  label: 'Vai trò',
+                  render: (value) => {
+                    const roleLabels: Record<string, string> = {
+                      ADMIN: 'Quản trị viên',
+                      STORE_MANAGER: 'Quản lý cửa hàng',
+                      WAREHOUSE_MANAGER: 'Quản lý kho',
+                      STAFF: 'Nhân viên',
+                      CUSTOMER: 'Khách hàng',
+                      'Store Manager': 'Quản lý cửa hàng',
+                      'Warehouse Manager': 'Quản lý kho',
+                    }
+                    const roleValue = String(value ?? '')
+                    return (
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                        {roleLabels[roleValue] || roleValue}
+                      </span>
+                    )
+                  },
                 },
-              },
-              {
-                key: 'status',
-                label: 'Trạng thái',
-                render: (value, item) => (
-                  <select
-                    className="px-2 py-1 text-xs border border-gray-300 rounded-md bg-white cursor-pointer hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={value as string}
-                    onChange={(e) => {
-                      e.stopPropagation()
-                      handleStatusChange(
-                        (item as User).id,
-                        e.target.value as UserStatus
-                      )
-                    }}
-                  >
-                    <option value="ACTIVE">Hoạt động</option>
-                    <option value="INACTIVE">Không hoạt động</option>
-                    <option value="SUSPENDED">Tạm khóa</option>
-                  </select>
-                ),
-              },
-              {
-                key: 'createdAt',
-                label: 'Ngày tạo',
-                render: (value) => {
-                  return new Date(value as string).toLocaleDateString('vi-VN', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                  })
+                {
+                  key: 'status',
+                  label: 'Trạng thái',
+                  render: (value, item) => (
+                    <select
+                      className="px-2 py-1 text-xs border border-gray-300 rounded-md bg-white cursor-pointer hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={value as string}
+                      onChange={(e) => {
+                        e.stopPropagation()
+                        handleStatusChange((item as unknown as User).id, e.target.value as UserStatus)
+                      }}
+                    >
+                      <option value="ACTIVE">Hoạt động</option>
+                      <option value="INACTIVE">Không hoạt động</option>
+                      <option value="SUSPENDED">Tạm khóa</option>
+                    </select>
+                  ),
                 },
-              },
-              {
-                key: 'id',
-                label: 'Thao tác',
-                render: (_value, item) => {
-                  const user = item as User
-                  return (
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleEditClick(user)
-                        }}
-                      >
+                {
+                  key: 'createdAt',
+                  label: 'Ngày tạo',
+                  render: (value) =>
+                    new Date(value as string).toLocaleDateString('vi-VN', {
+                      year: 'numeric', month: 'short', day: 'numeric',
+                    }),
+                },
+                {
+                  key: 'id',
+                  label: 'Thao tác',
+                  render: (_value, item) => {
+                    const user = item as unknown as User
+                    return (
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handleEditClick(user) }}>
                           Sửa
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteUser(user.id)
-                        }}
-                      >
+                        </Button>
+                        <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); handleDeleteUser(user.id) }}>
                           Xóa
-                      </Button>
-                    </div>
-                  )
+                        </Button>
+                      </div>
+                    )
+                  },
                 },
-              },
               ]}
             />
 
@@ -412,23 +441,11 @@ export default function UsersPage() {
                   Hiển thị {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, users.length)} / {users.length} người dùng
                 </p>
                 <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                    disabled={safeCurrentPage === 1}
-                  >
+                  <Button size="sm" variant="outline" onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))} disabled={safeCurrentPage === 1}>
                     Trước
                   </Button>
-                  <span className="text-sm text-gray-700">
-                    Trang {safeCurrentPage}/{totalPages}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                    disabled={safeCurrentPage === totalPages}
-                  >
+                  <span className="text-sm text-gray-700">Trang {safeCurrentPage}/{totalPages}</span>
+                  <Button size="sm" variant="outline" onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))} disabled={safeCurrentPage === totalPages}>
                     Sau
                   </Button>
                 </div>
@@ -438,6 +455,7 @@ export default function UsersPage() {
         )}
       </div>
 
+      {/* ── Modal ── */}
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseCreate}
@@ -445,16 +463,13 @@ export default function UsersPage() {
         size="md"
         footer={(
           <div className="flex justify-end gap-3">
-            <Button variant="secondary" onClick={handleCloseCreate}>
-              Hủy
-            </Button>
-            <Button onClick={handleSubmitUser}>
-              Lưu
-            </Button>
+            <Button variant="secondary" onClick={handleCloseCreate}>Hủy</Button>
+            <Button onClick={handleSubmitUser}>Lưu</Button>
           </div>
         )}
       >
         <form className="space-y-4" onSubmit={handleSubmitUser}>
+          {/* Họ và tên */}
           <Input
             label="Họ và tên"
             value={name}
@@ -462,6 +477,8 @@ export default function UsersPage() {
             placeholder="Nguyễn Văn A"
             required
           />
+
+          {/* Email */}
           <Input
             label="Email"
             type="email"
@@ -470,6 +487,8 @@ export default function UsersPage() {
             placeholder="user@example.com"
             required
           />
+
+          {/* Mật khẩu */}
           <div>
             <Input
               label={mode === 'create' ? 'Mật khẩu' : 'Mật khẩu mới (không bắt buộc)'}
@@ -477,17 +496,13 @@ export default function UsersPage() {
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value)
-                if (passwordError) {
-                  setPasswordError('')
-                }
+                if (passwordError) setPasswordError('')
               }}
               placeholder={mode === 'create' ? '••••••••' : 'Để trống để giữ mật khẩu hiện tại'}
               required={mode === 'create'}
               className={passwordError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
             />
-            {passwordError && (
-              <p className="mt-1 text-sm text-red-600">{passwordError}</p>
-            )}
+            {passwordError && <p className="mt-1 text-sm text-red-600">{passwordError}</p>}
             {!passwordError && password && (
               <div className="mt-2 text-xs text-gray-600 space-y-1">
                 <p className="font-medium">Yêu cầu mật khẩu:</p>
@@ -519,22 +534,57 @@ export default function UsersPage() {
               </div>
             )}
           </div>
+
+          {/* Role */}
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-700">
-              Role
-            </label>
+            <label className="text-sm font-medium text-gray-700">Role</label>
             <select
               className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
               value={role}
               onChange={(e) => setRole(e.target.value)}
             >
-              {roles.map((r) => (
-                <option key={r.id} value={r.name}>
-                  {r.name}
-                </option>
+              {filteredRoles.map((r) => (
+                <option key={r.id} value={r.name}>{r.name}</option>
               ))}
             </select>
           </div>
+
+          {/* Địa chỉ / Chi nhánh / Kho — chỉ hiện khi role cần */}
+          {showLocation && (
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-gray-700">
+                {STORE_ROLES.includes(role) ? 'Cửa hàng' : 'Kho'}
+                <span className="text-red-500 ml-1">*</span>
+              </label>
+              <select
+                className={`mt-1 block w-full rounded-md border bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1
+                  ${locationError
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                    : 'border-gray-300 focus:border-primary-500 focus:ring-primary-500'
+                  }`}
+                value={locationId}
+                onChange={(e) => {
+                  setLocationId(e.target.value)
+                  if (locationError) setLocationError('')
+                }}
+              >
+                <option value="">
+                  -- Chọn {STORE_ROLES.includes(role) ? 'cửa hàng' : 'kho'} --
+                </option>
+                {locationOptions.map((loc) => (
+                  <option key={loc.id} value={String(loc.id)}>
+                    {loc.name}{loc.location ? ` - ${loc.location}` : ''}
+                  </option>
+                ))}
+              </select>
+              {locationError && <p className="mt-1 text-sm text-red-600">{locationError}</p>}
+              {locationOptions.length === 0 && (
+                <p className="mt-1 text-xs text-yellow-600">
+                  Không tìm thấy {STORE_ROLES.includes(role) ? 'cửa hàng' : 'kho'} nào đang hoạt động.
+                </p>
+              )}
+            </div>
+          )}
         </form>
       </Modal>
     </div>
