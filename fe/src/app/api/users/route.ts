@@ -13,7 +13,8 @@ export async function GET(request: NextRequest) {
       headers['Authorization'] = authHeader
     }
 
-    const response = await fetch(`${IAM_SERVICE_URL}/api/users`, {
+    const url = `${IAM_SERVICE_URL}/api/users/list`
+    const response = await fetch(url, {
       method: 'GET',
       headers,
       cache: 'no-store',
@@ -48,21 +49,28 @@ export async function POST(request: NextRequest) {
       headers['Authorization'] = authHeader
     }
 
-    const response = await fetch(`${IAM_SERVICE_URL}/api/users`, {
+    const url = `${IAM_SERVICE_URL}/api/users/create`
+    console.log('🔄 Proxying POST to:', url, 'Body:', body)
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
     })
 
+    console.log('📡 IAM Service Response:', { status: response.status, statusText: response.statusText })
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
+      console.error('❌ IAM Service Error:', errorData)
       return NextResponse.json(errorData, { status: response.status })
     }
 
     const result = await response.json()
+    console.log('✅ User created:', result)
     return NextResponse.json(result, { status: response.status })
   } catch (error: any) {
-    console.error('Create user error:', error)
+    console.error('❌ Create user error:', error)
     return NextResponse.json(
       { error: `Failed to create user: ${error.message}` },
       { status: 500 }
