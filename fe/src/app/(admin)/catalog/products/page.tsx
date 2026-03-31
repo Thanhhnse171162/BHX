@@ -912,15 +912,15 @@ export default function ProductsPage() {
           
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-gray-700">
-              Status
+              Trạng thái
             </label>
             <select
               className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
               value={status}
               onChange={(e) => setStatus(e.target.value as ProductStatus)}
             >
-              <option value="ACTIVE">Active</option>
-              <option value="INACTIVE">Inactive</option>
+              <option value="ACTIVE">Hoạt động</option>
+              <option value="INACTIVE">Không hoạt động</option>
             </select>
           </div>
         </form>

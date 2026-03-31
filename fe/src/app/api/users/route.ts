@@ -51,8 +51,9 @@ export async function POST(request: NextRequest) {
     const roles = await executeQuery<{ id: string }>(roleQuery, { role })
     
     if (roles.length === 0) {
+      console.error('Role not found:', role)
       return NextResponse.json(
-        { error: 'Invalid role' },
+        { error: `Role "${role}" not found in database` },
         { status: 400 }
       )
     }
@@ -82,8 +83,9 @@ export async function POST(request: NextRequest) {
     })
 
     if (result.length === 0) {
+      console.error('Insert returned no result')
       return NextResponse.json(
-        { error: 'Failed to create user' },
+        { error: 'Failed to create user - insert returned no result' },
         { status: 500 }
       )
     }
@@ -108,8 +110,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Handle specific database errors
+    if (error.message?.includes('Cannot insert')) {
+      return NextResponse.json(
+        { error: `Database error: ${error.message}` },
+        { status: 400 }
+      )
+    }
+
     return NextResponse.json(
-      { error: 'Failed to create user' },
+      { error: `Failed to create user: ${error.message || 'Unknown error'}` },
       { status: 500 }
     )
   }
