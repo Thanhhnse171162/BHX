@@ -60,8 +60,6 @@ function resolveUserDisplayName(user: { full_name?: string; fullName?: string; n
   return (user?.full_name || user?.fullName || user?.name || '').trim()
 }
 
-<<<<<<< HEAD
-=======
 function normalizeUuid(value?: string): string {
   return String(value || '').trim().toLowerCase()
 }
@@ -127,7 +125,6 @@ function resolveReporterDisplayNameFromReport(report: DamageReportFromAPI): stri
   ).trim()
 }
 
->>>>>>> f23edfd716e4339259756e275b129f77dc992119
 async function buildReporterNameMap(reports: DamageReportFromAPI[]): Promise<Map<string, string>> {
   const ids = Array.from(new Set(reports.map((row) => (row.reportedBy || '').trim()).filter(Boolean)))
 
@@ -198,7 +195,19 @@ function mapDamageReportToIncident(
   const status = mapApiStatus(report.status)
 
   const reportedBy = (report.reportedBy || '').trim()
-  const reporter = reportedBy ? (reporterNameMap.get(reportedBy) || reportedBy) : 'Hệ thống'
+  
+  // Try to get name from map first (from API lookup)
+  let reporter = reportedBy ? reporterNameMap.get(reportedBy) : null
+  
+  // Fallback: try to extract name directly from report object
+  if (!reporter) {
+    reporter = resolveReporterDisplayNameFromReport(report)
+  }
+  
+  // Last resort: show "Hệ thống" if no name found
+  if (!reporter) {
+    reporter = 'Hệ thống'
+  }
 
   return {
     reportId: report.id,

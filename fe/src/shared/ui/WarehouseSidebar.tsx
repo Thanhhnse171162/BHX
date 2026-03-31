@@ -15,7 +15,6 @@ import {
   FileText,
   ArrowLeftRight,
   RefreshCw,
-  Truck,
   Building2,
   BoxIcon,
   BarChart3,
