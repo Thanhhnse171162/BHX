@@ -578,9 +578,7 @@ export default function CreateRestockRequestForm({ onClose, onCreated }: CreateF
                           />
                           {item.inventoryStatus === 'ready' &&
                             item.requestedQuantity !== '' &&
-                            toValidRequestedQuantity(item.requestedQuantity) > item.currentQuantity && (
-                            <p className="text-[11px] text-amber-600 font-semibold mt-1">SL vượt tồn kho</p>
-                          )}
+                            toValidRequestedQuantity(item.requestedQuantity) }
                         </div>
                         <div className="relative">
                           <label className="block text-[11px] font-medium text-gray-500 mb-1 flex items-center gap-1.5">

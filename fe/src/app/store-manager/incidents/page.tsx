@@ -60,24 +60,101 @@ function resolveUserDisplayName(user: { full_name?: string; fullName?: string; n
   return (user?.full_name || user?.fullName || user?.name || '').trim()
 }
 
+<<<<<<< HEAD
+=======
+function normalizeUuid(value?: string): string {
+  return String(value || '').trim().toLowerCase()
+}
+
+function getUserIdCandidates(user: unknown): string[] {
+  if (!user || typeof user !== 'object') return []
+
+  const raw = user as {
+    id?: string
+    userId?: string
+    user_id?: string
+    sub?: string
+    uid?: string
+  }
+
+  return [raw.id, raw.userId, raw.user_id, raw.sub, raw.uid]
+    .map((v) => String(v || '').trim())
+    .filter(Boolean)
+}
+
+function resolveReporterDisplayNameFromReport(report: DamageReportFromAPI): string {
+  const raw = report as DamageReportFromAPI & {
+    reportedByName?: string
+    reporterName?: string
+    reporterFullName?: string
+    reportedByFullName?: string
+    createdByName?: string
+    userName?: string
+    fullName?: string
+    full_name?: string
+    reporter?: {
+      full_name?: string
+      fullName?: string
+      name?: string
+      userName?: string
+    }
+    reportedByUser?: {
+      full_name?: string
+      fullName?: string
+      name?: string
+      userName?: string
+    }
+  }
+
+  return (
+    raw.reportedByName ||
+    raw.reporterName ||
+    raw.reporterFullName ||
+    raw.reportedByFullName ||
+    raw.createdByName ||
+    raw.userName ||
+    raw.fullName ||
+    raw.full_name ||
+    raw.reporter?.full_name ||
+    raw.reporter?.fullName ||
+    raw.reporter?.name ||
+    raw.reporter?.userName ||
+    raw.reportedByUser?.full_name ||
+    raw.reportedByUser?.fullName ||
+    raw.reportedByUser?.name ||
+    raw.reportedByUser?.userName ||
+    ''
+  ).trim()
+}
+
+>>>>>>> f23edfd716e4339259756e275b129f77dc992119
 async function buildReporterNameMap(reports: DamageReportFromAPI[]): Promise<Map<string, string>> {
   const ids = Array.from(new Set(reports.map((row) => (row.reportedBy || '').trim()).filter(Boolean)))
 
   if (ids.length === 0) return new Map()
 
   try {
-    const users = await UserAPIService.getIamUsersList()
-    const idToName = new Map(
-      users
-        .map((user) => {
-          const id = String(user.id || '').trim()
-          const name = resolveUserDisplayName(user)
-          return id && name ? ([id, name] as const) : null
-        })
-        .filter(Boolean) as Array<readonly [string, string]>
-    )
+    const [iamUsers, localUsers] = await Promise.all([
+      UserAPIService.getIamUsersList().catch(() => []),
+      UserAPIService.getAll().catch(() => []),
+    ])
 
-    const resolved = ids.map((id) => [id, idToName.get(id) || id] as const)
+    const users = [...iamUsers, ...localUsers]
+    const idToName = new Map<string, string>()
+
+    users.forEach((user) => {
+      const name = resolveUserDisplayName(user)
+      if (!name) return
+
+      getUserIdCandidates(user).forEach((id) => {
+        idToName.set(normalizeUuid(id), name)
+      })
+    })
+
+    const resolved = ids.map((id) => {
+      const name = idToName.get(normalizeUuid(id)) || id
+      return [id, name] as const
+    })
     return new Map(resolved)
   } catch {
     // Fallback to per-user lookup below when users list endpoint is unavailable.

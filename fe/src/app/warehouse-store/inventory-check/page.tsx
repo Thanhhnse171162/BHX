@@ -88,23 +88,6 @@ function StatusBadge({ status }: { status: 'in-progress' | 'completed' }) {
   )
 }
 
-function ProgressBar({ value, max, done }: { value: number; max: number; done: boolean }) {
-  const pct = max > 0 ? Math.round((value / max) * 100) : 0
-  return (
-    <div className="space-y-1 min-w-0">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-gray-400 tabular-nums whitespace-nowrap">{value}/{max}</span>
-        <span className="text-xs font-semibold text-gray-600 tabular-nums">{pct}%</span>
-      </div>
-      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all ${done ? 'bg-green-500' : 'bg-blue-500'}`}
-          style={{ width: `${pct}%` }} />
-      </div>
-    </div>
-  )
-}
-
 function DiscrepancyBadge({ count }: { count: number }) {
   if (count === 0) {
     return (
@@ -386,7 +369,6 @@ export default function Page() {
     phieu:     'w-[200px] min-w-[160px]',
     ngay:      'w-[120px] min-w-[100px]',
     nguoi:     'w-[180px] min-w-[140px]',
-    tiendo:    'w-[180px] min-w-[140px]',
     chenhlech: 'w-[100px] min-w-[80px]',
     trangthai: 'w-[140px] min-w-[120px]',
     action:    'w-[90px]  min-w-[80px]',
@@ -479,7 +461,6 @@ export default function Page() {
                 <th className={`text-left py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wide ${COL.phieu}`}>Phiếu kiểm kê</th>
                 <th className={`text-left py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wide ${COL.ngay}`}>Ngày kiểm</th>
                 <th className={`text-left py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wide ${COL.nguoi}`}>Người kiểm</th>
-                <th className={`text-left py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wide ${COL.tiendo}`}>Tiến độ</th>
                 <th className={`text-center py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wide ${COL.chenhlech}`}>Chênh lệch</th>
                 <th className={`text-center py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wide ${COL.trangthai}`}>Trạng thái</th>
                 <th className={`text-right py-3 px-4 ${COL.action}`} />
@@ -508,10 +489,6 @@ export default function Page() {
                       <Avatar name={getUserName(session.checkedBy)} />
                       <span className="text-sm text-gray-700 truncate">{getUserName(session.checkedBy)}</span>
                     </div>
-                  </td>
-                  <td className={`py-4 px-4 ${COL.tiendo}`}>
-                    {/* No checkedItems/totalItems in DTO, so show N/A or 0/0 */}
-                    <ProgressBar value={0} max={0} done={session.status?.toLowerCase() === "completed"} />
                   </td>
                   <td className={`py-4 px-4 text-center ${COL.chenhlech}`}>
                     <DiscrepancyBadge count={session.totalDiscrepancies ?? 0} />

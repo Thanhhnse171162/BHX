@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
-import { CheckCircle, Clock, Calendar, Plus, ChevronLeft, ChevronRight, AlertTriangle, Search, Check, X } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { CheckCircle, Calendar, Plus, ChevronLeft, ChevronRight, AlertTriangle, Search, Check, X } from 'lucide-react'
 import { Button } from '@/shared/ui/Button'
 import { Input } from '@/shared/ui/Input'
 import Modal from '@/shared/ui/Modal'
@@ -38,9 +38,6 @@ const inventoryChecks = [
 
 export default function InventoryChecksPage() {
   const [selectedCheck, setSelectedCheck] = useState<number | null>(null)
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
-  const [searchName, setSearchName] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [showNewCheckModal, setShowNewCheckModal] = useState(false)
   const [checkSearchQuery, setCheckSearchQuery] = useState('')
@@ -55,45 +52,11 @@ export default function InventoryChecksPage() {
     )
   }, [checkSearchQuery])
 
-  // Filter checks by date range and name
-  const filteredChecks = useMemo(() => {
-    return inventoryChecks.filter((check) => {
-      // Filter by name
-      if (searchName && !check.checkedBy.toLowerCase().includes(searchName.toLowerCase())) {
-        return false
-      }
-      
-      const checkDate = new Date(check.date)
-      
-      // If user has selected custom dates, use them
-      if (startDate || endDate) {
-        const start = startDate ? new Date(startDate) : null
-        const end = endDate ? new Date(endDate) : null
-        
-        if (start && checkDate < start) return false
-        if (end && checkDate > end) return false
-        return true
-      }
-      
-      // Default: Show only last 30 days
-      const today = new Date('2024-02-28') // Current date
-      const thirtyDaysAgo = new Date(today)
-      thirtyDaysAgo.setDate(today.getDate() - 30)
-      
-      return checkDate >= thirtyDaysAgo && checkDate <= today
-    })
-  }, [startDate, endDate, searchName])
-
   // Pagination
-  const totalPages = Math.ceil(filteredChecks.length / itemsPerPage)
+  const totalPages = Math.ceil(inventoryChecks.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
-  const paginatedChecks = filteredChecks.slice(startIndex, endIndex)
-
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [startDate, endDate, searchName])
+  const paginatedChecks = inventoryChecks.slice(startIndex, endIndex)
 
   return (
     <div className="space-y-6">
@@ -112,122 +75,14 @@ export default function InventoryChecksPage() {
         </Button>
       </div>
 
-      {/* Next Scheduled Check */}
-      <div className="bg-gradient-to-br from-[#2d6e3e] to-[#1f5b2e] rounded-xl shadow-lg p-6 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-bold mb-2">Kiểm tra đã lên lịch tiếp theo</h3>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Calendar size={18} />
-                <span className="font-medium">2024-03-01</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock size={18} />
-                <span className="font-medium">10:00 AM</span>
-              </div>
-            </div>
-            <p className="text-white/80 text-sm mt-2">Được giao cho: Nguyen Van A</p>
-          </div>
-          <Button className="bg-white/20 text-white border-2 border-white/30 hover:bg-white/30 hover:border-white/50">
-            Sắp lại lịch
-          </Button>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex flex-col md:flex-row gap-4 items-end">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Tìm theo tên
-            </label>
-            <Input
-              type="text"
-              placeholder="Nhập tên nhân viên..."
-              value={searchName}
-              onChange={(e) => setSearchName(e.target.value)}
-              className="w-full"
-            />
-          </div>
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Từ ngày
-            </label>
-            <Input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full"
-            />
-          </div>
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Đến ngày
-            </label>
-            <Input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full"
-            />
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setSearchName('')
-              setStartDate('')
-              setEndDate('')
-            }}
-            className="whitespace-nowrap"
-          >
-            Xóa bộ lọc
-          </Button>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl shadow-sm border-l-4 border-[#2d6e3e] p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm font-medium mb-1">Tổng kiểm tra</p>
-              <p className="text-3xl font-bold text-gray-900">{filteredChecks.length}</p>
-            </div>
-            <div className="w-12 h-12 bg-[#e8f5e9] rounded-xl flex items-center justify-center">
-              <CheckCircle className="text-[#2d6e3e]" size={24} />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border-l-4 border-blue-600 p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm font-medium mb-1">Kiểm tra cuối</p>
-              <p className="text-xl font-bold text-gray-900">{filteredChecks[0]?.date || 'N/A'}</p>
-            </div>
-            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
-              <Calendar className="text-blue-600" size={24} />
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Checks History */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-6 border-b border-gray-200 bg-gray-50">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-gray-900">Lịch sử kiểm tra</h2>
-            {!startDate && !endDate && !searchName && (
-              <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                30 ngày gần đây
-              </span>
-            )}
-            {(startDate || endDate || searchName) && (
-              <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                Đã lọc
-              </span>
-            )}
+            <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+              10 mục mỗi trang
+            </span>
           </div>
         </div>
         
@@ -307,8 +162,8 @@ export default function InventoryChecksPage() {
               {/* Pagination Info */}
               <div className="text-sm text-gray-600">
                 Hiển thị <span className="font-medium text-gray-900">{startIndex + 1}</span> đến{' '}
-                <span className="font-medium text-gray-900">{Math.min(endIndex, filteredChecks.length)}</span> trong{' '}
-                <span className="font-medium text-gray-900">{filteredChecks.length}</span> kiểm tra
+                <span className="font-medium text-gray-900">{Math.min(endIndex, inventoryChecks.length)}</span> trong{' '}
+                <span className="font-medium text-gray-900">{inventoryChecks.length}</span> kiểm tra
               </div>
 
               {/* Pagination Buttons */}
