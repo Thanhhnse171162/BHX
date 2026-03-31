@@ -60,51 +60,6 @@ function resolveUserDisplayName(user: { full_name?: string; fullName?: string; n
   return (user?.full_name || user?.fullName || user?.name || '').trim()
 }
 
-function resolveReporterDisplayNameFromReport(report: DamageReportFromAPI): string {
-  const raw = report as DamageReportFromAPI & {
-    reportedByName?: string
-    reporterName?: string
-    reporterFullName?: string
-    reportedByFullName?: string
-    createdByName?: string
-    userName?: string
-    fullName?: string
-    full_name?: string
-    reporter?: {
-      full_name?: string
-      fullName?: string
-      name?: string
-      userName?: string
-    }
-    reportedByUser?: {
-      full_name?: string
-      fullName?: string
-      name?: string
-      userName?: string
-    }
-  }
-
-  return (
-    raw.reportedByName ||
-    raw.reporterName ||
-    raw.reporterFullName ||
-    raw.reportedByFullName ||
-    raw.createdByName ||
-    raw.userName ||
-    raw.fullName ||
-    raw.full_name ||
-    raw.reporter?.full_name ||
-    raw.reporter?.fullName ||
-    raw.reporter?.name ||
-    raw.reporter?.userName ||
-    raw.reportedByUser?.full_name ||
-    raw.reportedByUser?.fullName ||
-    raw.reportedByUser?.name ||
-    raw.reportedByUser?.userName ||
-    ''
-  ).trim()
-}
-
 async function buildReporterNameMap(reports: DamageReportFromAPI[]): Promise<Map<string, string>> {
   const ids = Array.from(new Set(reports.map((row) => (row.reportedBy || '').trim()).filter(Boolean)))
 
@@ -166,8 +121,7 @@ function mapDamageReportToIncident(
   const status = mapApiStatus(report.status)
 
   const reportedBy = (report.reportedBy || '').trim()
-  const reporterFromReport = resolveReporterDisplayNameFromReport(report)
-  const reporter = reporterFromReport || (reportedBy ? (reporterNameMap.get(reportedBy) || reportedBy) : 'Hệ thống')
+  const reporter = reportedBy ? (reporterNameMap.get(reportedBy) || reportedBy) : 'Hệ thống'
 
   return {
     reportId: report.id,

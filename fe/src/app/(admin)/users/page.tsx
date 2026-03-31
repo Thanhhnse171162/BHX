@@ -34,14 +34,25 @@ interface Location {
 const STORE_ROLES  = ['Store Manager', 'Store Staff']
 const WAREHOUSE_ROLES = ['Warehouse Manager', 'Warehouse Staff', 'Warehouse Admin']
 const ROLES_NEEDING_LOCATION = [...STORE_ROLES, ...WAREHOUSE_ROLES]
-// Roles ẩn khỏi dropdown (không cho tạo CUSTOMER)
 const HIDDEN_ROLES = ['CUSTOMER', 'Customer']
 
+// Nới lỏng filter: chấp nhận cả tên không bắt đầu đúng chuẩn
+// Chỉ dựa vào status ACTIVE và isDeleted === false, sau đó phân loại bằng keyword linh hoạt hơn
 function classifyLocations(raw: Location[]) {
-  const active = raw.filter((l) => l.status === 'ACTIVE' && l.isDeleted === false)
+ const active = raw.filter((l) => l.status?.toUpperCase() === 'ACTIVE' && !l.isDeleted)
   return {
-    stores:     active.filter((l) => l.name.startsWith('Cửa Hàng')),
-    warehouses: active.filter((l) => l.name.startsWith('Kho')),
+    // Giữ startsWith cũ nhưng thêm fallback: những item không khớp store/warehouse keyword
+    // sẽ được xét riêng nếu cần — hiện tại nới bằng case-insensitive includes
+    stores:     active.filter((l) =>
+      l.name.startsWith('Cửa Hàng') ||
+      l.name.toLowerCase().includes('cửa hàng') ||
+      l.name.toLowerCase().includes('store')
+    ),
+    warehouses: active.filter((l) =>
+      l.name.startsWith('Kho') ||
+      l.name.toLowerCase().includes('kho') ||
+      l.name.toLowerCase().includes('warehouse')
+    ),
   }
 }
 
@@ -146,7 +157,6 @@ export default function UsersPage() {
       if (response.ok) {
         const data: Array<{ id: number; name: string }> = await response.json()
         setRoles(data)
-        // Set default role (skip hidden ones)
         const firstVisible = data.find((r) => !HIDDEN_ROLES.includes(r.name))
         if (firstVisible) setRole(firstVisible.name)
       }
@@ -181,7 +191,6 @@ export default function UsersPage() {
     setCurrentPage(1)
   }, [users.length])
 
-  // Reset locationId khi role thay đổi
   useEffect(() => {
     setLocationId('')
     setLocationError('')
@@ -211,10 +220,12 @@ export default function UsersPage() {
     setRole(firstVisible?.name ?? '')
   }
 
-  const handleOpenCreate = () => {
+  // Reload locations trước khi mở modal để luôn có dữ liệu mới nhất
+  const handleOpenCreate = async () => {
     setMode('create')
     setEditingId(null)
     resetForm()
+    await loadLocations() // <-- reload để lấy kho/cửa hàng mới nhất
     setIsModalOpen(true)
   }
 
@@ -223,7 +234,8 @@ export default function UsersPage() {
     resetForm()
   }
 
-  const handleEditClick = (user: User) => {
+  // Reload locations trước khi mở modal edit để luôn có dữ liệu mới nhất
+  const handleEditClick = async (user: User) => {
     setMode('edit')
     setEditingId(user.id)
     setName(user.name)
@@ -231,8 +243,9 @@ export default function UsersPage() {
     setPassword('')
     setPasswordError('')
     setRole(user.role)
-    setLocationId('')   // locationId không được trả về từ list API hiện tại → reset
+    setLocationId('')
     setLocationError('')
+    await loadLocations() // <-- reload để lấy kho/cửa hàng mới nhất
     setIsModalOpen(true)
   }
 
@@ -272,7 +285,6 @@ export default function UsersPage() {
   const handleSubmitUser = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validate password
     if (mode === 'create') {
       const pwdError = validatePassword(password)
       if (pwdError) { setPasswordError(pwdError); return }
@@ -282,7 +294,6 @@ export default function UsersPage() {
     }
     setPasswordError('')
 
-    // Validate location
     if (showLocation && !locationId) {
       setLocationError('Vui lòng chọn địa chỉ / chi nhánh cho vai trò này')
       return
