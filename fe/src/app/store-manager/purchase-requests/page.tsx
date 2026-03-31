@@ -175,8 +175,10 @@ export default function PurchaseRequestsPage() {
         // If products can't be loaded, continue without mapping
       }
 
-      // Load users to map userId → userName
+      // Load users to map userId → userName (try both local and IAM)
       const userMap: Record<string, string> = {}
+      
+      // Try local users first
       try {
         const users = await UserAPIService.getAll()
         for (const u of users) {
@@ -187,17 +189,18 @@ export default function PurchaseRequestsPage() {
         // If users can't be loaded, continue without mapping
       }
 
-      // Try IAM users as fallback if we didn't get enough users
-      if (Object.keys(userMap).length === 0) {
-        try {
-          const iamUsers = await UserAPIService.getIamUsersList()
-          for (const u of iamUsers) {
+      // Always try IAM users to fill in missing entries
+      try {
+        const iamUsers = await UserAPIService.getIamUsersList()
+        for (const u of iamUsers) {
+          // Only add if not already in map
+          if (!userMap[u.id]) {
             const userName = u.full_name || u.fullName || u.name || u.email || u.id
             userMap[u.id] = userName
           }
-        } catch {
-          // If IAM users can't be loaded, continue
         }
+      } catch {
+        // If IAM users can't be loaded, continue
       }
 
       const warehouseId = user?.workplaceId ?? user?.storeId ?? user?.warehouseId ?? ''

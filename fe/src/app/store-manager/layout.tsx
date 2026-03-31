@@ -7,16 +7,13 @@ import Link from 'next/link'
 import Image from 'next/image'
 import {
   LayoutDashboard,
-  TrendingUp,
   Archive,
   Warehouse,
   ArrowLeftRight,
   ClipboardCheck,
   AlertTriangle,
-  Users,
   LogOut,
   Bell,
-  ShoppingBag,
   PackagePlus,
   BadgePercent,
 } from 'lucide-react'
@@ -27,7 +24,6 @@ interface StoreManagerLayoutProps {
 
 const PRIMARY_NAV = [
   { href: '/store-manager',                          label: 'Tổng quan',            icon: LayoutDashboard, exact: true  },
-  { href: '/store-manager/reports',                  label: 'Doanh thu',            icon: TrendingUp,      exact: false },
   { href: '/store-manager/discounts',                label: 'Giảm giá',             icon: BadgePercent,    exact: false },
   { href: '/store-manager/products',                 label: 'Sản phẩm',            icon: Archive,         exact: false },
   // { href: '/store-manager/inventory',                label: 'Tồn kho kệ hàng',     icon: Archive,         exact: false },
@@ -38,14 +34,10 @@ const PRIMARY_NAV = [
   { href: '/store-manager/incidents',                label: 'Báo cáo sự cố',       icon: AlertTriangle,   exact: false, badge: 'incident' },
 ]
 
-const MANAGEMENT_NAV = [
-  { href: '/store-manager/orders',     label: 'Quản lý đơn hàng',   icon: ShoppingBag, exact: false },
-  { href: '/store-manager/customers',  label: 'Quản lý khách hàng', icon: Users,       exact: false },
-]
+const MANAGEMENT_NAV: any[] = []
 
 function getPageTitle(pathname: string): string {
   if (pathname === '/store-manager') return 'Tổng Quan'
-  if (pathname.startsWith('/store-manager/reports'))           return 'Doanh Thu'
   if (pathname.startsWith('/store-manager/discounts'))         return 'Giảm Giá'
   if (pathname.startsWith('/store-manager/products'))          return 'Sản Phẩm'
   if (pathname.startsWith('/store-manager/inventory-aux'))     return 'Tồn Kho Phụ'
@@ -54,8 +46,6 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith('/store-manager/purchase-requests')) return 'Yêu Cầu Nhập Hàng'
   if (pathname.startsWith('/store-manager/transfers'))         return 'Di Chuyển Hàng'
   if (pathname.startsWith('/store-manager/incidents'))         return 'Báo Cáo Sự Cố'
-  if (pathname.startsWith('/store-manager/orders'))            return 'Quản Lý Đơn Hàng'
-  if (pathname.startsWith('/store-manager/customers'))         return 'Quản Lý Khách Hàng'
   return 'Quản Lý Cửa Hàng'
 }
 
