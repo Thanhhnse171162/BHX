@@ -280,6 +280,7 @@ export default function CashierProductsPage() {
   const [loadingTransfers, setLoadingTransfers] = useState(false)
   const [selectedTransferId, setSelectedTransferId] = useState('')
   const [receiveItems, setReceiveItems] = useState<ReceiveTransferItemForm[]>([])
+  const [receiveProductNameById, setReceiveProductNameById] = useState<Record<string, string>>({})
   const [receiveNotes, setReceiveNotes] = useState('')
   const [receiving, setReceiving] = useState(false)
   const [receiveError, setReceiveError] = useState<string | null>(null)
@@ -441,6 +442,45 @@ export default function CashierProductsPage() {
     setReceiveItems(nextItems)
     setReceiveNotes(selectedTransfer.notes ?? '')
   }, [selectedTransfer])
+
+  useEffect(() => {
+    if (!selectedTransfer || receiveItems.length === 0) return
+
+    const missingProductIds = Array.from(new Set(
+      receiveItems
+        .map((item) => String(item.productId || '').trim())
+        .filter(Boolean)
+        .filter((productId) => {
+          const key = productId.toLowerCase()
+          return !productNameById[key] && !receiveProductNameById[key]
+        })
+    ))
+
+    if (missingProductIds.length === 0) return
+
+    Promise.all(
+      missingProductIds.map(async (productId) => {
+        try {
+          const product = await ProductAPIService.getById(productId)
+          const name = String(product?.name || '').trim()
+          return name ? ({ id: productId, name }) : null
+        } catch {
+          return null
+        }
+      })
+    ).then((rows) => {
+      const validRows = rows.filter((row): row is { id: string; name: string } => row !== null)
+      if (validRows.length === 0) return
+
+      setReceiveProductNameById((prev) => {
+        const next = { ...prev }
+        for (const row of validRows) {
+          next[String(row.id).trim().toLowerCase()] = row.name
+        }
+        return next
+      })
+    })
+  }, [selectedTransfer, receiveItems, productNameById, receiveProductNameById])
 
   const updateReceiveItem = (
     transferItemId: string,
@@ -887,7 +927,9 @@ export default function CashierProductsPage() {
                           {receiveItems.map(item => (
                             <tr key={item.transferItemId} className="border-t border-gray-100">
                               <td className="px-3 py-2 text-xs text-gray-700">
-                                {productNameById[String(item.productId ?? '').trim().toLowerCase()] || item.productId}
+                                {productNameById[String(item.productId ?? '').trim().toLowerCase()] ||
+                                  receiveProductNameById[String(item.productId ?? '').trim().toLowerCase()] ||
+                                  item.productId}
                               </td>
                               <td className="px-3 py-2">
                                 <input

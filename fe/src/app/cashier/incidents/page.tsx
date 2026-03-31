@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
 import { DamageReportAPIService, DamageReportFromAPI } from '@/services/damage-report-api.service'
+import { WarehouseLookupAPIService } from '@/services/warehouse-lookup-api.service'
 import { useAuthStore } from '@/store/auth.store'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -236,12 +237,14 @@ function CreateIncidentModal({
   products,
   locationType,
   locationId,
+  locationName,
 }: {
   onClose: () => void
   onCreate: (data: CreateIncidentPayload) => Promise<void>
   products: ProductFromAPI[]
   locationType: 'STORE' | 'WAREHOUSE'
   locationId: string
+  locationName: string
 }) {
   const [productId, setProductId] = useState('')
   const [damageType, setDamageType] = useState('')
@@ -365,10 +368,10 @@ function CreateIncidentModal({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">LocationId (workplace_id)</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">Địa điểm</label>
               <input
                 type="text"
-                value={locationId || 'Không có workplace_id'}
+                value={locationName || 'Không xác định'}
                 readOnly
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 text-slate-600"
               />
@@ -498,11 +501,37 @@ export default function CashierIncidentsPage() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [loadError, setLoadError] = useState('')
+  const [locationName, setLocationName] = useState('')
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 5
 
   const locationType: 'STORE' | 'WAREHOUSE' = user?.workplaceType === 'WAREHOUSE' ? 'WAREHOUSE' : 'STORE'
   const locationId = user?.workplaceId?.trim() || ''
+
+  useEffect(() => {
+    let cancelled = false
+
+    if (!locationId) {
+      setLocationName('')
+      return
+    }
+
+    WarehouseLookupAPIService.getById(locationId)
+      .then((location) => {
+        if (!cancelled) {
+          setLocationName(location?.name || locationId)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLocationName(locationId)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [locationId])
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -581,6 +610,7 @@ export default function CashierIncidentsPage() {
           products={products}
           locationType={locationType}
           locationId={locationId}
+          locationName={locationName}
         />
       )}
 
