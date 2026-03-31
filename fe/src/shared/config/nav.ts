@@ -155,27 +155,6 @@ export const getAdminNavigation = (): NavGroup[] => {
       ],
     },
     {
-      label: 'Đơn hàng',
-      items: [
-        {
-          label: 'Online Orders',
-          href: '/admin/orders/online',
-          icon: 'ShoppingCart',
-        },
-        {
-          label: 'POS Orders',
-          href: '/admin/orders/pos',
-          icon: 'Store',
-        },
-        {
-          label: 'Order Status',
-          href: '/admin/orders',
-          icon: 'ListChecks',
-        },
-      ],
-    },
-
-    {
       label: 'Báo cáo',
       items: [
         // Sales Reports entry removed
@@ -189,21 +168,6 @@ export const getAdminNavigation = (): NavGroup[] => {
           label: 'Báo cáo hư hại',
           href: '/admin/reports',
           icon: 'BarChart3',
-        },
-      ],
-    },
-    {
-      label: 'Hệ thống',
-      items: [
-        {
-          label: 'Configuration',
-          href: '/admin/system/config',
-          icon: 'Settings',
-        },
-        {
-          label: 'Security',
-          href: '/admin/system/security',
-          icon: 'Lock',
         },
       ],
     },
