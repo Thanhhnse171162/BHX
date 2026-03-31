@@ -155,27 +155,6 @@ export const getAdminNavigation = (): NavGroup[] => {
       ],
     },
     {
-      label: 'Đơn hàng',
-      items: [
-        {
-          label: 'Online Orders',
-          href: '/admin/orders/online',
-          icon: 'ShoppingCart',
-        },
-        {
-          label: 'POS Orders',
-          href: '/admin/orders/pos',
-          icon: 'Store',
-        },
-        {
-          label: 'Order Status',
-          href: '/admin/orders',
-          icon: 'ListChecks',
-        },
-      ],
-    },
-
-    {
       label: 'Báo cáo',
       items: [
         // Sales Reports entry removed
