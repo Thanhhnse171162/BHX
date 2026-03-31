@@ -187,6 +187,19 @@ export default function PurchaseRequestsPage() {
         // If users can't be loaded, continue without mapping
       }
 
+      // Try IAM users as fallback if we didn't get enough users
+      if (Object.keys(userMap).length === 0) {
+        try {
+          const iamUsers = await UserAPIService.getIamUsersList()
+          for (const u of iamUsers) {
+            const userName = u.full_name || u.fullName || u.name || u.email || u.id
+            userMap[u.id] = userName
+          }
+        } catch {
+          // If IAM users can't be loaded, continue
+        }
+      }
+
       const warehouseId = user?.workplaceId ?? user?.storeId ?? user?.warehouseId ?? ''
       if (!warehouseId) {
         setRequests([])
