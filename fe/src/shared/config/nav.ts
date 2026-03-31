@@ -159,11 +159,6 @@ export const getAdminNavigation = (): NavGroup[] => {
           icon: 'PackageOpen',
         },
         {
-          label: 'Lợi nhuận & thua lỗ',
-          href: '/admin/reports/finance',
-          icon: 'DollarSign',
-        },
-        {
           label: 'Báo cáo hư hại',
           href: '/admin/reports',
           icon: 'BarChart3',
