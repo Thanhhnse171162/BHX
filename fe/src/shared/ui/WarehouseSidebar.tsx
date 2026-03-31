@@ -79,11 +79,6 @@ function getNavigationItems(userRole?: string): NavItem[] {
       icon: RefreshCw
     },
     {
-      label: 'Quản lý NCC',
-      href: '/warehouse/suppliers',
-      icon: Truck
-    },
-    {
       label: 'Quản lý kho',
       href: '/warehouse/management',
       icon: Building2
