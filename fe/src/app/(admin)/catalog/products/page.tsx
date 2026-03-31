@@ -461,7 +461,7 @@ export default function ProductsPage() {
           name,
           price,
           unit,
-          isAvailable: status === 'ACTIVE',
+          isActive: status === 'ACTIVE',
         })
         alert('Cập nhật sản phẩm thành công!')
       }

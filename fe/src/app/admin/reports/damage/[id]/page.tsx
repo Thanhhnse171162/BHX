@@ -18,6 +18,7 @@ interface ReportDetail {
   report: DamageReportFromAPI | null
   productName: string | null
   reporterName: string | null
+  approverName: string | null
   locationName: string | null
 }
 
@@ -26,6 +27,7 @@ export default function DamageReportDetailPage({ params }: DamageReportDetailPag
     report: null,
     productName: null,
     reporterName: null,
+    approverName: null,
     locationName: null,
   })
   const [isLoading, setIsLoading] = useState(true)
@@ -40,7 +42,7 @@ export default function DamageReportDetailPage({ params }: DamageReportDetailPag
         const report = await DamageReportAPIService.getDamageReportById(params.id)
         if (!report) {
           setError('Không tìm thấy báo cáo')
-          setDetail({ report: null, productName: null, reporterName: null, locationName: null })
+          setDetail({ report: null, productName: null, reporterName: null, approverName: null, locationName: null })
           setIsLoading(false)
           return
         }
@@ -77,6 +79,22 @@ export default function DamageReportDetailPage({ params }: DamageReportDetailPag
           }
         }
 
+        // Fetch approver name
+        let approverName: string | null = null
+        if (report.approvedBy) {
+          try {
+            const user = await UserAPIService.getById(report.approvedBy)
+            if (user) {
+              approverName = user.full_name || user.fullName || user.name || null
+              console.log('Approver user fetched:', { userId: report.approvedBy, user, approverName })
+            } else {
+              console.warn('User API returned null for approver ID:', report.approvedBy)
+            }
+          } catch (err) {
+            console.error('Error fetching approver user:', err)
+          }
+        }
+
         // Fetch location name (warehouse/store)
         let locationName: string | null = null
         if (report.locationId) {
@@ -97,6 +115,7 @@ export default function DamageReportDetailPage({ params }: DamageReportDetailPag
           report,
           productName,
           reporterName,
+          approverName,
           locationName,
         })
       } catch (err) {
@@ -271,7 +290,7 @@ export default function DamageReportDetailPage({ params }: DamageReportDetailPag
               {detail.report.approvedBy && (
                 <div>
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Người phê duyệt</p>
-                  <p className="text-sm text-gray-900">{detail.report.approvedBy}</p>
+                  <p className="text-sm text-gray-900">{detail.approverName || detail.report.approvedBy}</p>
                 </div>
               )}
 
