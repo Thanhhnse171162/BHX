@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { CheckCircle, Clock, Calendar, Plus, ChevronLeft, ChevronRight, AlertTriangle, Search, Check, X } from 'lucide-react'
+import { CheckCircle, Calendar, Plus, ChevronLeft, ChevronRight, AlertTriangle, Search, Check, X } from 'lucide-react'
 import { Button } from '@/shared/ui/Button'
 import { Input } from '@/shared/ui/Input'
 import Modal from '@/shared/ui/Modal'
@@ -110,29 +110,6 @@ export default function InventoryChecksPage() {
           <Plus size={18} />
           Bắt đầu kiểm tra mới
         </Button>
-      </div>
-
-      {/* Next Scheduled Check */}
-      <div className="bg-gradient-to-br from-[#2d6e3e] to-[#1f5b2e] rounded-xl shadow-lg p-6 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-bold mb-2">Kiểm tra đã lên lịch tiếp theo</h3>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Calendar size={18} />
-                <span className="font-medium">2024-03-01</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock size={18} />
-                <span className="font-medium">10:00 AM</span>
-              </div>
-            </div>
-            <p className="text-white/80 text-sm mt-2">Được giao cho: Nguyen Van A</p>
-          </div>
-          <Button className="bg-white/20 text-white border-2 border-white/30 hover:bg-white/30 hover:border-white/50">
-            Sắp lại lịch
-          </Button>
-        </div>
       </div>
 
       {/* Filters */}
