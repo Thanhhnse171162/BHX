@@ -9,11 +9,11 @@ export async function PUT(
 ) {
   try {
     const body = await request.json()
-    const { email, fullName, phone, workplaceType, workplaceId } = body
+    const { email, fullName, roleId, workplaceType, workplaceId } = body
 
-    console.log('📝 Update user via IAM:', { id: params.id, email, fullName, workplaceType, workplaceId })
+    console.log('📝 Update user via IAM:', { id: params.id, email, fullName, roleId, workplaceType, workplaceId })
 
-    if (!email && !fullName && !phone && !workplaceType && !workplaceId) {
+    if (!email && !fullName && roleId === undefined && !workplaceType && !workplaceId) {
       return NextResponse.json(
         { error: 'At least one field to update is required' },
         { status: 400 }
@@ -27,7 +27,7 @@ export async function PUT(
     const payload: any = {}
     if (email) payload.email = email
     if (fullName) payload.fullName = fullName
-    if (phone) payload.phone = phone
+    if (roleId !== undefined && roleId !== null) payload.roleId = roleId
     if (workplaceType) payload.workplaceType = workplaceType
     if (workplaceId) payload.workplaceId = workplaceId
 
@@ -86,3 +86,4 @@ export async function PUT(
     )
   }
 }
+

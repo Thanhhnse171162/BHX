@@ -395,6 +395,15 @@ export default function UsersPage() {
           email,
           fullName: name,
         }
+        
+        // Lookup roleId from role name if role is provided
+        if (role) {
+          const selectedRole = roles.find((r) => r.name === role)
+          if (selectedRole) {
+            payload.roleId = selectedRole.id
+          }
+        }
+        
         if (showLocation && locationId) {
           payload.workplaceId = locationId
           payload.workplaceType = user?.workplaceType || 'WAREHOUSE'
