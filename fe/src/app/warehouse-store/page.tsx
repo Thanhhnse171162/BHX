@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useMemo } from 'react'
 import {
   ArrowRightLeft,
   AlertTriangle,
@@ -13,6 +13,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { TransferAPIService, TransferFromAPI } from '@/services/transfer-api.service'
+import { useAuthStore } from '@/store/auth.store'
 
 interface InboundRow {
   id: string
@@ -40,30 +41,58 @@ interface OutboundRow {
   statusClass: string
 }
 
+function normalizeId(value?: string | null): string {
+  return String(value ?? '').trim().toLowerCase()
+}
+
 export default function StoreWarehouseDashboard() {
   const router = useRouter()
+  const { user } = useAuthStore()
   const [inboundRows, setInboundRows] = useState<InboundRow[]>([])
   const [outboundRows, setOutboundRows] = useState<OutboundRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const workplaceId = useMemo(() => {
+    return user?.workplaceId || (user as any)?.workplace_id || (user as any)?.workplace?.id || user?.storeId || ''
+  }, [user])
+
+  const workplaceKey = normalizeId(workplaceId)
 
   // Fetch transfer data from API
   const fetchTransfers = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
+      if (!workplaceKey) {
+        setInboundRows([])
+        setOutboundRows([])
+        setIsLoading(false)
+        return
+      }
+
       const transfers = await TransferAPIService.getTransfers()
+      const transfersList = Array.isArray(transfers) ? transfers : []
       
-      // Separate inbound and outbound transfers
+      // Separate inbound and outbound transfers based on workplace location
       const inbound: InboundRow[] = []
       const outbound: OutboundRow[] = []
 
-      transfers.forEach((transfer: TransferFromAPI) => {
-        const isInbound = transfer.fromLocationType === 'WAREHOUSE' && transfer.toLocationType === 'STORE'
-        const isOutbound = transfer.fromLocationType === 'STORE' && transfer.toLocationType === 'WAREHOUSE'
+      transfersList.forEach((transfer: TransferFromAPI) => {
+        const fromKey = normalizeId(transfer.fromLocationId)
+        const toKey = normalizeId(transfer.toLocationId)
+        
+        // Inbound: current workplace is destination
+        const isInbound = toKey === workplaceKey && transfer.status !== 'COMPLETED' && transfer.status !== 'RECEIVED'
+        
+        // Outbound: current workplace is source and not yet shipped
+        const isOutbound = fromKey === workplaceKey && transfer.status !== 'COMPLETED' && transfer.status !== 'RECEIVED'
 
         const itemCount = transfer.items?.length ?? 0
-        const totalQty = transfer.items?.reduce((sum, item) => sum + (item.receivedQuantity ?? item.requestedQuantity ?? 0), 0) ?? 0
+        const totalQty = transfer.items?.reduce((sum, item) => {
+          const qty = item.shippedQuantity ?? item.receivedQuantity ?? item.requestedQuantity ?? 0
+          return sum + qty
+        }, 0) ?? 0
 
         const createdDate = new Date(transfer.transferDate).toLocaleDateString('vi-VN')
         const deliveryDate = transfer.actualDelivery 
@@ -113,7 +142,7 @@ export default function StoreWarehouseDashboard() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [workplaceKey])
 
   useEffect(() => {
     void fetchTransfers()
@@ -126,7 +155,7 @@ export default function StoreWarehouseDashboard() {
       'IN_TRANSIT': { label: 'Đang vận chuyển', class: 'bg-amber-100 text-amber-700' },
       'DELIVERED': { label: 'Đã giao', class: 'bg-emerald-100 text-emerald-700' },
       'RECEIVED': { label: 'Hoàn tất', class: 'bg-emerald-100 text-emerald-700' },
-      'COMPLETED': { label: 'Hoàn tất', class: 'bg-emerald-100 text-emerald-700' },
+      'COMPLETED': { label: 'Hoàn tát', class: 'bg-emerald-100 text-emerald-700' },
       'CANCELLED': { label: 'Đã hủy', class: 'bg-red-100 text-red-600' },
     }
     return statusMap[status] || { label: status, class: 'bg-slate-100 text-slate-600' }
