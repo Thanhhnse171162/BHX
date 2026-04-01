@@ -261,9 +261,16 @@ export default function UsersPage() {
 
   const handleStatusChange = async (id: string, status: UserStatus) => {
     try {
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      }
+      if (token) {
+        headers.Authorization = `Bearer ${token}`
+      }
+
       const response = await fetch(`/api/users/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ status }),
       })
       if (response.ok) {
@@ -281,7 +288,15 @@ export default function UsersPage() {
   const handleDeleteUser = async (id: string) => {
     if (!confirm('Bạn có chắc muốn xóa user này?')) return
     try {
-      const response = await fetch(`/api/users/${id}`, { method: 'DELETE' })
+      const headers: HeadersInit = {}
+      if (token) {
+        headers.Authorization = `Bearer ${token}`
+      }
+
+      const response = await fetch(`/api/users/${id}`, {
+        method: 'DELETE',
+        headers,
+      })
       if (response.ok) await loadUsers()
       else alert('Xóa user thất bại')
     } catch (error) {
@@ -320,15 +335,24 @@ export default function UsersPage() {
     setLocationError('')
 
     try {
+      // Prepare headers with Authorization token
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      }
+      if (token) {
+        headers.Authorization = `Bearer ${token}`
+      }
+
       if (mode === 'create') {
         const payload: any = { name, email, password, role }
         if (showLocation && locationId) payload.locationId = Number(locationId)
 
         console.log('📤 POST /api/users with payload:', payload)
+        console.log('📤 Authorization:', token ? `Bearer ${token.substring(0, 20)}...` : 'none')
 
         const response = await fetch('/api/users', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(payload),
         })
 
@@ -350,10 +374,11 @@ export default function UsersPage() {
         if (showLocation && locationId) payload.locationId = Number(locationId)
 
         console.log('📤 PUT /api/users/' + editingId + ' with payload:', payload)
+        console.log('📤 Authorization:', token ? `Bearer ${token.substring(0, 20)}...` : 'none')
 
         const response = await fetch(`/api/users/${editingId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(payload),
         })
 
