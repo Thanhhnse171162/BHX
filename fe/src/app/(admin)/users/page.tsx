@@ -132,14 +132,22 @@ export default function UsersPage() {
       setLoading(true)
       const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
 
-      let response = await fetch('/api/users/list', { headers })
-      if (!response.ok) response = await fetch('/api/users', { headers })
+      // Try local database first (will show newly created users)
+      // If it fails, fallback to IAM service
+      let response = await fetch('/api/users', { headers })
+      if (!response.ok) response = await fetch('/api/users/list', { headers })
+
+      console.log('📋 loadUsers response:', response.status, response.statusText, response.url)
 
       if (response.ok) {
         const payload = await response.json()
+        console.log('📥 Payload received:', payload)
         const data = Array.isArray(payload) ? payload : payload?.data
+        console.log('📊 Processed data:', data ? `Array of ${data.length} items` : 'Empty')
         setUsers(Array.isArray(data) ? data.map(mapApiUserToUi) : [])
+        console.log('✅ Users set in state')
       } else {
+        console.error('❌ Response not ok:', response.status)
         setUsers([])
       }
     } catch (error) {
@@ -285,16 +293,27 @@ export default function UsersPage() {
   const handleSubmitUser = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    console.log('📝 Submit User:', { mode, name, email, role, locationId })
+
     if (mode === 'create') {
       const pwdError = validatePassword(password)
-      if (pwdError) { setPasswordError(pwdError); return }
+      if (pwdError) { 
+        console.error('❌ Password error:', pwdError)
+        setPasswordError(pwdError)
+        return 
+      }
     } else if (mode === 'edit' && password) {
       const pwdError = validatePassword(password)
-      if (pwdError) { setPasswordError(pwdError); return }
+      if (pwdError) { 
+        console.error('❌ Password error:', pwdError)
+        setPasswordError(pwdError)
+        return 
+      }
     }
     setPasswordError('')
 
     if (showLocation && !locationId) {
+      console.error('❌ Location error: Location is required')
       setLocationError('Vui lòng chọn địa chỉ / chi nhánh cho vai trò này')
       return
     }
@@ -305,17 +324,24 @@ export default function UsersPage() {
         const payload: any = { name, email, password, role }
         if (showLocation && locationId) payload.locationId = Number(locationId)
 
+        console.log('📤 POST /api/users with payload:', payload)
+
         const response = await fetch('/api/users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         })
 
+        console.log('📥 API Response Status:', response.status, response.statusText)
+
         if (response.ok) {
+          console.log('✅ User created successfully')
           await loadUsers()
+          handleCloseCreate()
         } else {
           const error = await response.json()
-          alert(error.error || 'Tạo user thất bại')
+          console.error('❌ API Error:', error)
+          alert('Lỗi: ' + (error.error || 'Tạo user thất bại'))
           return
         }
       } else if (mode === 'edit' && editingId) {
@@ -323,25 +349,30 @@ export default function UsersPage() {
         if (password) payload.password = password
         if (showLocation && locationId) payload.locationId = Number(locationId)
 
+        console.log('📤 PUT /api/users/' + editingId + ' with payload:', payload)
+
         const response = await fetch(`/api/users/${editingId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         })
 
+        console.log('📥 API Response Status:', response.status, response.statusText)
+
         if (response.ok) {
+          console.log('✅ User updated successfully')
           await loadUsers()
+          handleCloseCreate()
         } else {
           const error = await response.json()
-          alert(error.error || 'Cập nhật user thất bại')
+          console.error('❌ API Error:', error)
+          alert('Lỗi: ' + (error.error || 'Cập nhật user thất bại'))
           return
         }
       }
-
-      handleCloseCreate()
     } catch (error) {
-      console.error('Submit user error:', error)
-      alert('Có lỗi xảy ra')
+      console.error('❌ Submit user error:', error)
+      alert('Có lỗi xảy ra: ' + (error instanceof Error ? error.message : 'Unknown error'))
     }
   }
 
@@ -475,11 +506,17 @@ export default function UsersPage() {
         footer={(
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={handleCloseCreate}>Hủy</Button>
-            <Button onClick={handleSubmitUser}>Lưu</Button>
+            <button 
+              form="userFormModal" 
+              type="submit" 
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              Lưu
+            </button>
           </div>
         )}
       >
-        <form className="space-y-4" onSubmit={handleSubmitUser}>
+        <form id="userFormModal" className="space-y-4" onSubmit={handleSubmitUser}>
           {/* Họ và tên */}
           <Input
             label="Họ và tên"
