@@ -13,8 +13,6 @@ import {
   ArrowUpDown,
   BarChart3,
   ClipboardList,
-  Bell,
-  Settings,
   LogOut,
   MapPin,
 } from 'lucide-react'
@@ -171,13 +169,6 @@ export default function WarehouseManagerLayout({
         {/* Header */}
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-end px-6">
           <div className="flex items-center gap-4">
-            <button className="relative p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
-            <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-              <Settings className="w-5 h-5" />
-            </button>
             <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-orange-500 rounded-full flex items-center justify-center text-white font-semibold cursor-pointer hover:shadow-lg transition-shadow">
               {user.name?.[0]?.toUpperCase() || 'W'}
             </div>

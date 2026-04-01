@@ -1,8 +1,8 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useState } from 'react'
 import {
-  ArrowDownToLine,
   ArrowRightLeft,
   AlertTriangle,
   ClipboardList,
@@ -12,22 +12,138 @@ import {
   Warehouse,
   Zap,
 } from 'lucide-react'
+import { TransferAPIService, TransferFromAPI } from '@/services/transfer-api.service'
+
+interface InboundRow {
+  id: string
+  source: string
+  dest: string
+  created: string
+  received: string
+  sku: number
+  qty: number
+  status: string
+  statusClass: string
+}
+
+interface OutboundRow {
+  id: string
+  source: string
+  dest: string
+  created: string
+  sent: string
+  sku: number
+  qty: number
+  priority: string
+  priorityClass: string
+  status: string
+  statusClass: string
+}
 
 export default function StoreWarehouseDashboard() {
   const router = useRouter()
+  const [inboundRows, setInboundRows] = useState<InboundRow[]>([])
+  const [outboundRows, setOutboundRows] = useState<OutboundRow[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Fetch transfer data from API
+  const fetchTransfers = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const transfers = await TransferAPIService.getTransfers()
+      
+      // Separate inbound and outbound transfers
+      const inbound: InboundRow[] = []
+      const outbound: OutboundRow[] = []
+
+      transfers.forEach((transfer: TransferFromAPI) => {
+        const isInbound = transfer.fromLocationType === 'WAREHOUSE' && transfer.toLocationType === 'STORE'
+        const isOutbound = transfer.fromLocationType === 'STORE' && transfer.toLocationType === 'WAREHOUSE'
+
+        const itemCount = transfer.items?.length ?? 0
+        const totalQty = transfer.items?.reduce((sum, item) => sum + (item.receivedQuantity ?? item.requestedQuantity ?? 0), 0) ?? 0
+
+        const createdDate = new Date(transfer.transferDate).toLocaleDateString('vi-VN')
+        const deliveryDate = transfer.actualDelivery 
+          ? new Date(transfer.actualDelivery).toLocaleDateString('vi-VN')
+          : transfer.expectedDelivery 
+          ? new Date(transfer.expectedDelivery).toLocaleDateString('vi-VN')
+          : createdDate
+
+        const statusConfig = getStatusConfig(transfer.status)
+
+        if (isInbound) {
+          inbound.push({
+            id: transfer.transferNumber || transfer.id,
+            source: transfer.fromLocationId,
+            dest: transfer.toLocationId,
+            created: createdDate,
+            received: deliveryDate,
+            sku: itemCount,
+            qty: totalQty,
+            status: transfer.status || 'Chờ xử lý',
+            statusClass: statusConfig.class,
+          })
+        }
+
+        if (isOutbound) {
+          outbound.push({
+            id: transfer.transferNumber || transfer.id,
+            source: transfer.fromLocationId,
+            dest: transfer.toLocationId,
+            created: createdDate,
+            sent: deliveryDate,
+            sku: itemCount,
+            qty: totalQty,
+            priority: 'Trung bình',
+            priorityClass: 'bg-blue-100 text-blue-600',
+            status: transfer.status || 'Chờ xử lý',
+            statusClass: statusConfig.class,
+          })
+        }
+      })
+
+      setInboundRows(inbound.slice(0, 5)) // Limit to 5 rows
+      setOutboundRows(outbound.slice(0, 5))
+    } catch (err) {
+      console.error('Error fetching transfers:', err)
+      setError('Không thể tải dữ liệu transfers')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void fetchTransfers()
+  }, [fetchTransfers])
+
+  function getStatusConfig(status: string): { label: string; class: string } {
+    const statusMap: Record<string, { label: string; class: string }> = {
+      'PENDING': { label: 'Chờ xử lý', class: 'bg-slate-100 text-slate-600' },
+      'SHIPPED': { label: 'Đã gửi', class: 'bg-blue-100 text-blue-600' },
+      'IN_TRANSIT': { label: 'Đang vận chuyển', class: 'bg-amber-100 text-amber-700' },
+      'DELIVERED': { label: 'Đã giao', class: 'bg-emerald-100 text-emerald-700' },
+      'RECEIVED': { label: 'Hoàn tất', class: 'bg-emerald-100 text-emerald-700' },
+      'COMPLETED': { label: 'Hoàn tất', class: 'bg-emerald-100 text-emerald-700' },
+      'CANCELLED': { label: 'Đã hủy', class: 'bg-red-100 text-red-600' },
+    }
+    return statusMap[status] || { label: status, class: 'bg-slate-100 text-slate-600' }
+  }
 
   const summaryCards = [
     {
       title: 'Yêu cầu châm hàng',
-      value: '128',
-      status: '+5 mới',
+      value: isLoading ? '—' : inboundRows.length.toString(),
+      status: inboundRows.length > 0 ? '+5 mới' : 'Không có',
       icon: <ArrowRightLeft className="h-4 w-4" />,
       iconWrap: 'bg-blue-100 text-blue-600',
       statusWrap: 'bg-blue-100 text-blue-600',
     },
     {
       title: 'Hàng đang về',
-      value: '45',
+      value: isLoading ? '—' : inboundRows.length.toString(),
       status: 'Đang vận chuyển',
       icon: <Truck className="h-4 w-4" />,
       iconWrap: 'bg-emerald-100 text-emerald-600',
@@ -35,8 +151,8 @@ export default function StoreWarehouseDashboard() {
     },
     {
       title: 'Chuyển kho',
-      value: '12',
-      status: '3 đang chờ',
+      value: isLoading ? '—' : outboundRows.length.toString(),
+      status: outboundRows.length > 0 ? `${outboundRows.length} đang chờ` : 'Không có',
       icon: <ClipboardList className="h-4 w-4" />,
       iconWrap: 'bg-amber-100 text-amber-600',
       statusWrap: 'bg-amber-100 text-amber-600',
@@ -52,24 +168,20 @@ export default function StoreWarehouseDashboard() {
     },
   ]
 
-  const inboundRows = [
-    { id: 'GR-2024-001', source: 'Kho NCC Vinamilk', dest: 'Kho Tổng HCM', created: '22/05/2024', received: '24/05/2024', sku: 15, qty: 450, status: 'Hoàn tất', statusClass: 'bg-emerald-100 text-emerald-700' },
-    { id: 'GR-2024-002', source: 'Kho NCC CP Foods', dest: 'Kho Lạnh Q7', created: '23/05/2024', received: '24/05/2024', sku: 8, qty: 120, status: 'Chờ xử lý', statusClass: 'bg-slate-100 text-slate-600' },
-    { id: 'GR-2024-003', source: 'Kho Trung chuyển', dest: 'Kho Tổng HCM', created: '24/05/2024', received: '25/05/2024', sku: 24, qty: 600, status: 'Chờ xử lý', statusClass: 'bg-slate-100 text-slate-600' },
-    { id: 'GR-2024-004', source: 'Kho Masan', dest: 'Kho Tổng HCM', created: '23/05/2024', received: '24/05/2024', sku: 12, qty: 200, status: 'Đã hủy', statusClass: 'bg-red-100 text-red-600' },
-    { id: 'GR-2024-005', source: 'Kho Nestle', dest: 'Kho Tổng HCM', created: '24/05/2024', received: '26/05/2024', sku: 10, qty: 180, status: 'Chờ xử lý', statusClass: 'bg-slate-100 text-slate-600' },
-  ]
-
-  const outboundRows = [
-    { id: 'GD-8821', source: 'Kho Tổng HCM', dest: 'BHX Quận 7', created: '24/05/2024', sent: '24/05/2024', sku: 45, qty: 420, priority: 'Cao', priorityClass: 'bg-amber-100 text-amber-700', status: 'Chờ xử lý', statusClass: 'bg-slate-100 text-slate-600' },
-    { id: 'GD-8825', source: 'Kho Tổng HCM', dest: 'BHX Bình Chánh', created: '24/05/2024', sent: '25/05/2024', sku: 18, qty: 150, priority: 'Thấp', priorityClass: 'bg-slate-100 text-slate-500', status: 'Chờ xử lý', statusClass: 'bg-slate-100 text-slate-600' },
-    { id: 'GD-8826', source: 'Kho Lạnh Q7', dest: 'BHX Quận 4', created: '24/05/2024', sent: '24/05/2024', sku: 12, qty: 85, priority: 'Trung bình', priorityClass: 'bg-blue-100 text-blue-600', status: 'Chờ xử lý', statusClass: 'bg-slate-100 text-slate-600' },
-    { id: 'GD-8827', source: 'Kho Tổng HCM', dest: 'BHX Thủ Đức', created: '24/05/2024', sent: '23/05/2024', sku: 30, qty: 310, priority: 'Cao', priorityClass: 'bg-amber-100 text-amber-700', status: 'Chờ xử lý', statusClass: 'bg-slate-100 text-slate-600' },
-    { id: 'GD-8828', source: 'Kho Tổng HCM', dest: 'BHX Tân Bình', created: '24/05/2024', sent: '25/05/2024', sku: 22, qty: 205, priority: 'Thấp', priorityClass: 'bg-slate-100 text-slate-500', status: 'Chờ xử lý', statusClass: 'bg-slate-100 text-slate-600' },
-  ]
-
   return (
     <div className="min-h-screen space-y-5 p-6" style={{ background: '#f1f5f9', color: '#1e293b' }}>
+
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
+          {error}
+          <button
+            onClick={() => void fetchTransfers()}
+            className="ml-3 font-semibold underline hover:no-underline"
+          >
+            Thử lại
+          </button>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -79,11 +191,13 @@ export default function StoreWarehouseDashboard() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors"
+            onClick={() => void fetchTransfers()}
+            disabled={isLoading}
+            className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50"
             style={{ borderColor: '#e2e8f0', background: '#ffffff', color: '#475569' }}
           >
-            <ArrowDownToLine className="h-4 w-4 text-emerald-400" />
-            Xuất báo cáo
+            {isLoading ? '⏳' : '🔄'}
+            Làm mới
           </button>
           <button
             className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white"
@@ -136,33 +250,46 @@ export default function StoreWarehouseDashboard() {
               Xem tất cả phiếu nhập →
             </button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-xs">
-              <thead style={{ background: '#f8fafc' }}>
-                <tr>
-                  {['Mã phiếu', 'Kho nguồn', 'Kho đích', 'Ngày tạo', 'Ngày nhận', 'Tổng SKU', 'Tổng số lượng', 'Trạng thái'].map((h) => (
-                    <th key={h} className="px-4 py-2.5 font-semibold whitespace-nowrap" style={{ color: '#94a3b8' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {inboundRows.map((row) => (
-                  <tr key={row.id} className="border-t hover:bg-slate-50 transition-colors" style={{ borderColor: '#f1f5f9' }}>
-                    <td className="px-4 py-2.5 font-semibold text-emerald-600 whitespace-nowrap">{row.id}</td>
-                    <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{row.source}</td>
-                    <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{row.dest}</td>
-                    <td className="px-4 py-2.5 text-slate-400 whitespace-nowrap">{row.created}</td>
-                    <td className="px-4 py-2.5 text-slate-400 whitespace-nowrap">{row.received}</td>
-                    <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{row.sku}</td>
-                    <td className="px-4 py-2.5 font-semibold text-slate-700 whitespace-nowrap">{row.qty}</td>
-                    <td className="px-4 py-2.5 whitespace-nowrap">
-                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold ${row.statusClass}`}>{row.status}</span>
-                    </td>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <div className="inline-flex h-8 w-8 animate-spin rounded-full border-4 border-emerald-200 border-t-emerald-600"></div>
+                <p className="mt-2 text-sm text-slate-500">Đang tải dữ liệu...</p>
+              </div>
+            </div>
+          ) : inboundRows.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <p className="text-sm text-slate-500">Không có phiếu nhập nào</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-xs">
+                <thead style={{ background: '#f8fafc' }}>
+                  <tr>
+                    {['Mã phiếu', 'Kho nguồn', 'Kho đích', 'Ngày tạo', 'Ngày nhận', 'Tổng SKU', 'Tổng số lượng', 'Trạng thái'].map((h) => (
+                      <th key={h} className="px-4 py-2.5 font-semibold whitespace-nowrap" style={{ color: '#94a3b8' }}>{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {inboundRows.map((row) => (
+                    <tr key={row.id} className="border-t hover:bg-slate-50 transition-colors" style={{ borderColor: '#f1f5f9' }}>
+                      <td className="px-4 py-2.5 font-semibold text-emerald-600 whitespace-nowrap">{row.id}</td>
+                      <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{row.source}</td>
+                      <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{row.dest}</td>
+                      <td className="px-4 py-2.5 text-slate-400 whitespace-nowrap">{row.created}</td>
+                      <td className="px-4 py-2.5 text-slate-400 whitespace-nowrap">{row.received}</td>
+                      <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{row.sku}</td>
+                      <td className="px-4 py-2.5 font-semibold text-slate-700 whitespace-nowrap">{row.qty}</td>
+                      <td className="px-4 py-2.5 whitespace-nowrap">
+                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold ${row.statusClass}`}>{row.status}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </article>
       </section>
 
@@ -183,36 +310,49 @@ export default function StoreWarehouseDashboard() {
               Xem tất cả phiếu xuất →
             </button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-xs">
-              <thead style={{ background: '#f8fafc' }}>
-                <tr>
-                  {['Mã phiếu', 'Kho nguồn', 'Cửa hàng đích', 'Ngày tạo', 'Ngày gửi', 'Tổng SKU', 'Tổng số lượng', 'Ưu tiên', 'Trạng thái'].map((h) => (
-                    <th key={h} className="px-4 py-2.5 font-semibold whitespace-nowrap" style={{ color: '#94a3b8' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {outboundRows.map((row) => (
-                  <tr key={row.id} className="border-t hover:bg-slate-50 transition-colors" style={{ borderColor: '#f1f5f9' }}>
-                    <td className="px-4 py-2.5 font-semibold text-emerald-600 whitespace-nowrap">{row.id}</td>
-                    <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{row.source}</td>
-                    <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{row.dest}</td>
-                    <td className="px-4 py-2.5 text-slate-400 whitespace-nowrap">{row.created}</td>
-                    <td className="px-4 py-2.5 text-slate-400 whitespace-nowrap">{row.sent}</td>
-                    <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{row.sku}</td>
-                    <td className="px-4 py-2.5 font-semibold text-slate-700 whitespace-nowrap">{row.qty}</td>
-                    <td className="px-4 py-2.5 whitespace-nowrap">
-                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold ${row.priorityClass}`}>{row.priority}</span>
-                    </td>
-                    <td className="px-4 py-2.5 whitespace-nowrap">
-                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold ${row.statusClass}`}>{row.status}</span>
-                    </td>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <div className="inline-flex h-8 w-8 animate-spin rounded-full border-4 border-emerald-200 border-t-emerald-600"></div>
+                <p className="mt-2 text-sm text-slate-500">Đang tải dữ liệu...</p>
+              </div>
+            </div>
+          ) : outboundRows.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <p className="text-sm text-slate-500">Không có phiếu xuất nào đang chờ</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-xs">
+                <thead style={{ background: '#f8fafc' }}>
+                  <tr>
+                    {['Mã phiếu', 'Kho nguồn', 'Cửa hàng đích', 'Ngày tạo', 'Ngày gửi', 'Tổng SKU', 'Tổng số lượng', 'Ưu tiên', 'Trạng thái'].map((h) => (
+                      <th key={h} className="px-4 py-2.5 font-semibold whitespace-nowrap" style={{ color: '#94a3b8' }}>{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {outboundRows.map((row) => (
+                    <tr key={row.id} className="border-t hover:bg-slate-50 transition-colors" style={{ borderColor: '#f1f5f9' }}>
+                      <td className="px-4 py-2.5 font-semibold text-emerald-600 whitespace-nowrap">{row.id}</td>
+                      <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{row.source}</td>
+                      <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{row.dest}</td>
+                      <td className="px-4 py-2.5 text-slate-400 whitespace-nowrap">{row.created}</td>
+                      <td className="px-4 py-2.5 text-slate-400 whitespace-nowrap">{row.sent}</td>
+                      <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{row.sku}</td>
+                      <td className="px-4 py-2.5 font-semibold text-slate-700 whitespace-nowrap">{row.qty}</td>
+                      <td className="px-4 py-2.5 whitespace-nowrap">
+                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold ${row.priorityClass}`}>{row.priority}</span>
+                      </td>
+                      <td className="px-4 py-2.5 whitespace-nowrap">
+                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold ${row.statusClass}`}>{row.status}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </article>
       </section>
 

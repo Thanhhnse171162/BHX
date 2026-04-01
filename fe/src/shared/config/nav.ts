@@ -149,11 +149,6 @@ export const getAdminNavigation = (): NavGroup[] => {
       items: [
         // Sales Reports entry removed
         {
-          label: 'Báo cáo tồn kho',
-          href: '/admin/reports/inventory',
-          icon: 'PackageOpen',
-        },
-        {
           label: 'Báo cáo hư hại',
           href: '/admin/reports',
           icon: 'BarChart3',
