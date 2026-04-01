@@ -1,20 +1,116 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, X } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Plus, X, Search, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react'
 import { Button } from '@/shared/ui/Button'
 import { useAuthStore } from '@/store/auth.store'
+import axiosInstance from '@/shared/api/http'
+
+// Types
+interface InventoryCheck {
+  id: string
+  locationId: string
+  locationType: 'WAREHOUSE' | 'STORE'
+  checkType: 'PARTIAL' | 'FULL'
+  checkNumber: string
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED'
+  notes: string
+  createdBy: string
+  createdDate: string
+  completedDate?: string
+  totalItemsChecked?: number
+  discrepancyCount?: number
+  items?: InventoryCheckItem[]
+}
+
+interface InventoryCheckItem {
+  id: string
+  productId: string
+  productName: string
+  sku: string
+  systemQuantity: number
+  actualQuantity: number
+  unit: string
+  discrepancy: number
+  notes: string
+}
+
+interface CheckStats {
+  totalChecks: number
+  completedChecks: number
+  totalDiscrepancies: number
+}
 
 export default function InventoryChecksPage() {
-  const { user } = useAuthStore()
+  const { user, token } = useAuthStore()
+  
+  // Checks list state
+  const [checks, setChecks] = useState<InventoryCheck[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [stats, setStats] = useState<CheckStats>({ totalChecks: 0, completedChecks: 0, totalDiscrepancies: 0 })
+  
+  // Modal states
   const [showNewCheckModal, setShowNewCheckModal] = useState(false)
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [selectedCheck, setSelectedCheck] = useState<InventoryCheck | null>(null)
+  
+  // Form states
   const [checkType, setCheckType] = useState<'PARTIAL' | 'FULL'>('PARTIAL')
   const [notes, setNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  // Detail modal states
+  const [searchQuery, setSearchQuery] = useState('')
+  const [itemsToCheck, setItemsToCheck] = useState<InventoryCheckItem[]>([])
+  const [checkedItems, setCheckedItems] = useState<Record<string, { actualQuantity: number; notes: string }>>({})
 
-  // Get user's workplace/location info
   const userWorkplaceId = user?.workplaceId || user?.warehouseId || user?.storeId || ''
   const userWorkplaceName = user?.name || 'Chỗ làm việc'
+
+  // Fetch inventory checks
+  const fetchChecks = useCallback(async () => {
+    if (!token || !userWorkplaceId) return
+    setIsLoading(true)
+    setError(null)
+    try {
+      const response = await axiosInstance.get(`/inventory-checks?locationId=${userWorkplaceId}`)
+      const data = Array.isArray(response.data?.data) ? response.data.data : Array.isArray(response.data) ? response.data : []
+      setChecks(data)
+      
+      // Calculate stats
+      const completed = data.filter((c: InventoryCheck) => c.status === 'COMPLETED').length
+      const discrepancies = data.reduce((sum: number, c: InventoryCheck) => sum + (c.discrepancyCount || 0), 0)
+      setStats({
+        totalChecks: data.length,
+        completedChecks: completed,
+        totalDiscrepancies: discrepancies,
+      })
+    } catch (err) {
+      setError('Không thể tải danh sách phiếu kiểm kê.')
+      console.error(err)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [token, userWorkplaceId])
+
+  // Fetch items for check detail
+  const fetchCheckItems = useCallback(async (checkId: string) => {
+    if (!token) return
+    try {
+      const response = await axiosInstance.get(`/inventory-checks/${checkId}/items`)
+      const items = Array.isArray(response.data?.data) ? response.data.data : Array.isArray(response.data) ? response.data : []
+      setItemsToCheck(items)
+    } catch (err) {
+      console.error('Failed to fetch check items:', err)
+    }
+  }, [token])
+
+  useEffect(() => {
+    if (token && userWorkplaceId) {
+      fetchChecks()
+    }
+  }, [token, userWorkplaceId, fetchChecks])
 
   const handleSubmit = async () => {
     if (!userWorkplaceId) {
@@ -24,34 +120,119 @@ export default function InventoryChecksPage() {
 
     try {
       setIsSubmitting(true)
-      // TODO: Submit to API
       const payload = {
         locationId: userWorkplaceId,
         locationType: user?.roleId === 7 ? 'WAREHOUSE' : 'STORE',
         checkType: checkType,
         notes: notes,
-        assignedStaff: [], // Chỉ gửi cho nhân viên nó quản lý
       }
       
-      console.log('Creating inventory check:', payload)
-      alert(`Tạo phiếu kiểm kê thành công!`)
+      const response = await axiosInstance.post('/inventory-checks', payload)
       
-      // Reset form
-      setCheckType('PARTIAL')
-      setNotes('')
-      setShowNewCheckModal(false)
-    } catch (error) {
-      alert('Không thể tạo phiếu kiểm kê. Vui lòng thử lại.')
+      if (response.data?.id || response.data?.data?.id) {
+        alert(`Tạo phiếu kiểm kê thành công!`)
+        setCheckType('PARTIAL')
+        setNotes('')
+        setShowNewCheckModal(false)
+        fetchChecks()
+      } else {
+        alert('Tạo phiếu kiểm kê thất bại.')
+      }
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || 'Không thể tạo phiếu kiểm kê. Vui lòng thử lại.'
+      alert(msg)
+      console.error(error)
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  const handleOpenDetailModal = (check: InventoryCheck) => {
+    setSelectedCheck(check)
+    setShowDetailModal(true)
+    setCheckedItems({})
+    setSearchQuery('')
+    fetchCheckItems(check.id)
+  }
+
+  const handleCompleteCheck = async () => {
+    if (!selectedCheck) return
+    
+    const itemsWithData = itemsToCheck.map(item => ({
+      inventoryCheckItemId: item.id,
+      actualQuantity: checkedItems[item.id]?.actualQuantity ?? item.actualQuantity ?? 0,
+      notes: checkedItems[item.id]?.notes ?? item.notes ?? '',
+    }))
+
+    try {
+      await axiosInstance.put(`/inventory-checks/${selectedCheck.id}/complete`, 
+        { items: itemsWithData }
+      )
+      alert('Hoàn thành kiểm kê thành công!')
+      setShowDetailModal(false)
+      setSelectedCheck(null)
+      setCheckedItems({})
+      fetchChecks()
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || 'Không thể hoàn thành kiểm kê.'
+      alert(msg)
+    }
+  }
+
+  // Filter items by search
+  const filteredItems = itemsToCheck.filter(item =>
+    item.productName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.sku?.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
   // Old mock data removed - no longer needed
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-6 pb-10">
+      {/* ══════════════════════════════════════════════════════
+          STATS
+      ══════════════════════════════════════════════════════ */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tổng phiếu kiểm kê</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">{stats.totalChecks}</p>
+            </div>
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Plus size={18} className="text-blue-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Đã hoàn thành</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">{stats.completedChecks}</p>
+            </div>
+            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+              <CheckCircle size={18} className="text-green-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tổng chênh lệch</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">{stats.totalDiscrepancies}</p>
+            </div>
+            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+              <AlertTriangle size={18} className="text-red-600" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════
+          HEADER
+      ══════════════════════════════════════════════════════ */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Kiểm kê tồn kho</h1>
@@ -66,24 +247,91 @@ export default function InventoryChecksPage() {
         </Button>
       </div>
 
-      {/* Empty State */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-12 text-center">
-          <div className="text-gray-300 mb-4 flex justify-center">
-            <Plus size={64} />
+      {/* ══════════════════════════════════════════════════════
+          CHECKS LIST
+      ══════════════════════════════════════════════════════ */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <h2 className="text-lg font-bold text-gray-900">Lịch sử kiểm kê</h2>
+        </div>
+
+        {error && (
+          <div className="mx-4 mt-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg">
+            {error}
           </div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">Chưa có phiếu kiểm kê nào</h3>
-          <p className="text-gray-500">
-            Bấm nút "Tạo phiếu kiểm kê" ở trên để bắt đầu
-          </p>
+        )}
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                {['Phiếu kiểm kê', 'Ngày kiểm', 'Người kiểm', 'Chênh lệch', 'Trạng thái', 'Ghi chú'].map(col => (
+                  <th key={col} className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{col}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-400">
+                    Đang tải...
+                  </td>
+                </tr>
+              ) : checks.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-400">
+                    Chưa có phiếu kiểm kê nào
+                  </td>
+                </tr>
+              ) : (
+                checks.map((check) => (
+                  <tr 
+                    key={check.id} 
+                    onClick={() => handleOpenDetailModal(check)}
+                    className="border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition-colors"
+                  >
+                    <td className="px-6 py-4">
+                      <span className="font-semibold text-gray-900">{check.checkNumber || check.id.slice(0, 8)}</span>
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {new Date(check.createdDate).toLocaleDateString('vi-VN')}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {check.createdBy ? `${check.createdBy.slice(0, 8)}...` : '—'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={check.discrepancyCount && check.discrepancyCount > 0 ? 'text-red-600 font-semibold' : 'text-green-600'}>
+                        {check.discrepancyCount ?? 0}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        check.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
+                        check.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {check.status === 'COMPLETED' ? 'Hoàn thành' :
+                         check.status === 'IN_PROGRESS' ? 'Đang kiểm' :
+                         'Chờ xử lý'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-gray-600 max-w-xs truncate">
+                      {check.notes || '—'}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {/* Create Check Modal */}
+      {/* ══════════════════════════════════════════════════════
+          CREATE CHECK MODAL
+      ══════════════════════════════════════════════════════ */}
       {showNewCheckModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <h2 className="text-lg font-bold text-gray-900">Tạo Phiếu Kiểm Kê</h2>
               <button
@@ -94,9 +342,7 @@ export default function InventoryChecksPage() {
               </button>
             </div>
 
-            {/* Content */}
             <div className="p-6 space-y-5">
-              {/* Loại vị trí */}
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                   Loại vị trị
@@ -107,7 +353,6 @@ export default function InventoryChecksPage() {
                 <p className="text-xs text-gray-400 mt-1">Tự động được set dựa trên vai trò của bạn</p>
               </div>
 
-              {/* Vị trị */}
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                   Vị trị làm việc
@@ -118,7 +363,6 @@ export default function InventoryChecksPage() {
                 <p className="text-xs text-gray-400 mt-1">Không thể thay đổi</p>
               </div>
 
-              {/* Loại kiểm kê */}
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                   Loại kiểm kê <span className="text-red-400">*</span>
@@ -133,7 +377,6 @@ export default function InventoryChecksPage() {
                 </select>
               </div>
 
-              {/* Ghi chú */}
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                   Ghi chú
@@ -147,7 +390,6 @@ export default function InventoryChecksPage() {
                 />
               </div>
 
-              {/* Info */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <p className="text-xs text-blue-700">
                   <span className="font-semibold">Lưu ý:</span> Phiếu kiểm kê sẽ được gửi đến các nhân viên trong quản lý của bạn.
@@ -155,7 +397,6 @@ export default function InventoryChecksPage() {
               </div>
             </div>
 
-            {/* Footer */}
             <div className="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
               <button
                 onClick={() => setShowNewCheckModal(false)}
@@ -166,9 +407,172 @@ export default function InventoryChecksPage() {
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-60"
+                className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
               >
-                {isSubmitting ? 'Đang tạo...' : 'Tạo phiếu'}
+                {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+                Tạo phiếu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════
+          CHECK DETAIL MODAL
+      ══════════════════════════════════════════════════════ */}
+      {showDetailModal && selectedCheck && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Kiểm tra tồn kho</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {selectedCheck.checkNumber || selectedCheck.id.slice(0, 8)} • {selectedCheck.checkType === 'FULL' ? 'Kiểm kê toàn bộ' : 'Kiểm kê cục bộ'}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowDetailModal(false)}
+                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-xs text-blue-700">
+                  <AlertTriangle className="w-4 h-4 inline mr-2" />
+                  Kiểm tra và nhập số lượng thực tế của các sản phẩm. Hệ thống sẽ so sánh với số lượng trong kho.
+                </p>
+              </div>
+
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm sản phẩm theo tên hoặc SKU..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                />
+              </div>
+
+              <div className="border border-gray-200 rounded-xl overflow-hidden max-h-96 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      {['Sản phẩm', 'SKU', 'SL Hệ thống', 'SL Thực tế', 'Chênh lệch', 'Ghi chú'].map(h => (
+                        <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredItems.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="text-center py-8 text-gray-500">
+                          Không tìm thấy sản phẩm
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredItems.map((item) => {
+                        const actualQty = checkedItems[item.id]?.actualQuantity ?? item.actualQuantity ?? 0
+                        const discrepancy = actualQty - item.systemQuantity
+                        return (
+                          <tr key={item.id} className={discrepancy === 0 ? 'bg-green-50' : ''}>
+                            <td className="px-4 py-3">
+                              <div className="font-medium text-gray-900">{item.productName}</div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-600">{item.sku}</td>
+                            <td className="px-4 py-3 font-medium">{item.systemQuantity} {item.unit}</td>
+                            <td className="px-4 py-3">
+                              <input
+                                type="number"
+                                value={checkedItems[item.id]?.actualQuantity ?? ''}
+                                onChange={(e) => {
+                                  setCheckedItems(prev => ({
+                                    ...prev,
+                                    [item.id]: {
+                                      actualQuantity: Math.max(0, parseInt(e.target.value) || 0),
+                                      notes: prev[item.id]?.notes ?? ''
+                                    }
+                                  }))
+                                }}
+                                className="w-24 px-2 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                                min="0"
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              {discrepancy === 0 ? (
+                                <span className="inline-flex items-center gap-1 text-green-600 font-semibold">
+                                  <CheckCircle size={14} /> Khớp
+                                </span>
+                              ) : (
+                                <span className={`font-semibold ${discrepancy > 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                                  {discrepancy > 0 ? '+' : ''}{discrepancy}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <input
+                                type="text"
+                                value={checkedItems[item.id]?.notes ?? ''}
+                                onChange={(e) => {
+                                  setCheckedItems(prev => ({
+                                    ...prev,
+                                    [item.id]: {
+                                      actualQuantity: prev[item.id]?.actualQuantity ?? item.actualQuantity ?? 0,
+                                      notes: e.target.value
+                                    }
+                                  }))
+                                }}
+                                placeholder="Ghi chú..."
+                                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                              />
+                            </td>
+                          </tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <div className="text-2xl font-bold text-gray-900">{Object.keys(checkedItems).length}</div>
+                    <div className="text-xs text-gray-600">Đã kiểm tra</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-gray-900">{filteredItems.length}</div>
+                    <div className="text-xs text-gray-600">Tổng sản phẩm</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-red-600">
+                      {Object.entries(checkedItems).filter(([id, data]) => {
+                        const item = itemsToCheck.find(i => i.id === id)
+                        return item && data.actualQuantity !== item.systemQuantity
+                      }).length}
+                    </div>
+                    <div className="text-xs text-gray-600">Chênh lệch</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl sticky bottom-0">
+              <button
+                onClick={() => setShowDetailModal(false)}
+                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleCompleteCheck}
+                className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <CheckCircle size={14} />
+                Hoàn thành kiểm tra
               </button>
             </div>
           </div>
