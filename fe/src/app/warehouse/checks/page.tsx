@@ -4,56 +4,31 @@ import { useState, useEffect, useCallback } from 'react'
 import { Plus, X, Search, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react'
 import { Button } from '@/shared/ui/Button'
 import { useAuthStore } from '@/store/auth.store'
-import axiosInstance from '@/shared/api/http'
-
-// Types
-interface InventoryCheck {
-  id: string
-  locationId: string
-  locationType: 'WAREHOUSE' | 'STORE'
-  checkType: 'PARTIAL' | 'FULL'
-  checkNumber: string
-  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED'
-  notes: string
-  createdBy: string
-  createdDate: string
-  completedDate?: string
-  totalItemsChecked?: number
-  discrepancyCount?: number
-  items?: InventoryCheckItem[]
-}
-
-interface InventoryCheckItem {
-  id: string
-  productId: string
-  productName: string
-  sku: string
-  systemQuantity: number
-  actualQuantity: number
-  unit: string
-  discrepancy: number
-  notes: string
-}
-
-interface CheckStats {
-  totalChecks: number
-  completedChecks: number
-  totalDiscrepancies: number
-}
+import {
+  getInventoryChecks,
+  getInventoryCheckById,
+  createInventoryCheck,
+  submitInventoryCheck,
+  type InventoryCheckListDto,
+  type InventoryCheckDto,
+  type InventoryCheckItemDto,
+  type CreateInventoryCheckDto,
+  type SubmitInventoryCheckDto,
+} from '@/services/inventory-check-api'
 
 export default function InventoryChecksPage() {
   const { user, token } = useAuthStore()
   
   // Checks list state
-  const [checks, setChecks] = useState<InventoryCheck[]>([])
+  const [checks, setChecks] = useState<InventoryCheckListDto[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [stats, setStats] = useState<CheckStats>({ totalChecks: 0, completedChecks: 0, totalDiscrepancies: 0 })
+  const [stats, setStats] = useState({ totalChecks: 0, completedChecks: 0, totalDiscrepancies: 0 })
   
   // Modal states
   const [showNewCheckModal, setShowNewCheckModal] = useState(false)
   const [showDetailModal, setShowDetailModal] = useState(false)
-  const [selectedCheck, setSelectedCheck] = useState<InventoryCheck | null>(null)
+  const [selectedCheck, setSelectedCheck] = useState<InventoryCheckDto | null>(null)
   
   // Form states
   const [checkType, setCheckType] = useState<'PARTIAL' | 'FULL'>('PARTIAL')
@@ -62,25 +37,24 @@ export default function InventoryChecksPage() {
   
   // Detail modal states
   const [searchQuery, setSearchQuery] = useState('')
-  const [itemsToCheck, setItemsToCheck] = useState<InventoryCheckItem[]>([])
-  const [checkedItems, setCheckedItems] = useState<Record<string, { actualQuantity: number; notes: string }>>({})
+  const [itemsToCheck, setItemsToCheck] = useState<InventoryCheckItemDto[]>([])
+  const [checkedItems, setCheckedItems] = useState<Record<string, { actualQuantity: number; note: string }>>({})
 
   const userWorkplaceId = user?.workplaceId || user?.warehouseId || user?.storeId || ''
   const userWorkplaceName = user?.name || 'Chỗ làm việc'
 
   // Fetch inventory checks
   const fetchChecks = useCallback(async () => {
-    if (!token || !userWorkplaceId) return
+    if (!token) return
     setIsLoading(true)
     setError(null)
     try {
-      const response = await axiosInstance.get(`/inventory-checks?locationId=${userWorkplaceId}`)
-      const data = Array.isArray(response.data?.data) ? response.data.data : Array.isArray(response.data) ? response.data : []
+      const data = await getInventoryChecks()
       setChecks(data)
       
       // Calculate stats
-      const completed = data.filter((c: InventoryCheck) => c.status === 'COMPLETED').length
-      const discrepancies = data.reduce((sum: number, c: InventoryCheck) => sum + (c.discrepancyCount || 0), 0)
+      const completed = data.filter(c => c.status === 'COMPLETED').length
+      const discrepancies = data.reduce((sum, c) => sum + (c.totalDiscrepancies || 0), 0)
       setStats({
         totalChecks: data.length,
         completedChecks: completed,
@@ -92,17 +66,17 @@ export default function InventoryChecksPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [token, userWorkplaceId])
+  }, [token])
 
   // Fetch items for check detail
   const fetchCheckItems = useCallback(async (checkId: string) => {
     if (!token) return
     try {
-      const response = await axiosInstance.get(`/inventory-checks/${checkId}/items`)
-      const items = Array.isArray(response.data?.data) ? response.data.data : Array.isArray(response.data) ? response.data : []
-      setItemsToCheck(items)
+      const data = await getInventoryCheckById(checkId)
+      setItemsToCheck(data.items || [])
     } catch (err) {
       console.error('Failed to fetch check items:', err)
+      setItemsToCheck([])
     }
   }, [token])
 
@@ -120,26 +94,21 @@ export default function InventoryChecksPage() {
 
     try {
       setIsSubmitting(true)
-      const payload = {
+      const payload: CreateInventoryCheckDto = {
         locationId: userWorkplaceId,
         locationType: user?.roleId === 7 ? 'WAREHOUSE' : 'STORE',
         checkType: checkType,
         notes: notes,
       }
       
-      const response = await axiosInstance.post('/inventory-checks', payload)
-      
-      if (response.data?.id || response.data?.data?.id) {
-        alert(`Tạo phiếu kiểm kê thành công!`)
-        setCheckType('PARTIAL')
-        setNotes('')
-        setShowNewCheckModal(false)
-        fetchChecks()
-      } else {
-        alert('Tạo phiếu kiểm kê thất bại.')
-      }
+      await createInventoryCheck(payload)
+      alert(`Tạo phiếu kiểm kê thành công!`)
+      setCheckType('PARTIAL')
+      setNotes('')
+      setShowNewCheckModal(false)
+      fetchChecks()
     } catch (error: any) {
-      const msg = error?.response?.data?.message || 'Không thể tạo phiếu kiểm kê. Vui lòng thử lại.'
+      const msg = error?.response?.data?.message || error?.message || 'Không thể tạo phiếu kiểm kê. Vui lòng thử lại.'
       alert(msg)
       console.error(error)
     } finally {
@@ -147,42 +116,45 @@ export default function InventoryChecksPage() {
     }
   }
 
-  const handleOpenDetailModal = (check: InventoryCheck) => {
-    setSelectedCheck(check)
+  const handleOpenDetailModal = (check: InventoryCheckListDto) => {
+    setSelectedCheck(null) // Will be loaded by fetchCheckItems
     setShowDetailModal(true)
     setCheckedItems({})
     setSearchQuery('')
     fetchCheckItems(check.id)
+    // Store check info for display
+    setSelectedCheck(check as any)
   }
 
   const handleCompleteCheck = async () => {
     if (!selectedCheck) return
     
-    const itemsWithData = itemsToCheck.map(item => ({
-      inventoryCheckItemId: item.id,
-      actualQuantity: checkedItems[item.id]?.actualQuantity ?? item.actualQuantity ?? 0,
-      notes: checkedItems[item.id]?.notes ?? item.notes ?? '',
-    }))
+    const payload: SubmitInventoryCheckDto = {
+      items: itemsToCheck.map(item => ({
+        productId: item.productId,
+        unit: item.Unit || item.unit,
+        actualQuantity: checkedItems[item.id]?.actualQuantity ?? item.actualQuantity ?? 0,
+        note: checkedItems[item.id]?.note ?? item.note ?? '',
+      })),
+    }
 
     try {
-      await axiosInstance.put(`/inventory-checks/${selectedCheck.id}/complete`, 
-        { items: itemsWithData }
-      )
+      await submitInventoryCheck(selectedCheck.id, payload)
       alert('Hoàn thành kiểm kê thành công!')
       setShowDetailModal(false)
       setSelectedCheck(null)
       setCheckedItems({})
       fetchChecks()
     } catch (error: any) {
-      const msg = error?.response?.data?.message || 'Không thể hoàn thành kiểm kê.'
+      const msg = error?.response?.data?.message || error?.message || 'Không thể hoàn thành kiểm kê.'
       alert(msg)
+      console.error(error)
     }
   }
 
   // Filter items by search
   const filteredItems = itemsToCheck.filter(item =>
-    item.productName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.sku?.toLowerCase().includes(searchQuery.toLowerCase())
+    item.productId.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   // Old mock data removed - no longer needed
@@ -294,14 +266,14 @@ export default function InventoryChecksPage() {
                       <span className="font-semibold text-gray-900">{check.checkNumber || check.id.slice(0, 8)}</span>
                     </td>
                     <td className="px-6 py-4 text-gray-600">
-                      {new Date(check.createdDate).toLocaleDateString('vi-VN')}
+                      {new Date(check.checkDate).toLocaleDateString('vi-VN')}
                     </td>
                     <td className="px-6 py-4 text-gray-600">
-                      {check.createdBy ? `${check.createdBy.slice(0, 8)}...` : '—'}
+                      {check.checkedBy ? `${check.checkedBy.slice(0, 8)}...` : '—'}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={check.discrepancyCount && check.discrepancyCount > 0 ? 'text-red-600 font-semibold' : 'text-green-600'}>
-                        {check.discrepancyCount ?? 0}
+                      <span className={check.totalDiscrepancies && check.totalDiscrepancies > 0 ? 'text-red-600 font-semibold' : 'text-green-600'}>
+                        {check.totalDiscrepancies ?? 0}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -316,7 +288,7 @@ export default function InventoryChecksPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-gray-600 max-w-xs truncate">
-                      {check.notes || '—'}
+                      —
                     </td>
                   </tr>
                 ))
@@ -461,7 +433,7 @@ export default function InventoryChecksPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 sticky top-0">
                     <tr>
-                      {['Sản phẩm', 'SKU', 'SL Hệ thống', 'SL Thực tế', 'Chênh lệch', 'Ghi chú'].map(h => (
+                      {['Sản phẩm', 'SL Hệ thống', 'SL Thực tế', 'Chênh lệch', 'Ghi chú'].map(h => (
                         <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
                       ))}
                     </tr>
@@ -469,7 +441,7 @@ export default function InventoryChecksPage() {
                   <tbody className="divide-y divide-gray-200">
                     {filteredItems.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-8 text-gray-500">
+                        <td colSpan={5} className="text-center py-8 text-gray-500">
                           Không tìm thấy sản phẩm
                         </td>
                       </tr>
@@ -477,13 +449,13 @@ export default function InventoryChecksPage() {
                       filteredItems.map((item) => {
                         const actualQty = checkedItems[item.id]?.actualQuantity ?? item.actualQuantity ?? 0
                         const discrepancy = actualQty - item.systemQuantity
+                        const unit = item.Unit || item.unit || ''
                         return (
                           <tr key={item.id} className={discrepancy === 0 ? 'bg-green-50' : ''}>
                             <td className="px-4 py-3">
-                              <div className="font-medium text-gray-900">{item.productName}</div>
+                              <div className="font-medium text-gray-900">{item.productId}</div>
                             </td>
-                            <td className="px-4 py-3 text-gray-600">{item.sku}</td>
-                            <td className="px-4 py-3 font-medium">{item.systemQuantity} {item.unit}</td>
+                            <td className="px-4 py-3 font-medium">{item.systemQuantity} {unit}</td>
                             <td className="px-4 py-3">
                               <input
                                 type="number"
@@ -493,7 +465,7 @@ export default function InventoryChecksPage() {
                                     ...prev,
                                     [item.id]: {
                                       actualQuantity: Math.max(0, parseInt(e.target.value) || 0),
-                                      notes: prev[item.id]?.notes ?? ''
+                                      note: prev[item.id]?.note ?? ''
                                     }
                                   }))
                                 }}
@@ -515,13 +487,13 @@ export default function InventoryChecksPage() {
                             <td className="px-4 py-3">
                               <input
                                 type="text"
-                                value={checkedItems[item.id]?.notes ?? ''}
+                                value={checkedItems[item.id]?.note ?? ''}
                                 onChange={(e) => {
                                   setCheckedItems(prev => ({
                                     ...prev,
                                     [item.id]: {
                                       actualQuantity: prev[item.id]?.actualQuantity ?? item.actualQuantity ?? 0,
-                                      notes: e.target.value
+                                      note: e.target.value
                                     }
                                   }))
                                 }}
