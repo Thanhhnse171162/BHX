@@ -87,11 +87,6 @@ export const getAdminNavigation = (): NavGroup[] => {
           href: '/admin/users',
           icon: 'Users',
         },
-        {
-          label: 'Vai trò & quyền hạn',
-          href: '/admin/users/roles',
-          icon: 'ShieldCheck',
-        },
       ],
     },
     {

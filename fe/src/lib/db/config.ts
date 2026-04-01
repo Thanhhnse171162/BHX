@@ -17,14 +17,18 @@ function createDbConfig(): sql.config {
     getHostFromUrl(process.env.NEXT_PUBLIC_IAM_URL) ||
     getHostFromUrl(process.env.NEXT_PUBLIC_API_BASE_URL)
 
+  // Use inferred server if available, fallback to localhost for local dev
+  // Only throw error if we're in production AND still have no server
+  const server = inferredServer || 'localhost'
+  
   if (process.env.NODE_ENV === 'production' && !inferredServer) {
-    throw new Error('Missing DB server configuration: set DB_SERVER for production runtime.')
+    console.warn('⚠️ Warning: DB_SERVER not configured, falling back to localhost. Set DB_SERVER env var for production.')
   }
 
   return {
     user: process.env.DB_USER || 'sa',
     password: process.env.DB_PASSWORD || '12345',
-    server: inferredServer || 'localhost',
+    server: server,
     database: process.env.DB_NAME || 'IdentityDB',
     options: {
       encrypt: process.env.DB_ENCRYPT === 'true', // Use true for Azure

@@ -69,6 +69,7 @@ export interface CreateProductDTO {
   storageInstructions?: string
   isPerishable?: boolean
   isAvailable?: boolean
+  isActive?: boolean  // Also support isActive (from response mapping)
   isFeatured?: boolean
   isNew?: boolean
   isOnSale?: boolean

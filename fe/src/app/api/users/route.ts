@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { executeQuery } from '@/lib/db/config'
 import bcrypt from 'bcryptjs'
 
-// GET /api/users - List all users
+// GET /api/users - List all users from local database
 export async function GET(_request: NextRequest) {
   try {
     const query = `
@@ -33,7 +33,7 @@ export async function GET(_request: NextRequest) {
   }
 }
 
-// POST /api/users - Create new user
+// POST /api/users - Create new user in local database
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
