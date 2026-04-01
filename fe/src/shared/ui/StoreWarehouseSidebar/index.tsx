@@ -65,7 +65,7 @@ export function StoreWarehouseSidebar() {
           </div>
           <div>
             <h1 className="text-[24px] leading-none font-extrabold text-slate-800">Hệ thống</h1>
-            <p className="mt-1 text-[12px] font-semibold uppercase tracking-wide text-slate-500">Quản lý kho hàng</p>
+            <p className="mt-1 text-[12px] font-semibold uppercase tracking-wide text-slate-500">Nhân viên kho</p>
           </div>
         </div>
       </div>
@@ -111,7 +111,7 @@ export function StoreWarehouseSidebar() {
           </div>
           <div className="min-w-0">
             <p className="truncate text-[15px] font-semibold text-slate-800">John Doe</p>
-            <p className="truncate text-[12px] text-slate-500">Nhân viên kho cao cấp</p>
+            <p className="truncate text-[12px] text-slate-500">Nhân viên kho hàng</p>
           </div>
         </div>
       </div>

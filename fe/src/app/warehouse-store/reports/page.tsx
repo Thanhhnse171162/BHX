@@ -4,7 +4,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { Search, Plus, X, Eye, ChevronLeft, ChevronRight, Upload } from 'lucide-react'
 import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
 import { DamageReportAPIService, DamageReportFromAPI } from '@/services/damage-report-api.service'
+import { WarehouseLookupAPIService } from '@/services/warehouse-lookup-api.service'
 import { useAuthStore } from '@/store/auth.store'
+
+function normalizeId(value?: string | null): string {
+  return String(value ?? '').trim().toLowerCase()
+}
 
 type LocationType = 'STORE' | 'WAREHOUSE'
 type StatusType = 'PENDING' | 'APPROVED' | 'REJECTED' | 'PROCESSING' | 'COMPLETED'
@@ -35,11 +40,11 @@ interface CreatePayload {
 }
 
 const STATUS_CONFIG: Record<StatusType, { label: string; bg: string; text: string; dot: string; border: string }> = {
-  PENDING: { label: 'PENDING', bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-400', border: 'border-amber-200' },
-  PROCESSING: { label: 'PROCESSING', bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-500', border: 'border-blue-200' },
-  APPROVED: { label: 'APPROVED', bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', border: 'border-emerald-200' },
-  COMPLETED: { label: 'COMPLETED', bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', border: 'border-emerald-200' },
-  REJECTED: { label: 'REJECTED', bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500', border: 'border-red-200' },
+  PENDING: { label: 'Chờ xử lý', bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-400', border: 'border-amber-200' },
+  PROCESSING: { label: 'Đang xử lý', bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-500', border: 'border-blue-200' },
+  APPROVED: { label: 'Được duyệt', bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', border: 'border-emerald-200' },
+  COMPLETED: { label: 'Hoàn tất', bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', border: 'border-emerald-200' },
+  REJECTED: { label: 'Bị từ chối', bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500', border: 'border-red-200' },
 }
 
 function normalizeStatus(status?: string): StatusType {
@@ -160,7 +165,11 @@ function mapReportToView(report: DamageReportFromAPI, products: ProductFromAPI[]
   }
 }
 
-function DetailModal({ report, onClose }: { report: DamageReportView; onClose: () => void }) {
+function DetailModal({ report, onClose, nameMap }: { report: DamageReportView; onClose: () => void; nameMap: Record<string, string> }) {
+  function getLocationName(locationId: string): string {
+    return nameMap[normalizeId(locationId)] || locationId
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -179,6 +188,7 @@ function DetailModal({ report, onClose }: { report: DamageReportView; onClose: (
             {[
               { label: 'Mã báo cáo', value: report.reportNumber },
               { label: 'Ngày báo cáo', value: formatDateTime(report.reportDate) },
+              { label: 'Vị trí', value: getLocationName(report.locationId) },
               { label: 'Loại địa điểm', value: <LocationBadge type={report.locationType} /> },
               { label: 'Sản phẩm', value: report.productName },
               { label: 'Loại thiệt hại', value: <DamageTypeBadge type={report.damageType} /> },
@@ -283,7 +293,7 @@ function CreateModal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div>
             <h2 className="text-lg font-bold text-slate-800">Tạo báo cáo thiệt hại</h2>
-            <p className="text-sm text-slate-500">Submit đúng schema BE multipart/form-data</p>
+            <p className="text-sm text-slate-500">Gửi báo cáo đúng định dạng</p>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500">
             <X size={18} />
@@ -310,19 +320,19 @@ function CreateModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">DamageType <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">Loại thiệt hại <span className="text-red-500">*</span></label>
               <input
                 type="text"
                 value={damageType}
                 onChange={(e) => setDamageType(e.target.value)}
-                placeholder="VD: hư hại"
+                placeholder="VD: hư hải"
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Quality <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">Số lượng <span className="text-red-500">*</span></label>
               <input
                 type="number"
                 min={1}
@@ -335,7 +345,7 @@ function CreateModal({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">ReportedDate <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-medium text-slate-600 mb-1.5">Ngày báo cáo <span className="text-red-500">*</span></label>
             <input
               type="datetime-local"
               value={reportedDate}
@@ -347,16 +357,16 @@ function CreateModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">LocationType</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">Loại địa điểm</label>
               <input
                 type="text"
-                value={locationType}
+                value={locationType === 'STORE' ? 'Cửa hàng' : 'Kho hàng'}
                 readOnly
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 text-slate-600"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">LocationId (workplace_id)</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">ID địa điểm</label>
               <input
                 type="text"
                 value={locationId || 'Không có workplace_id'}
@@ -367,7 +377,7 @@ function CreateModal({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">Description <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-medium text-slate-600 mb-1.5">Mô tả <span className="text-red-500">*</span></label>
             <textarea
               rows={3}
               value={description}
@@ -379,7 +389,7 @@ function CreateModal({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">Photos</label>
+            <label className="block text-xs font-medium text-slate-600 mb-1.5">Hình ảnh</label>
             <div className="flex gap-2 items-center">
               <label className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-slate-200 hover:border-emerald-400 cursor-pointer transition-colors bg-slate-50 hover:bg-emerald-50">
                 <Upload className="w-4 h-4 text-slate-400" />
@@ -430,6 +440,7 @@ export default function DamageReportsPage() {
   const [loadError, setLoadError] = useState('')
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
+  const [nameMap, setNameMap] = useState<Record<string, string>>({})
   const PAGE_SIZE = 5
 
   const locationType: LocationType = user?.workplaceType === 'STORE' ? 'STORE' : 'WAREHOUSE'
@@ -461,6 +472,29 @@ export default function DamageReportsPage() {
 
         setProducts(productRows)
         setReports(reportRows.map((row) => mapReportToView(row, productRows)))
+
+        // Fetch location names
+        const uniqueLocationIds = Array.from(
+          new Set(reportRows.map((r) => normalizeId(r.locationId)).filter(Boolean))
+        )
+        const unresolved = uniqueLocationIds.filter((id) => !nameMap[id])
+        if (unresolved.length > 0) {
+          const resolved = await Promise.all(
+            unresolved.map(async (id) => {
+              try {
+                const data = await WarehouseLookupAPIService.getById(id)
+                return [id, data?.name || id] as const
+              } catch {
+                return [id, id] as const
+              }
+            }),
+          )
+          setNameMap((prev) => {
+            const next = { ...prev }
+            for (const [id, label] of resolved) next[id] = label
+            return next
+          })
+        }
       } catch (error: any) {
         setLoadError(error?.message || 'Không thể tải dữ liệu báo cáo thiệt hại.')
       } finally {
@@ -519,9 +553,14 @@ export default function DamageReportsPage() {
     setPage(1)
   }
 
+  function getLocationName(locationId: string): string {
+    const key = normalizeId(locationId)
+    return nameMap[key] || locationId
+  }
+
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      {selectedReport && <DetailModal report={selectedReport} onClose={() => setSelectedReport(null)} />}
+      {selectedReport && <DetailModal report={selectedReport} onClose={() => setSelectedReport(null)} nameMap={nameMap} />}
       {showCreate && (
         <CreateModal
           onClose={() => setShowCreate(false)}
@@ -607,11 +646,11 @@ export default function DamageReportsPage() {
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
               <option value="">Tất cả</option>
-              <option value="PENDING">PENDING</option>
-              <option value="PROCESSING">PROCESSING</option>
-              <option value="APPROVED">APPROVED</option>
-              <option value="COMPLETED">COMPLETED</option>
-              <option value="REJECTED">REJECTED</option>
+              <option value="PENDING">Chờ xử lý</option>
+              <option value="PROCESSING">Đang xử lý</option>
+              <option value="APPROVED">Được duyệt</option>
+              <option value="COMPLETED">Hoàn tất</option>
+              <option value="REJECTED">Bị từ chối</option>
             </select>
           </div>
         </div>
@@ -653,6 +692,7 @@ export default function DamageReportsPage() {
                 <td className="px-4 py-4 font-semibold text-slate-800 text-xs leading-tight whitespace-nowrap">{report.reportNumber}</td>
                 <td className="px-4 py-4">
                   <div className="space-y-1">
+                    <p className="text-xs font-semibold text-slate-700">{getLocationName(report.locationId)}</p>
                     <LocationBadge type={report.locationType} />
                   </div>
                 </td>
@@ -675,7 +715,7 @@ export default function DamageReportsPage() {
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
                   >
                     <Eye size={12} />
-                    View
+                    Xem
                   </button>
                 </td>
               </tr>
