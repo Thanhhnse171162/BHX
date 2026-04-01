@@ -379,14 +379,20 @@ export default function UsersPage() {
           return
         }
       } else if (mode === 'edit' && editingId) {
-        const payload: any = { name, email, role }
-        if (password) payload.password = password
-        if (showLocation && locationId) payload.locationId = Number(locationId)
+        // Map FE fields to backend API fields
+        const payload: any = {
+          email,
+          fullName: name,
+        }
+        if (showLocation && locationId) {
+          payload.workplaceId = locationId
+          payload.workplaceType = user?.workplaceType || 'WAREHOUSE'
+        }
 
-        console.log('📤 PUT /api/users/' + editingId + ' with payload:', payload)
+        console.log('📤 PUT /api/users/update/' + editingId + ' with payload:', payload)
         console.log('📤 Authorization:', token ? `Bearer ${token.substring(0, 20)}...` : 'none')
 
-        const response = await fetch(`/api/users/${editingId}`, {
+        const response = await fetch(`/api/users/update/${editingId}`, {
           method: 'PUT',
           headers,
           body: JSON.stringify(payload),
