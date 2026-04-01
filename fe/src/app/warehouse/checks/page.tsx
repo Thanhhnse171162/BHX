@@ -1,4 +1,4 @@
-'use client'
+"use client"
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Eye, Filter, Loader2, Plus, Search, X } from 'lucide-react'
@@ -29,7 +29,7 @@ function formatDateVI(value?: string) {
   return date.toLocaleDateString('vi-VN')
 }
 
-export default function WarehouseInventoryChecksPage() {
+export default function StoreManagerInventoryCheckPage() {
   const { user, hydrated } = useAuthStore()
 
   const [loading, setLoading] = useState(false)
@@ -48,7 +48,7 @@ export default function WarehouseInventoryChecksPage() {
   const [detailProductNameMap, setDetailProductNameMap] = useState<Map<string, string>>(new Map())
   const [currentStoreName, setCurrentStoreName] = useState<string>('')
   const [createForm, setCreateForm] = useState<CreateCheckForm>({
-    locationType: 'WAREHOUSE',
+    locationType: 'STORE',
     checkType: 'PARTIAL',
     notes: '',
   })
@@ -234,8 +234,8 @@ export default function WarehouseInventoryChecksPage() {
     <section className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Danh sách phiếu kiểm kê kho</h2>
-          <p className="text-sm text-gray-500 mt-1">Quản lý các phiếu kiểm kê kho</p>
+          <h2 className="text-2xl font-bold text-gray-900">Danh sách phiếu kiểm kê</h2>
+          <p className="text-sm text-gray-500 mt-1">Quản lý các phiếu kiểm kê kho và cửa hàng</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -284,7 +284,7 @@ export default function WarehouseInventoryChecksPage() {
                   Loại vị trí
                   <input
                     type="text"
-                    value={createForm.locationType === 'WAREHOUSE' ? 'Kho (WAREHOUSE)' : 'Cửa hàng (STORE)'}
+                    value="Cửa hàng (STORE)"
                     disabled
                     className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-300 bg-gray-50 text-sm text-gray-600"
                   />
