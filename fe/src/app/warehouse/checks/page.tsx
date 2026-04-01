@@ -350,7 +350,7 @@ export default function StoreManagerInventoryCheckPage() {
                   Loại vị trí
                   <input
                     type="text"
-                    value="Cửa hàng (STORE)"
+                    value="(WAREHOUSE) Kho hàng"
                     disabled
                     className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-300 bg-gray-50 text-sm text-gray-600"
                   />
