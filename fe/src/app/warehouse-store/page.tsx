@@ -13,6 +13,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { TransferAPIService, TransferFromAPI } from '@/services/transfer-api.service'
+import { WarehouseLookupAPIService } from '@/services/warehouse-lookup-api.service'
 import { useAuthStore } from '@/store/auth.store'
 
 interface InboundRow {
@@ -52,6 +53,7 @@ export default function StoreWarehouseDashboard() {
   const [outboundRows, setOutboundRows] = useState<OutboundRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [nameMap, setNameMap] = useState<Record<string, string>>({})
 
   const workplaceId = useMemo(() => {
     return user?.workplaceId || (user as any)?.workplace_id || (user as any)?.workplace?.id || user?.storeId || ''
@@ -136,6 +138,31 @@ export default function StoreWarehouseDashboard() {
 
       setInboundRows(inbound.slice(0, 5)) // Limit to 5 rows
       setOutboundRows(outbound.slice(0, 5))
+
+      // Fetch warehouse/location names
+      const allRows = [...inbound, ...outbound]
+      const uniqueIds = Array.from(new Set(
+        allRows.flatMap((r) => [r.source, r.dest]).map((x) => normalizeId(x)).filter(Boolean),
+      ))
+
+      const unresolved = uniqueIds.filter((id) => !nameMap[id])
+      if (unresolved.length > 0) {
+        const resolved = await Promise.all(
+          unresolved.map(async (id) => {
+            try {
+              const data = await WarehouseLookupAPIService.getById(id)
+              return [id, data?.name || id] as const
+            } catch {
+              return [id, id] as const
+            }
+          }),
+        )
+        setNameMap((prev) => {
+          const next = { ...prev }
+          for (const [id, label] of resolved) next[id] = label
+          return next
+        })
+      }
     } catch (err) {
       console.error('Error fetching transfers:', err)
       setError('Không thể tải dữ liệu transfers')
@@ -147,6 +174,11 @@ export default function StoreWarehouseDashboard() {
   useEffect(() => {
     void fetchTransfers()
   }, [fetchTransfers])
+
+  function getWarehouseName(locationId: string): string {
+    const key = normalizeId(locationId)
+    return nameMap[key] || locationId
+  }
 
   function getStatusConfig(status: string): { label: string; class: string } {
     const statusMap: Record<string, { label: string; class: string }> = {
@@ -304,8 +336,8 @@ export default function StoreWarehouseDashboard() {
                   {inboundRows.map((row) => (
                     <tr key={row.id} className="border-t hover:bg-slate-50 transition-colors" style={{ borderColor: '#f1f5f9' }}>
                       <td className="px-4 py-2.5 font-semibold text-emerald-600 whitespace-nowrap">{row.id}</td>
-                      <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{row.source}</td>
-                      <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{row.dest}</td>
+                      <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{getWarehouseName(row.source)}</td>
+                      <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{getWarehouseName(row.dest)}</td>
                       <td className="px-4 py-2.5 text-slate-400 whitespace-nowrap">{row.created}</td>
                       <td className="px-4 py-2.5 text-slate-400 whitespace-nowrap">{row.received}</td>
                       <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{row.sku}</td>
@@ -364,8 +396,8 @@ export default function StoreWarehouseDashboard() {
                   {outboundRows.map((row) => (
                     <tr key={row.id} className="border-t hover:bg-slate-50 transition-colors" style={{ borderColor: '#f1f5f9' }}>
                       <td className="px-4 py-2.5 font-semibold text-emerald-600 whitespace-nowrap">{row.id}</td>
-                      <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{row.source}</td>
-                      <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{row.dest}</td>
+                      <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{getWarehouseName(row.source)}</td>
+                      <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{getWarehouseName(row.dest)}</td>
                       <td className="px-4 py-2.5 text-slate-400 whitespace-nowrap">{row.created}</td>
                       <td className="px-4 py-2.5 text-slate-400 whitespace-nowrap">{row.sent}</td>
                       <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{row.sku}</td>
