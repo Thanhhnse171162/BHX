@@ -5,7 +5,7 @@ import {
   Search, ChevronDown, Plus, X, AlertTriangle,
   Package, Trash2, RefreshCw, CheckCircle, XCircle, Loader2,
   ArrowRight, Truck, MapPin, User, FileText,
-  ChevronLeft, ChevronRight, Inbox,
+  ChevronLeft, ChevronRight, Inbox, Eye,
 } from 'lucide-react'
 import { RestockAPIService, RestockRequestFromAPI, RestockRequestItem } from '@/services/restock-api.service'
 import { TransferAPIService, TransferFromAPI } from '@/services/transfer-api.service'
@@ -270,6 +270,7 @@ export default function WarehouseRequestsPage() {
   const [transferSearch, setTransferSearch] = useState('')
   const [transferStatusFilter, setTransferStatusFilter] = useState('ALL')
   const [receivingTransferId, setReceivingTransferId] = useState<string | null>(null)
+  const [selectedTransfer, setSelectedTransfer] = useState<TransferFromAPI | null>(null)
 
   // ── Modal state ────────────────────────────────────────────────────────────
   const [showModal, setShowModal] = useState(false)
@@ -579,6 +580,14 @@ export default function WarehouseRequestsPage() {
     }
   }, [reqPagination.paginated, selectedRequest])
 
+  useEffect(() => {
+    if (!selectedTransfer) return
+    const isVisible = trPagination.paginated.some(t => t.id === selectedTransfer.id)
+    if (!isVisible && trPagination.paginated.length > 0) {
+      setSelectedTransfer(trPagination.paginated[0])
+    }
+  }, [trPagination.paginated, selectedTransfer])
+
   // ── Transfer request options ───────────────────────────────────────────────
   const transferRequestOptions = useMemo(
     () => requests.filter(r => r.status === 'APPROVED' || r.status === 'PROCESSING'),
@@ -586,7 +595,7 @@ export default function WarehouseRequestsPage() {
   )
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
-  const fmtDate = (d: string | null) => {
+  const fmtDate = (d: string | null | undefined) => {
     if (!d) return '—'
     return new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: 'short', year: 'numeric' })
   }
@@ -1334,20 +1343,25 @@ export default function WarehouseRequestsPage() {
                     <tbody>
                       {selectedRequest.items.length === 0 ? (
                         <tr><td colSpan={6} className="px-4 py-6 text-center text-xs text-gray-400">Không có sản phẩm</td></tr>
-                      ) : selectedRequest.items.map((item: RestockRequestItem, idx: number) => (
-                        <tr key={item.id} className={idx !== selectedRequest.items.length - 1 ? 'border-b border-gray-100' : ''}>
-                          <td className="px-4 py-3 font-medium text-gray-800">{item.productName}</td>
-                          <td className="px-4 py-3 text-gray-400 text-xs">{item.unit}</td>
-                          <td className="px-4 py-3 text-gray-500 text-xs">{item.currentQuantity}</td>
-                          <td className="px-4 py-3 font-semibold text-green-600">{item.requestedQuantity}</td>
-                          <td className="px-4 py-3">
-                            {item.approvedQuantity !== null
-                              ? <span className="font-semibold text-teal-600">{item.approvedQuantity}</span>
-                              : <span className="text-gray-300">—</span>}
-                          </td>
-                          <td className="px-4 py-3 text-gray-400 italic text-xs">{item.reason || '—'}</td>
-                        </tr>
-                      ))}
+                      ) : selectedRequest.items.map((item: RestockRequestItem, idx: number) => {
+                        const product = products.find(p => p.id === item.productId)
+                        const productName = item.productName || product?.name || item.productId || '—'
+                        const productUnit = item.unit || product?.unit || '—'
+                        return (
+                          <tr key={item.id} className={idx !== selectedRequest.items.length - 1 ? 'border-b border-gray-100' : ''}>
+                            <td className="px-4 py-3 font-medium text-gray-800">{productName}</td>
+                            <td className="px-4 py-3 text-gray-400 text-xs">{productUnit}</td>
+                            <td className="px-4 py-3 text-gray-500 text-xs">{item.currentQuantity}</td>
+                            <td className="px-4 py-3 font-semibold text-green-600">{item.requestedQuantity}</td>
+                            <td className="px-4 py-3">
+                              {item.approvedQuantity !== null
+                                ? <span className="font-semibold text-teal-600">{item.approvedQuantity}</span>
+                                : <span className="text-gray-300">—</span>}
+                            </td>
+                            <td className="px-4 py-3 text-gray-400 italic text-xs">{item.reason || '—'}</td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1435,18 +1449,24 @@ export default function WarehouseRequestsPage() {
                     {t.actualDelivery ? fmtDate(t.actualDelivery ?? null) : fmtDate(t.expectedDelivery ?? null)}
                     {t.actualDelivery && <span className="ml-1.5 text-teal-600 font-medium text-xs">✓</span>}
                   </td>
-                  <td className="px-5 py-3.5">
-                    {canReceiveTransfer(t) ? (
+                  <td className="px-5 py-3.5 flex items-center gap-2">
+                    <button
+                      onClick={() => setSelectedTransfer(t)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-600 hover:bg-blue-50 transition-colors"
+                      title="Xem chi tiết"
+                    >
+                      <Eye size={12} />
+                      Chi tiết
+                    </button>
+                    {canReceiveTransfer(t) && (
                       <button
                         onClick={() => handleReceiveTransfer(t)}
                         disabled={receivingTransferId === t.id}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         {receivingTransferId === t.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
-                        Xác nhận nhận
+                        Xác nhận
                       </button>
-                    ) : (
-                      <span className="text-xs text-gray-400">—</span>
                     )}
                   </td>
                 </tr>
@@ -1461,6 +1481,111 @@ export default function WarehouseRequestsPage() {
           setPage={trPagination.setPage}
         />
       </div>
+
+      {/* ══════════════════════════════════════════════════════
+          TRANSFER DETAIL PANEL
+      ══════════════════════════════════════════════════════ */}
+      {selectedTransfer && !isLoadingTransfers && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-gray-900 text-base">{selectedTransfer.transferNumber}</h3>
+                <StatusBadge status={selectedTransfer.status} />
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Tạo: {fmtDate(selectedTransfer.transferDate)}
+                {selectedTransfer.actualDelivery && ` · Giao: ${fmtDate(selectedTransfer.actualDelivery)}`}
+              </p>
+            </div>
+            <button
+              onClick={() => setSelectedTransfer(null)}
+              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="p-6">
+            <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+              <div className="xl:col-span-2 space-y-5">
+                <div>
+                  <SectionLabel>Tuyến vận chuyển</SectionLabel>
+                  <div className="grid grid-cols-2 gap-4">
+                    <InfoField
+                      label="Từ kho"
+                      value={getWarehouseLabel(selectedTransfer.fromLocationId)}
+                      icon={MapPin}
+                    />
+                    <InfoField
+                      label="Tới kho"
+                      value={getWarehouseLabel(selectedTransfer.toLocationId)}
+                      icon={MapPin}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <SectionLabel>Thông tin giao hàng</SectionLabel>
+                  <div className="grid grid-cols-2 gap-4">
+                    <InfoField
+                      label="Dự kiến giao"
+                      value={fmtDate(selectedTransfer.expectedDelivery)}
+                    />
+                    <InfoField
+                      label="Thực tế giao"
+                      value={selectedTransfer.actualDelivery ? fmtDate(selectedTransfer.actualDelivery) : '—'}
+                    />
+                  </div>
+                </div>
+                {selectedTransfer.shippedBy && (
+                  <div>
+                    <SectionLabel>Người giao</SectionLabel>
+                    <InfoField label="Người giao hàng" value={getUserLabel(selectedTransfer.shippedBy)} icon={User} />
+                  </div>
+                )}
+                {selectedTransfer.notes && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Ghi chú</p>
+                    <p className="text-sm text-gray-600">{selectedTransfer.notes}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="xl:col-span-3">
+                <div className="flex items-center justify-between mb-3">
+                  <SectionLabel>Sản phẩm vận chuyển</SectionLabel>
+                  <span className="text-xs text-gray-500">{selectedTransfer.items?.length ?? 0} sản phẩm</span>
+                </div>
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        {['Sản phẩm', 'Lô', 'SL yêu cầu', 'SL giao', 'SL nhận', 'Ghi chú'].map(h => (
+                          <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {!selectedTransfer.items || selectedTransfer.items.length === 0 ? (
+                        <tr><td colSpan={6} className="px-4 py-6 text-center text-xs text-gray-400">Không có sản phẩm</td></tr>
+                      ) : selectedTransfer.items.map((item: any, idx: number) => (
+                        <tr key={item.id} className={idx !== selectedTransfer.items.length - 1 ? 'border-b border-gray-100' : ''}>
+                          <td className="px-4 py-3 font-medium text-gray-800">{item.productName || item.productId || '—'}</td>
+                          <td className="px-4 py-3 text-gray-500 text-xs font-mono">{item.batchNumber || item.batchId || '—'}</td>
+                          <td className="px-4 py-3 font-semibold text-blue-600">{item.requestedQuantity ?? '—'}</td>
+                          <td className="px-4 py-3 text-gray-600">{item.shippedQuantity ?? '—'}</td>
+                          <td className="px-4 py-3 font-semibold text-teal-600">{item.receivedQuantity ?? '—'}</td>
+                          <td className="px-4 py-3 text-gray-400 italic text-xs">{item.notes || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )
