@@ -294,15 +294,26 @@ export default function UsersPage() {
         headers.Authorization = `Bearer ${token}`
       }
 
-      const response = await fetch(`/api/users/${id}`, {
+      console.log('📤 DELETE /api/users/delete/' + id)
+      console.log('📤 Authorization:', token ? `Bearer ${token.substring(0, 20)}...` : 'none')
+
+      const response = await fetch(`/api/users/delete/${id}`, {
         method: 'DELETE',
         headers,
       })
-      if (response.ok) await loadUsers()
-      else alert('Xóa user thất bại')
+
+      console.log('📥 API Response Status:', response.status, response.statusText)
+
+      if (response.ok) {
+        console.log('✅ User deleted successfully')
+        await loadUsers()
+      } else {
+        const error = await response.json()
+        alert('Xóa user thất bại: ' + (error.error || 'Unknown error'))
+      }
     } catch (error) {
       console.error('Delete user error:', error)
-      alert('Có lỗi xảy ra')
+      alert('Có lỗi xảy ra khi xóa user')
     }
   }
 
