@@ -62,20 +62,45 @@ export default function StoreManagerInventoryCheckPage() {
     setLoading(true)
     setError(null)
 
+    let retries = 0
+    const maxRetries = 2
+    
+    const attemptLoad = async (): Promise<void> => {
+      try {
+        console.log('🔍 Loading inventory checks for warehouse:', {
+          workplaceId: user.workplaceId,
+          workplaceType: user.workplaceType,
+          hydrated,
+        })
+        
+        const all = await getInventoryChecks()
+        const currentLocationId = String(user.workplaceId).trim().toLowerCase()
+        const filtered = all.filter((check) => String(check.locationId ?? '').trim().toLowerCase() === currentLocationId)
+        setItems(filtered)
+        setPage(1)
+      } catch (err: any) {
+        const status = err?.response?.status
+        console.error('❌ Error loading inventory checks:', { status, message: err?.message })
+        
+        // Retry on 403 (auth issue may resolve with token refresh)
+        if (status === 403 && retries < maxRetries) {
+          retries++
+          await new Promise(resolve => setTimeout(resolve, 500 * retries))
+          return attemptLoad()
+        }
+        
+        const message = err?.response?.data?.message || err?.message || 'Không thể tải danh sách phiếu kiểm kê.'
+        setError(message)
+        setItems([])
+      }
+    }
+    
     try {
-      const all = await getInventoryChecks()
-      const currentLocationId = String(user.workplaceId).trim().toLowerCase()
-      const filtered = all.filter((check) => String(check.locationId ?? '').trim().toLowerCase() === currentLocationId)
-      setItems(filtered)
-      setPage(1)
-    } catch (err: any) {
-      const message = err?.response?.data?.message || err?.message || 'Không thể tải danh sách phiếu kiểm kê.'
-      setError(message)
-      setItems([])
+      await attemptLoad()
     } finally {
       setLoading(false)
     }
-  }, [hydrated, user?.workplaceId])
+  }, [hydrated, user?.workplaceId, user?.workplaceType])
 
   useEffect(() => {
     void loadChecks()
