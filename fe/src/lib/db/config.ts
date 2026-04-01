@@ -27,6 +27,7 @@ function createDbConfig(): sql.config {
     user: process.env.DB_USER || 'sa',
     password: process.env.DB_PASSWORD || '12345',
     server: inferredServer || 'localhost',
+    port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 1433,
     database: process.env.DB_NAME || 'IdentityDB',
     options: {
       encrypt: process.env.DB_ENCRYPT === 'true', // Use true for Azure
@@ -46,6 +47,7 @@ console.log('🔧 DB Config:', {
   user: process.env.DB_USER,
   hasPassword: !!process.env.DB_PASSWORD,
   server: process.env.DB_SERVER,
+  port: process.env.DB_PORT || 1433,
   database: process.env.DB_NAME,
   encrypt: process.env.DB_ENCRYPT,
   trustCert: process.env.DB_TRUST_CERT,

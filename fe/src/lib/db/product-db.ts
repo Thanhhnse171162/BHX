@@ -25,6 +25,7 @@ function createProductDbConfig(): sql.config {
     user: process.env.PRODUCT_DB_USER || 'sa',
     password: process.env.PRODUCT_DB_PASSWORD || '12345',
     server: inferredProductServer || 'localhost',
+    port: process.env.PRODUCT_DB_PORT ? parseInt(process.env.PRODUCT_DB_PORT, 10) : 1433,
     database: process.env.PRODUCT_DB_NAME || 'ProductDB',
     options: {
       encrypt: process.env.PRODUCT_DB_ENCRYPT === 'true',
@@ -49,6 +50,7 @@ console.log('🛒 ProductDB Config:', {
   user: process.env.PRODUCT_DB_USER,
   hasPassword: !!process.env.PRODUCT_DB_PASSWORD,
   server: process.env.PRODUCT_DB_SERVER,
+  port: process.env.PRODUCT_DB_PORT || 1433,
   database: process.env.PRODUCT_DB_NAME,
   encrypt: process.env.PRODUCT_DB_ENCRYPT,
   trustCert: process.env.PRODUCT_DB_TRUST_CERT,
