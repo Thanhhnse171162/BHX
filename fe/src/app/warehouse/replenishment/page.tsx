@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Plus, FileDown, Search, SlidersHorizontal, Eye,
+  Plus, Search, SlidersHorizontal, Eye,
   ChevronLeft, ChevronRight, X, ChevronDown,
   Package, ArrowRight, Trash2
 } from 'lucide-react'
@@ -1370,10 +1370,6 @@ export default function ReplenishmentPage() {
             >
               <Plus size={15} />
               Tạo yêu cầu nhập hàng
-            </button>
-            <button className="flex items-center gap-2 border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors">
-              <FileDown size={15} />
-              Excel
             </button>
           </div>
         </div>

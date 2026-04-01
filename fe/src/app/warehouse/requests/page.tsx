@@ -588,6 +588,26 @@ export default function WarehouseRequestsPage() {
     }
   }, [trPagination.paginated, selectedTransfer])
 
+  // ── Resolve shipper names for selected transfer ─────────────────────────
+  useEffect(() => {
+    if (!token || !selectedTransfer?.shippedBy) return
+    const shipperId = selectedTransfer.shippedBy
+    if (userNameMap[shipperId]) return  // Already resolved
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const info = await UserAPIService.getIamDetailsById(shipperId)
+        const name = info?.fullName || info?.full_name || info?.name || info?.email || ''
+        if (cancelled) return
+        if (name) {
+          setUserNameMap(prev => ({ ...prev, [shipperId]: name }))
+        }
+      } catch { /* ignore */ }
+    })()
+    return () => { cancelled = true }
+  }, [token, selectedTransfer?.shippedBy, userNameMap])
+
   // ── Transfer request options ───────────────────────────────────────────────
   const transferRequestOptions = useMemo(
     () => requests.filter(r => r.status === 'APPROVED' || r.status === 'PROCESSING'),
@@ -1157,10 +1177,6 @@ export default function WarehouseRequestsPage() {
             className="p-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors" title="Làm mới">
             <RefreshCw size={15} className="text-gray-500" />
           </button>
-          <button onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2.5 rounded-lg text-sm transition-colors">
-            <Plus size={15} /> Yêu Cầu Nhập
-          </button>
           <button onClick={openTransferModal}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2.5 rounded-lg text-sm transition-colors">
             <Truck size={15} /> Tạo Đơn Vận Chuyển
@@ -1568,16 +1584,20 @@ export default function WarehouseRequestsPage() {
                     <tbody>
                       {!selectedTransfer.items || selectedTransfer.items.length === 0 ? (
                         <tr><td colSpan={6} className="px-4 py-6 text-center text-xs text-gray-400">Không có sản phẩm</td></tr>
-                      ) : selectedTransfer.items.map((item: any, idx: number) => (
-                        <tr key={item.id} className={idx !== selectedTransfer.items.length - 1 ? 'border-b border-gray-100' : ''}>
-                          <td className="px-4 py-3 font-medium text-gray-800">{item.productName || item.productId || '—'}</td>
-                          <td className="px-4 py-3 text-gray-500 text-xs font-mono">{item.batchNumber || item.batchId || '—'}</td>
-                          <td className="px-4 py-3 font-semibold text-blue-600">{item.requestedQuantity ?? '—'}</td>
-                          <td className="px-4 py-3 text-gray-600">{item.shippedQuantity ?? '—'}</td>
-                          <td className="px-4 py-3 font-semibold text-teal-600">{item.receivedQuantity ?? '—'}</td>
-                          <td className="px-4 py-3 text-gray-400 italic text-xs">{item.notes || '—'}</td>
-                        </tr>
-                      ))}
+                      ) : selectedTransfer.items.map((item: any, idx: number) => {
+                        const product = products.find(p => p.id === item.productId)
+                        const productName = item.productName || product?.name || item.productId || '—'
+                        return (
+                          <tr key={item.id} className={idx !== selectedTransfer.items.length - 1 ? 'border-b border-gray-100' : ''}>
+                            <td className="px-4 py-3 font-medium text-gray-800">{productName}</td>
+                            <td className="px-4 py-3 text-gray-500 text-xs font-mono">{item.batchNumber || item.batchId || '—'}</td>
+                            <td className="px-4 py-3 font-semibold text-blue-600">{item.requestedQuantity ?? '—'}</td>
+                            <td className="px-4 py-3 text-gray-600">{item.shippedQuantity ?? '—'}</td>
+                            <td className="px-4 py-3 font-semibold text-teal-600">{item.receivedQuantity ?? '—'}</td>
+                            <td className="px-4 py-3 text-gray-400 italic text-xs">{item.notes || '—'}</td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
