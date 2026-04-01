@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { executeQuery } from '@/lib/db/config'
 import bcrypt from 'bcryptjs'
 
+const IAM_SERVICE_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://13.229.29.52:5000'
+
 // GET /api/users - List all users from local database
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const query = `
       SELECT 
@@ -26,6 +28,24 @@ export async function GET(_request: NextRequest) {
     return NextResponse.json(users)
   } catch (error) {
     console.error('Get users error:', error)
+    
+    // Fall back to IAM service
+    try {
+      const authHeader = request.headers.get('authorization') || ''
+      const iamRes = await fetch(`${IAM_SERVICE_URL}/api/users/list`, {
+        headers: {
+          Authorization: authHeader,
+        },
+      })
+      
+      if (iamRes.ok) {
+        const iamData = await iamRes.json()
+        return NextResponse.json(Array.isArray(iamData) ? iamData : iamData.data || [])
+      }
+    } catch (iamError) {
+      console.error('IAM fallback error:', iamError)
+    }
+    
     return NextResponse.json(
       { error: 'Failed to fetch users' },
       { status: 500 }

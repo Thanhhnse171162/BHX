@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { executeQuery } from '@/lib/db/config'
 import bcrypt from 'bcryptjs'
 
+const IAM_SERVICE_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://13.229.29.52:5000'
+
 // GET /api/users/[id] - Get user by ID
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    // Try local database first
     const query = `
       SELECT 
         u.id,
@@ -24,6 +27,19 @@ export async function GET(
     const users = await executeQuery(query, { id: params.id })
 
     if (users.length === 0) {
+      // Fall back to IAM service if not found locally
+      const authHeader = request.headers.get('authorization') || ''
+      const iamRes = await fetch(`${IAM_SERVICE_URL}/api/users/details/${encodeURIComponent(params.id)}`, {
+        headers: {
+          Authorization: authHeader,
+        },
+      })
+      
+      if (iamRes.ok) {
+        const iamData = await iamRes.json()
+        return NextResponse.json(iamData.data || iamData)
+      }
+      
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
@@ -33,6 +49,24 @@ export async function GET(
     return NextResponse.json(users[0])
   } catch (error) {
     console.error('Get user error:', error)
+    
+    // Try fallback to IAM service
+    try {
+      const authHeader = request.headers.get('authorization') || ''
+      const iamRes = await fetch(`${IAM_SERVICE_URL}/api/users/details/${encodeURIComponent(params.id)}`, {
+        headers: {
+          Authorization: authHeader,
+        },
+      })
+      
+      if (iamRes.ok) {
+        const iamData = await iamRes.json()
+        return NextResponse.json(iamData.data || iamData)
+      }
+    } catch (iamError) {
+      console.error('IAM fallback error:', iamError)
+    }
+    
     return NextResponse.json(
       { error: 'Failed to fetch user' },
       { status: 500 }
