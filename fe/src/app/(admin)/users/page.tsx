@@ -94,6 +94,7 @@ function mapApiUserToUi(raw: any): User {
 export default function UsersPage() {
   const ITEMS_PER_PAGE = 10
   const token = useAuthStore((state) => state.token)
+  const user = useAuthStore((state) => state.user)
 
   // ── Modal / form state ────────────────────────────────────────────────────
   const [isModalOpen, setIsModalOpen]   = useState(false)
@@ -344,13 +345,22 @@ export default function UsersPage() {
       }
 
       if (mode === 'create') {
-        const payload: any = { name, email, password, role }
-        if (showLocation && locationId) payload.locationId = Number(locationId)
+        // Map FE fields to backend API fields
+        const payload: any = {
+          fullName: name,
+          email,
+          password,
+          roleName: role,
+        }
+        if (showLocation && locationId) {
+          payload.workplaceId = locationId
+          payload.workplaceType = user?.workplaceType || 'WAREHOUSE'
+        }
 
-        console.log('📤 POST /api/users with payload:', payload)
+        console.log('📤 POST /api/users/create with payload:', payload)
         console.log('📤 Authorization:', token ? `Bearer ${token.substring(0, 20)}...` : 'none')
 
-        const response = await fetch('/api/users', {
+        const response = await fetch('/api/users/create', {
           method: 'POST',
           headers,
           body: JSON.stringify(payload),
