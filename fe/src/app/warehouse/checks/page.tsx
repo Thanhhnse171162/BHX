@@ -17,7 +17,7 @@ import {
 } from '@/services/inventory-check-api'
 
 export default function InventoryChecksPage() {
-  const { user, token } = useAuthStore()
+  const { user, hydrated } = useAuthStore()
   
   // Checks list state
   const [checks, setChecks] = useState<InventoryCheckListDto[]>([])
@@ -45,32 +45,40 @@ export default function InventoryChecksPage() {
 
   // Fetch inventory checks
   const fetchChecks = useCallback(async () => {
-    if (!token) return
+    if (!hydrated || !userWorkplaceId) {
+      setChecks([])
+      setIsLoading(false)
+      return
+    }
+    
     setIsLoading(true)
     setError(null)
     try {
       const data = await getInventoryChecks()
-      setChecks(data)
+      const currentLocationId = String(userWorkplaceId).trim().toLowerCase()
+      const filtered = data.filter((check) => String(check.locationId ?? '').trim().toLowerCase() === currentLocationId)
+      setChecks(filtered)
       
       // Calculate stats
-      const completed = data.filter(c => c.status === 'COMPLETED').length
-      const discrepancies = data.reduce((sum, c) => sum + (c.totalDiscrepancies || 0), 0)
+      const completed = filtered.filter(c => c.status === 'COMPLETED').length
+      const discrepancies = filtered.reduce((sum, c) => sum + (c.totalDiscrepancies || 0), 0)
       setStats({
-        totalChecks: data.length,
+        totalChecks: filtered.length,
         completedChecks: completed,
         totalDiscrepancies: discrepancies,
       })
-    } catch (err) {
-      setError('Không thể tải danh sách phiếu kiểm kê.')
+    } catch (err: any) {
+      const message = err?.response?.data?.message || err?.message || 'Không thể tải danh sách phiếu kiểm kê.'
+      setError(message)
       console.error(err)
+      setChecks([])
     } finally {
       setIsLoading(false)
     }
-  }, [token])
+  }, [hydrated, userWorkplaceId])
 
   // Fetch items for check detail
   const fetchCheckItems = useCallback(async (checkId: string) => {
-    if (!token) return
     try {
       const data = await getInventoryCheckById(checkId)
       setItemsToCheck(data.items || [])
@@ -78,13 +86,11 @@ export default function InventoryChecksPage() {
       console.error('Failed to fetch check items:', err)
       setItemsToCheck([])
     }
-  }, [token])
+  }, [])
 
   useEffect(() => {
-    if (token && userWorkplaceId) {
-      fetchChecks()
-    }
-  }, [token, userWorkplaceId, fetchChecks])
+    void fetchChecks()
+  }, [fetchChecks])
 
   const handleSubmit = async () => {
     if (!userWorkplaceId) {
