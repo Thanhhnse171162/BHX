@@ -48,7 +48,7 @@ export default function StoreManagerInventoryCheckPage() {
   const [detailProductNameMap, setDetailProductNameMap] = useState<Map<string, string>>(new Map())
   const [currentStoreName, setCurrentStoreName] = useState<string>('')
   const [createForm, setCreateForm] = useState<CreateCheckForm>({
-    locationType: 'STORE',
+    locationType: 'WAREHOUSE', // Default to WAREHOUSE for this warehouse/checks page
     checkType: 'PARTIAL',
     notes: '',
   })
@@ -62,20 +62,56 @@ export default function StoreManagerInventoryCheckPage() {
     setLoading(true)
     setError(null)
 
+    let retries = 0
+    const maxRetries = 2
+    
+    const attemptLoad = async (): Promise<void> => {
+      try {
+        console.log('🔍 Loading inventory checks for warehouse:', {
+          workplaceId: user.workplaceId,
+          workplaceType: user.workplaceType,
+          hydrated,
+        })
+        
+        const all = await getInventoryChecks()
+        const currentLocationId = String(user.workplaceId).trim().toLowerCase()
+        const filtered = all.filter((check) => String(check.locationId ?? '').trim().toLowerCase() === currentLocationId)
+        setItems(filtered)
+        setPage(1)
+      } catch (err: any) {
+        const status = err?.response?.status
+        console.error('❌ Error loading inventory checks:', { status, message: err?.message })
+        
+        // Retry on 403 (auth issue may resolve with token refresh)
+        if (status === 403 && retries < maxRetries) {
+          retries++
+          await new Promise(resolve => setTimeout(resolve, 500 * retries))
+          return attemptLoad()
+        }
+        
+        const message = err?.response?.data?.message || err?.message || 'Không thể tải danh sách phiếu kiểm kê.'
+        setError(message)
+        setItems([])
+      }
+    }
+    
     try {
-      const all = await getInventoryChecks()
-      const currentLocationId = String(user.workplaceId).trim().toLowerCase()
-      const filtered = all.filter((check) => String(check.locationId ?? '').trim().toLowerCase() === currentLocationId)
-      setItems(filtered)
-      setPage(1)
-    } catch (err: any) {
-      const message = err?.response?.data?.message || err?.message || 'Không thể tải danh sách phiếu kiểm kê.'
-      setError(message)
-      setItems([])
+      await attemptLoad()
     } finally {
       setLoading(false)
     }
-  }, [hydrated, user?.workplaceId])
+  }, [hydrated, user?.workplaceId, user?.workplaceType])
+
+  // Reset form locationType when user workplaceType changes
+  useEffect(() => {
+    if (!hydrated || !user?.workplaceId) return
+    
+    const locationType = String(user.workplaceType || '').toUpperCase() === 'WAREHOUSE' ? 'WAREHOUSE' : 'STORE'
+    setCreateForm(prev => ({
+      ...prev,
+      locationType,
+    }))
+  }, [hydrated, user?.workplaceType])
 
   useEffect(() => {
     void loadChecks()
@@ -167,20 +203,50 @@ export default function StoreManagerInventoryCheckPage() {
     setIsCreating(true)
     setCreateError(null)
 
-    try {
-      const payload: CreateInventoryCheckDto = {
-        locationType: createForm.locationType,
-        locationId: String(user.workplaceId),
-        checkType: createForm.checkType,
-        notes: createForm.notes.trim() || undefined,
-      }
+    let retries = 0
+    const maxRetries = 2
 
-      await createInventoryCheck(payload)
-      setShowCreateModal(false)
-      await loadChecks()
-    } catch (err: any) {
-      const message = err?.response?.data?.message || err?.message || 'Không thể tạo phiếu kiểm kê.'
-      setCreateError(message)
+    const attemptCreate = async (): Promise<void> => {
+      try {
+        const payload: CreateInventoryCheckDto = {
+          locationType: createForm.locationType,
+          locationId: String(user.workplaceId),
+          checkType: createForm.checkType,
+          notes: createForm.notes.trim() || undefined,
+        }
+
+        console.log('🔍 Creating inventory check:', {
+          payload,
+          workplaceId: user.workplaceId,
+          workplaceType: user.workplaceType,
+        })
+
+        await createInventoryCheck(payload)
+        setShowCreateModal(false)
+        await loadChecks()
+      } catch (err: any) {
+        const status = err?.response?.status
+        console.error('❌ Create inventory check error:', {
+          status,
+          message: err?.message,
+          data: err?.response?.data,
+        })
+
+        // Retry on 403 (auth issue may resolve with token refresh)
+        if (status === 403 && retries < maxRetries) {
+          retries++
+          console.log(`🔄 Retrying... attempt ${retries}/${maxRetries}`)
+          await new Promise(resolve => setTimeout(resolve, 500 * retries))
+          return attemptCreate()
+        }
+
+        const message = err?.response?.data?.message || err?.message || 'Không thể tạo phiếu kiểm kê.'
+        setCreateError(message)
+      }
+    }
+
+    try {
+      await attemptCreate()
     } finally {
       setIsCreating(false)
     }
@@ -284,7 +350,7 @@ export default function StoreManagerInventoryCheckPage() {
                   Loại vị trí
                   <input
                     type="text"
-                    value="Cửa hàng (STORE)"
+                    value="(WAREHOUSE) Kho hàng"
                     disabled
                     className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-300 bg-gray-50 text-sm text-gray-600"
                   />

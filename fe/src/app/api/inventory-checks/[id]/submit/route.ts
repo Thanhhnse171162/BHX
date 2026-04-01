@@ -14,7 +14,6 @@ export async function PUT(
     const id = params.id
     const body = await request.json()
     const url = `${INVENTORY_SERVICE_URL}/api/inventory-checks/${id}/submit`
-
     console.log('Submitting inventory check:', {
       id,
       payload: JSON.stringify(body, null, 2),
