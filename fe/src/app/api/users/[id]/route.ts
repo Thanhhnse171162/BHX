@@ -85,90 +85,117 @@ export async function PUT(
 
     console.log('PUT /api/users/[id] - Request:', { id: params.id, body })
 
-    // Get role_id if role is provided
-    let roleId = null
-    if (role) {
-      const roleQuery = `SELECT id FROM roles WHERE name = @role`
-      const roles = await executeQuery<{ id: string }>(roleQuery, { role })
-      if (roles.length > 0) {
-        roleId = roles[0].id
+    try {
+      // Get role_id if role is provided
+      let roleId = null
+      if (role) {
+        const roleQuery = `SELECT id FROM roles WHERE name = @role`
+        const roles = await executeQuery<{ id: string }>(roleQuery, { role })
+        if (roles.length > 0) {
+          roleId = roles[0].id
+        }
       }
+
+      // Build update query dynamically
+      const updates: string[] = []
+      const queryParams: Record<string, any> = { id: params.id }
+
+      if (name) {
+        updates.push('full_name = @name')
+        queryParams.name = name
+      }
+      if (email) {
+        updates.push('email = @email')
+        queryParams.email = email
+      }
+      if (password) {
+        const passwordHash = await bcrypt.hash(password, 10)
+        updates.push('password_hash = @password_hash')
+        queryParams.password_hash = passwordHash
+      }
+      if (roleId) {
+        updates.push('role_id = @role_id')
+        queryParams.role_id = roleId
+      }
+      if (status) {
+        updates.push('status = @status')
+        queryParams.status = status
+      }
+
+      console.log('Update query params:', { updates, queryParams })
+
+      if (updates.length === 0) {
+        return NextResponse.json(
+          { error: 'No fields to update' },
+          { status: 400 }
+        )
+      }
+
+      const updateQuery = `
+        UPDATE users
+        SET ${updates.join(', ')}
+        OUTPUT INSERTED.id, INSERTED.email, INSERTED.full_name, INSERTED.status
+        WHERE id = @id
+      `
+
+      const result = await executeQuery<{
+        id: string
+        email: string
+        full_name: string
+        status: string
+      }>(updateQuery, queryParams)
+
+      if (result.length === 0) {
+        return NextResponse.json(
+          { error: 'User not found' },
+          { status: 404 }
+        )
+      }
+
+      const updatedUser = result[0]
+
+      // Get role name
+      const roleQuery = roleId 
+        ? `SELECT name FROM roles WHERE id = @role_id`
+        : `SELECT r.name FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id = @id`
+      
+      const roleParams = roleId ? { role_id: roleId } : { id: params.id }
+      const roles = await executeQuery<{ name: string }>(roleQuery, roleParams)
+      const roleName = roles[0]?.name || role
+
+      return NextResponse.json({
+        id: updatedUser.id,
+        name: updatedUser.full_name,
+        email: updatedUser.email,
+        role: roleName,
+        status: updatedUser.status,
+      })
+    } catch (dbError: any) {
+      // If database connection fails, try IAM service fallback
+      if (dbError.message?.includes('connect') || dbError.message?.includes('localhost') || dbError.code === 'ESOCKET') {
+        console.warn('⚠️  Local database unavailable, falling back to IAM service')
+        
+        const authHeader = request.headers.get('authorization') || ''
+        const iamRes = await fetch(`${IAM_SERVICE_URL}/api/users/${encodeURIComponent(params.id)}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: authHeader,
+          },
+          body: JSON.stringify({ name, email, password, role, status }),
+        })
+
+        if (iamRes.ok) {
+          const iamData = await iamRes.json()
+          return NextResponse.json(iamData.data || iamData)
+        }
+
+        throw new Error(`IAM service returned ${iamRes.status}`)
+      }
+
+      // Re-throw other database errors for handling below
+      throw dbError
     }
-
-    // Build update query dynamically
-    const updates: string[] = []
-    const queryParams: Record<string, any> = { id: params.id }
-
-    if (name) {
-      updates.push('full_name = @name')
-      queryParams.name = name
-    }
-    if (email) {
-      updates.push('email = @email')
-      queryParams.email = email
-    }
-    if (password) {
-      const passwordHash = await bcrypt.hash(password, 10)
-      updates.push('password_hash = @password_hash')
-      queryParams.password_hash = passwordHash
-    }
-    if (roleId) {
-      updates.push('role_id = @role_id')
-      queryParams.role_id = roleId
-    }
-    if (status) {
-      updates.push('status = @status')
-      queryParams.status = status
-    }
-
-    console.log('Update query params:', { updates, queryParams })
-
-    if (updates.length === 0) {
-      return NextResponse.json(
-        { error: 'No fields to update' },
-        { status: 400 }
-      )
-    }
-
-    const updateQuery = `
-      UPDATE users
-      SET ${updates.join(', ')}
-      OUTPUT INSERTED.id, INSERTED.email, INSERTED.full_name, INSERTED.status
-      WHERE id = @id
-    `
-
-    const result = await executeQuery<{
-      id: string
-      email: string
-      full_name: string
-      status: string
-    }>(updateQuery, queryParams)
-
-    if (result.length === 0) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
-    }
-
-    const updatedUser = result[0]
-
-    // Get role name
-    const roleQuery = roleId 
-      ? `SELECT name FROM roles WHERE id = @role_id`
-      : `SELECT r.name FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id = @id`
-    
-    const roleParams = roleId ? { role_id: roleId } : { id: params.id }
-    const roles = await executeQuery<{ name: string }>(roleQuery, roleParams)
-    const roleName = roles[0]?.name || role
-
-    return NextResponse.json({
-      id: updatedUser.id,
-      name: updatedUser.full_name,
-      email: updatedUser.email,
-      role: roleName,
-      status: updatedUser.status,
-    })
   } catch (error: any) {
     console.error('Update user error:', error)
     

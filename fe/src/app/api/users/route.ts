@@ -69,85 +69,113 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get role_id from role name (case-insensitive, trim whitespace)
-    const roleQuery = `SELECT id FROM roles WHERE LOWER(TRIM(name)) = LOWER(TRIM(@role))`
-    const roles = await executeQuery<{ id: string }>(roleQuery, { role: String(role).trim() })
-    
-    if (roles.length === 0) {
-      console.error('❌ Role not found:', role)
-      // Log available roles for debugging
-      const allRolesQuery = `SELECT id, name FROM roles`
-      const allRoles = await executeQuery(allRolesQuery)
-      console.log('📋 Available roles:', allRoles)
-      return NextResponse.json(
-        { error: `Role "${role}" not found in database` },
-        { status: 400 }
-      )
+    // Try local database first
+    try {
+      // Get role_id from role name (case-insensitive, trim whitespace)
+      const roleQuery = `SELECT id FROM roles WHERE LOWER(TRIM(name)) = LOWER(TRIM(@role))`
+      const roles = await executeQuery<{ id: string }>(roleQuery, { role: String(role).trim() })
+      
+      if (roles.length === 0) {
+        console.error('❌ Role not found:', role)
+        // Log available roles for debugging
+        const allRolesQuery = `SELECT id, name FROM roles`
+        const allRoles = await executeQuery(allRolesQuery)
+        console.log('📋 Available roles:', allRoles)
+        return NextResponse.json(
+          { error: `Role "${role}" not found in database` },
+          { status: 400 }
+        )
+      }
+
+      const roleId = roles[0].id
+      console.log('✅ Role ID found:', roleId)
+
+      // Hash password
+      const passwordHash = await bcrypt.hash(password, 10)
+      console.log('✅ Password hashed')
+
+      // Insert user with IdentityDB structure
+      let insertQuery = `
+        INSERT INTO users (id, email, password_hash, full_name, role_id, status, email_verified`
+
+      const insertParams: Record<string, any> = {
+        email,
+        password_hash: passwordHash,
+        name,
+        role_id: roleId,
+      }
+
+      // Add locationId if provided
+      if (locationId) {
+        insertQuery += `, warehouse_id`
+        insertParams.warehouse_id = locationId
+      }
+
+      insertQuery += `)
+        OUTPUT INSERTED.id, INSERTED.email, INSERTED.full_name, INSERTED.status
+        VALUES (NEWID(), @email, @password_hash, @name, @role_id, 'ACTIVE', 0`
+
+      if (locationId) {
+        insertQuery += `, @warehouse_id`
+      }
+
+      insertQuery += `)`
+
+      console.log('📝 Insert query:', insertQuery)
+      console.log('🔧 Insert params:', insertParams)
+
+      const result = await executeQuery<{
+        id: string
+        email: string
+        full_name: string
+        status: string
+      }>(insertQuery, insertParams)
+
+      if (result.length === 0) {
+        console.error('❌ Insert returned no result')
+        return NextResponse.json(
+          { error: 'Failed to create user - insert returned no result' },
+          { status: 500 }
+        )
+      }
+
+      const newUser = result[0]
+      console.log('✅ User created:', newUser.id)
+
+      return NextResponse.json({
+        id: newUser.id,
+        name: newUser.full_name,
+        email: newUser.email,
+        role,
+        status: newUser.status,
+        locationId: locationId || undefined,
+      }, { status: 201 })
+    } catch (dbError: any) {
+      // If database connection fails, try IAM service fallback
+      if (dbError.message?.includes('connect') || dbError.message?.includes('localhost') || dbError.code === 'ESOCKET') {
+        console.warn('⚠️  Local database unavailable, falling back to IAM service')
+        
+        const authHeader = request.headers.get('authorization') || ''
+        const iamRes = await fetch(`${IAM_SERVICE_URL}/api/users`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: authHeader,
+          },
+          body: JSON.stringify({ name, email, password, role, locationId }),
+        })
+
+        if (iamRes.ok) {
+          const iamData = await iamRes.json()
+          return NextResponse.json(iamData.data || iamData, { status: 201 })
+        }
+
+        throw new Error(`IAM service returned ${iamRes.status}`)
+      }
+
+      // Re-throw other database errors for handling below
+      throw dbError
     }
-
-    const roleId = roles[0].id
-    console.log('✅ Role ID found:', roleId)
-
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10)
-    console.log('✅ Password hashed')
-
-    // Insert user with IdentityDB structure
-    let insertQuery = `
-      INSERT INTO users (id, email, password_hash, full_name, role_id, status, email_verified`
-
-    const insertParams: Record<string, any> = {
-      email,
-      password_hash: passwordHash,
-      name,
-      role_id: roleId,
-    }
-
-    // Add locationId if provided
-    if (locationId) {
-      insertQuery += `, warehouse_id`
-      insertParams.warehouse_id = locationId
-    }
-
-    insertQuery += `)
-      OUTPUT INSERTED.id, INSERTED.email, INSERTED.full_name, INSERTED.status
-      VALUES (NEWID(), @email, @password_hash, @name, @role_id, 'ACTIVE', 0`
-
-    if (locationId) {
-      insertQuery += `, @warehouse_id`
-    }
-
-    insertQuery += `)`
-
-    console.log('📝 Insert query:', insertQuery)
-    console.log('🔧 Insert params:', insertParams)
-
-    const result = await executeQuery<{
-      id: string
-      email: string
-      full_name: string
-      status: string
-    }>(insertQuery, insertParams)
-
-    if (result.length === 0) {
-      console.error('❌ Insert returned no result')
-      return NextResponse.json(
-        { error: 'Failed to create user - insert returned no result' },
-        { status: 500 }
-      )
-    }
-
-    const newUser = result[0]
-    console.log('✅ User created:', newUser.id)
-
-    return NextResponse.json({
-      id: newUser.id,
-      name: newUser.full_name,
-      email: newUser.email,
-      role,
-      status: newUser.status,
-      locationId: locationId || undefined,
-    }, { status: 201 })
   } catch (error: any) {
     console.error('❌ Create user error:', error)
     
