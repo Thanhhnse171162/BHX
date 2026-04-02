@@ -242,13 +242,6 @@ export default function WarehouseManagementPage() {
       ),
     },
     {
-      key: 'capacity' as keyof AdminWarehouse,
-      label: 'Dung Lượng',
-      render: (_: unknown, item: AdminWarehouse) => (
-        <div className="text-gray-900">{item.capacity}</div>
-      ),
-    },
-    {
       key: 'status' as keyof AdminWarehouse,
       label: 'Trạng Thái',
       render: (_: unknown, item: AdminWarehouse) => {
