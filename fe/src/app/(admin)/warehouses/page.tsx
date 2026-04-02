@@ -94,7 +94,7 @@ export default function WarehousesAdminPage() {
     capacityMin: '',
     capacityMax: '',
     status: '',
-    isDeleted: '0', // Default to show only active (not deleted)
+    isDeleted: '', // Show all warehouses (both deleted and active)
     createdAtFrom: '',
     createdAtTo: '',
     createdBy: '',
@@ -331,7 +331,7 @@ export default function WarehousesAdminPage() {
           headers['Authorization'] = `Bearer ${token}`
         }
 
-        const response = await fetch(`/api/Warehouse/warehouses/${editingId}`, {
+        const response = await fetch(`/api/warehouses/${editingId}`, {
           method: 'PATCH',
           headers,
           body: JSON.stringify(payload),
@@ -409,13 +409,6 @@ export default function WarehousesAdminPage() {
       ),
     },
     {
-      key: 'capacity' as keyof AdminWarehouse,
-      label: 'Dung Lượng',
-      render: (_: unknown, item: AdminWarehouse) => (
-        <div className="text-gray-900">{item.capacity}</div>
-      ),
-    },
-    {
       key: 'parentId' as keyof AdminWarehouse,
       label: 'Kho Phụ',
       render: (_: unknown, item: AdminWarehouse) => (
@@ -428,9 +421,10 @@ export default function WarehousesAdminPage() {
       key: 'status' as keyof AdminWarehouse,
       label: 'Trạng Thái',
       render: (_: unknown, item: AdminWarehouse) => {
-        const normalizedStatus = normalizeStatus(item.status)
-        const label = statusLabels[normalizedStatus as keyof typeof statusLabels] || 'Unknown'
-        const color = statusColors[normalizedStatus as keyof typeof statusColors] || 'bg-gray-100 text-gray-800'
+        // Show INACTIVE if item is soft-deleted, otherwise show actual status
+        const displayStatus = item.isDeleted ? 'INACTIVE' : normalizeStatus(item.status)
+        const label = statusLabels[displayStatus as keyof typeof statusLabels] || 'Unknown'
+        const color = statusColors[displayStatus as keyof typeof statusColors] || 'bg-gray-100 text-gray-800'
         return (
           <span
             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${color}`}
@@ -628,20 +622,22 @@ export default function WarehousesAdminPage() {
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="isDeleted"
-              checked={formData.isDeleted || false}
-              onChange={(e) =>
-                setFormData({ ...formData, isDeleted: e.target.checked })
-              }
-              className="w-4 h-4 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 cursor-pointer"
-            />
-            <label htmlFor="isDeleted" className="text-sm font-medium text-gray-700 cursor-pointer">
-              Đánh dấu là đã xóa
-            </label>
-          </div>
+          {mode === 'edit' && (
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="isDeleted"
+                checked={formData.isDeleted || false}
+                onChange={(e) =>
+                  setFormData({ ...formData, isDeleted: e.target.checked })
+                }
+                className="w-4 h-4 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              />
+              <label htmlFor="isDeleted" className="text-sm font-medium text-gray-700 cursor-pointer">
+                Đánh dấu là đã xóa
+              </label>
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4">
             <Button type="button" variant="outline" onClick={handleCloseModal}>
