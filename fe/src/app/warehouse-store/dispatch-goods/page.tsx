@@ -476,34 +476,6 @@ export default function DispatchGoodsPage() {
             />
           </div>
 
-          <select className="h-10 border rounded-lg px-3 text-sm">
-            <option>Kho nguồn</option>
-            <option>Kho Quận 12</option>
-            <option>Kho Bình Dương</option>
-            <option>Kho Thủ Đức</option>
-          </select>
-
-          <select className="h-10 border rounded-lg px-3 text-sm">
-            <option>Cửa hàng đích</option>
-            <option>Cửa hàng Quận 1</option>
-            <option>Cửa hàng Quận 3</option>
-            <option>Cửa hàng Quận 5</option>
-          </select>
-
-          <input
-            type="date"
-            className="h-10 border rounded-lg px-3 text-sm"
-          />
-
-          <button
-            className="h-10 px-4 border rounded-lg text-sm text-slate-600 hover:bg-slate-50 inline-flex items-center gap-1.5"
-            onClick={loadOrders}
-            disabled={isLoading}
-          >
-            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
-            Làm mới
-          </button>
-
         </div>
 
         {/* STATUS TABS */}
