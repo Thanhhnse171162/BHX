@@ -283,15 +283,19 @@ export default function WarehouseManagerRequestsPage() {
 
       try {
         const allUsers = await UserAPIService.getAll()
+        console.log(`👥 Fetched ${allUsers.length} users from UserAPIService.getAll()`)
         
         // Map tất cả users để hiển thị tên của requestedBy (sử dụng normalized id làm key)
         for (const u of allUsers) {
           const userName = u.full_name || u.fullName || u.name || u.email || u.id
           const normalizedUserId = normalizeId(u.id)
           userMap[normalizedUserId] = userName
+          console.log(`  ✓ Mapped: ${normalizedUserId} -> ${userName}`)
         }
+        console.log(`✅ userMap build complete with ${Object.keys(userMap).length} entries`)
         setUserMap(userMap)
-      } catch {
+      } catch (error) {
+        console.error('❌ Failed to fetch users:', error)
         setUserMap({})
       }
 
@@ -2027,7 +2031,12 @@ export default function WarehouseManagerRequestsPage() {
               <div>
                 <p className="text-xs text-gray-500 uppercase font-semibold">Nguồn / Người yêu cầu</p>
                 <p className="text-sm font-medium text-gray-700">
-                  {selectedFullRequest ? userMap[normalizeId(selectedFullRequest.requestedBy)] || selectedFullRequest.requestedBy || '—' : selectedRequest.source}
+                  {selectedFullRequest ? (() => {
+                    const normalizedId = normalizeId(selectedFullRequest.requestedBy)
+                    const displayName = userMap[normalizedId] || selectedFullRequest.requestedBy
+                    console.log(`🔍 Detail Modal - requestedBy: ${selectedFullRequest.requestedBy}, normalized: ${normalizedId}, found in map: ${!!userMap[normalizedId]}, display: ${displayName}, userMapSize: ${Object.keys(userMap).length}`)
+                    return displayName || '—'
+                  })() : selectedRequest.source}
                 </p>
               </div>
 
