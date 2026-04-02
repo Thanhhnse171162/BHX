@@ -181,61 +181,127 @@ export default function StoreManagerDashboard() {
   const fetchAll = async () => {
     try {
       setLoading(true)
-      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
+      // Reset KPI values
+      setRevenue('—')
+      setChartData([])
+      setProducts([])
+      setStockCount(0)
+      setLowCount(0)
+      setOutCount(0)
+
+      if (!token || !selectedStoreId) {
+        console.warn('Missing token or selectedStoreId')
+        setLoading(false)
+        return
+      }
+
+      const headers: HeadersInit = { Authorization: `Bearer ${token}` }
 
       const params = new URLSearchParams()
-      if (selectedStoreId) params.set('storeId', selectedStoreId)
-      if (activeRange !== 'custom') params.set('range', activeRange)
-      else {
+      params.set('storeId', selectedStoreId)
+      if (activeRange !== 'custom') {
+        params.set('range', activeRange)
+      } else {
         if (dateFrom) params.set('from', dateFrom)
         if (dateTo) params.set('to', dateTo)
       }
-      const qs = params.toString() ? `?${params}` : ''
+      const qs = `?${params.toString()}`
 
-      // Revenue
-      const revenueRes = await fetch(`/api/reports/manager/revenue${qs}`, { headers })
-      if (revenueRes.ok) {
-        const data = await revenueRes.json()
-        setRevenue(
-          (data.totalRevenue || 0).toLocaleString('vi-VN', { style: 'currency', currency: 'VND' })
-        )
-        setChartData(
-          (data.chartData || []).map((d: any) => ({ day: d.day || d.date || d.label, value: d.value || d.revenue || 0 }))
-        )
-        setProducts(
-          (data.topProducts || []).slice(0, 5).map((p: any, _: number, arr: any[]) => {
-            const maxRev = arr[0]?.revenue || 1
-            return {
-              name: p.productName || p.name,
-              units: p.unitsSold || p.units || 0,
-              revenue: (p.revenue || 0).toLocaleString('vi-VN'),
-              pct: Math.round(((p.revenue || 0) / maxRev) * 100),
-            }
-          })
-        )
+      // ── Fetch Revenue Data ──────────────────────────────────────────────────
+      try {
+        const revenueRes = await fetch(`/api/reports/manager/revenue${qs}`, { headers })
+        if (revenueRes.ok) {
+          const data = await revenueRes.json()
+          console.log('Revenue API Response:', data)
+
+          // Set total revenue
+          const totalRev = data?.totalRevenue || 0
+          setRevenue(totalRev.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' }))
+
+          // Set chart data
+          const chartD = data?.chartData || []
+          if (Array.isArray(chartD) && chartD.length > 0) {
+            setChartData(
+              chartD.map((d: any) => ({
+                day: d.day || d.date || d.label || '',
+                value: typeof d.value === 'number' ? d.value : (d.revenue || 0),
+              }))
+            )
+          }
+
+          // Set top products
+          const topProds = data?.topProducts || []
+          if (Array.isArray(topProds) && topProds.length > 0) {
+            const maxRev = topProds[0]?.revenue || 1
+            setProducts(
+              topProds.slice(0, 5).map((p: any) => ({
+                name: p.productName || p.name || 'N/A',
+                units: parseInt(p.unitsSold || p.units || 0),
+                revenue: (p.revenue || 0).toLocaleString('vi-VN'),
+                pct: Math.round(((p.revenue || 0) / maxRev) * 100),
+              }))
+            )
+          }
+        } else {
+          console.error('Revenue API error:', revenueRes.status, await revenueRes.text())
+        }
+      } catch (revErr) {
+        console.error('Revenue fetch error:', revErr)
       }
 
-      // Inventory
-      const invRes = await fetch(`/api/Inventory/low-stock-alerts${qs}`, { headers })
-      if (invRes.ok) {
-        const data: any = await invRes.json()
-        const items = Array.isArray(data) ? data : data.data || []
-        setLowCount(items.filter((i: any) => i.quantity > 0).length)
-        setOutCount(items.filter((i: any) => i.quantity === 0).length)
-        setStockCount(items.reduce((sum: number, i: any) => sum + (i.totalQuantity || 0), 0))
+      // ── Fetch Inventory Data ────────────────────────────────────────────────
+      try {
+        const invRes = await fetch(`/api/Inventory/low-stock-alerts${qs}`, { headers })
+        if (invRes.ok) {
+          const data = await invRes.json()
+          console.log('Inventory API Response:', data)
+
+          const items = Array.isArray(data) ? data : (data?.data || [])
+          if (Array.isArray(items) && items.length > 0) {
+            // Calculate counts
+            const lowStockItems = items.filter((i: any) => {
+              const qty = i.quantity || i.currentStock || 0
+              return qty > 0 && qty < (i.minimumStock || 10)
+            })
+            const outStockItems = items.filter((i: any) => {
+              const qty = i.quantity || i.currentStock || 0
+              return qty === 0
+            })
+            const totalStock = items.reduce((sum: number, i: any) => {
+              return sum + (i.quantity || i.currentStock || i.totalQuantity || 0)
+            }, 0)
+
+            setLowCount(lowStockItems.length)
+            setOutCount(outStockItems.length)
+            setStockCount(totalStock)
+          }
+        } else {
+          console.error('Inventory API error:', invRes.status, await invRes.text())
+        }
+      } catch (invErr) {
+        console.error('Inventory fetch error:', invErr)
       }
     } catch (err) {
-      console.error(err)
+      console.error('Fatal error in fetchAll:', err)
     } finally {
       setLoading(false)
     }
   }
 
+  // Auto-fetch when store, time range, or dates change
   useEffect(() => { 
-    if (selectedStoreId) fetchAll() 
-  }, [token, activeRange, selectedStoreId])
+    if (selectedStoreId && token) {
+      fetchAll() 
+    }
+  }, [token, activeRange, selectedStoreId, dateFrom, dateTo])
 
-  const handleApply = () => fetchAll()
+  const handleApply = () => {
+    if (activeRange === 'custom' && (!dateFrom || !dateTo)) {
+      alert('Vui lòng chọn cả ngày bắt đầu và ngày kết thúc')
+      return
+    }
+    fetchAll()
+  }
 
   const handleReset = () => {
     setDateFrom('')
