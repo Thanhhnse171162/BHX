@@ -24,6 +24,8 @@ export default function WarehouseManagementPage() {
   const [error, setError] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
   const [formData, setFormData] = useState<CreateWarehouseForm>({
     name: '',
     location: '',
@@ -169,6 +171,7 @@ export default function WarehouseManagementPage() {
 
     setLoading(true)
     setError(null)
+    setCurrentPage(1)
     try {
       const headers: HeadersInit = {}
       if (token) {
@@ -300,7 +303,60 @@ export default function WarehouseManagementPage() {
             description="Bạn hiện không quản lý chi nhánh kho nào"
           />
         ) : (
-          <DataTable columns={columns} data={warehouses} />
+          <>
+            {/* Data Table */}
+            <DataTable 
+              columns={columns} 
+              data={warehouses.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)} 
+            />
+
+            {/* Pagination Controls */}
+            {Math.ceil(warehouses.length / itemsPerPage) > 1 && (
+              <div className="mt-6 flex items-center justify-between bg-white rounded-lg shadow p-4">
+                <div className="text-sm text-gray-600">
+                  Hiển thị <span className="font-semibold">{(currentPage - 1) * itemsPerPage + 1}</span> đến&nbsp;
+                  <span className="font-semibold">{Math.min(currentPage * itemsPerPage, warehouses.length)}</span> trong&nbsp;
+                  <span className="font-semibold">{warehouses.length}</span> kho
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    ← Trang trước
+                  </Button>
+                  
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.ceil(warehouses.length / itemsPerPage) }, (_, i) => i + 1).map(page => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                          currentPage === page
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(warehouses.length / itemsPerPage)))}
+                    disabled={currentPage === Math.ceil(warehouses.length / itemsPerPage)}
+                  >
+                    Trang sau →
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 

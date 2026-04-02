@@ -16,7 +16,6 @@ import {
   ArrowLeftRight,
   RefreshCw,
   Building2,
-  BoxIcon,
   BarChart3,
   MapPin
 } from 'lucide-react'
@@ -81,11 +80,6 @@ function getNavigationItems(userRole?: string): NavItem[] {
       label: 'Quản lý kho',
       href: '/warehouse/management',
       icon: Building2
-    },
-    {
-      label: 'Quản lý sản phẩm',
-      href: '/warehouse/products',
-      icon: BoxIcon
     }
   ]
   // Only show 'Báo cáo' if not WAREHOUSE_STAFF (role id 5)
