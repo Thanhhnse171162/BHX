@@ -6,56 +6,61 @@ const IAM_SERVICE_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://13.229.29.52:
 
 // GET /api/users - List all users from IAM service (or local database if available)
 export async function GET(request: NextRequest) {
-  try {
-    // On Vercel, skip local database and go directly to IAM service
-    if (process.env.VERCEL === '1' || process.env.VERCEL_ENV) {
-      throw new Error('Using IAM service on Vercel')
-    }
+  const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV
 
-    const query = `
-      SELECT 
-        u.id,
-        u.email,
-        u.full_name as name,
-        u.phone,
-        u.status,
-        r.name as role,
-        u.role_id,
-        GETDATE() as createdAt
-      FROM users u
-      LEFT JOIN roles r ON u.role_id = r.id
-      WHERE r.name NOT IN ('CUSTOMER', 'Customer')
-      ORDER BY u.id DESC
-    `
-
-    const users = await executeQuery(query)
-
-    return NextResponse.json(users)
-  } catch (error) {
-    console.error('Get users error:', error)
-    
-    // Fall back to IAM service (primary method on Vercel)
+  // Try local database first (only if not on Vercel)
+  if (!isVercel) {
     try {
-      const authHeader = request.headers.get('authorization') || ''
-      const iamRes = await fetch(`${IAM_SERVICE_URL}/api/users/list`, {
-        headers: {
-          Authorization: authHeader,
-        },
-      })
-      
-      if (iamRes.ok) {
-        const iamData = await iamRes.json()
-        return NextResponse.json(Array.isArray(iamData) ? iamData : iamData.data || [])
-      }
-    } catch (iamError) {
-      console.error('IAM fallback error:', iamError)
+      const query = `
+        SELECT 
+          u.id,
+          u.email,
+          u.full_name as name,
+          u.phone,
+          u.status,
+          r.name as role,
+          u.role_id,
+          GETDATE() as createdAt
+        FROM users u
+        LEFT JOIN roles r ON u.role_id = r.id
+        WHERE r.name NOT IN ('CUSTOMER', 'Customer')
+        ORDER BY u.id DESC
+      `
+
+      const users = await executeQuery(query)
+      return NextResponse.json(users)
+    } catch (error) {
+      console.error('Local database error:', error)
+      // Fall through to IAM service
     }
-    
-    return NextResponse.json(
-      { error: 'Failed to fetch users' },
-      { status: 500 }
-    )
   }
+
+  // Fall back to IAM service (primary method on Vercel)
+  try {
+    const authHeader = request.headers.get('authorization') || ''
+    console.log(`📡 Fetching users from IAM service: ${IAM_SERVICE_URL}/api/users/list`)
+    
+    const iamRes = await fetch(`${IAM_SERVICE_URL}/api/users/list`, {
+      headers: {
+        Authorization: authHeader,
+      },
+    })
+    
+    if (iamRes.ok) {
+      const iamData = await iamRes.json()
+      console.log('✅ Users fetched from IAM service')
+      return NextResponse.json(Array.isArray(iamData) ? iamData : iamData.data || [])
+    } else {
+      console.error(`❌ IAM service returned ${iamRes.status}`)
+    }
+  } catch (iamError) {
+    console.error('IAM fallback error:', iamError)
+  }
+  
+  return NextResponse.json(
+    { error: 'Failed to fetch users' },
+    { status: 500 }
+  )
 }
 
 // POST /api/users - Create new user in local database
