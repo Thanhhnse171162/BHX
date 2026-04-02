@@ -328,13 +328,13 @@ export default function WarehousesAdminPage() {
         }
 
         const response = await fetch(`/api/warehouses/${editingId}`, {
-          method: 'PATCH',
+          method: 'PUT',
           headers,
           body: JSON.stringify(payload),
         })
 
-        console.log('PATCH Response status:', response.status, 'ok:', response.ok)
-        console.log('PATCH payload:', payload)
+        console.log('PUT Response status:', response.status, 'ok:', response.ok)
+        console.log('PUT payload:', payload)
 
         if (response.ok || response.status === 200) {
           showToast('Warehouse updated successfully', 'success')
