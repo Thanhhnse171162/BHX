@@ -36,7 +36,7 @@ export interface UserInfoFromAPI {
 export class UserAPIService {
   static async getAll(): Promise<UserInfoFromAPI[]> {
     try {
-      console.log('📍 UserAPIService.getAll() - Fetching from local /api/users')
+      console.log('📍 UserAPIService.getAll() - Trying local /api/users')
       const res = await localApiClient.get('/users')
       const payload = res.data
       
@@ -47,19 +47,21 @@ export class UserAPIService {
         users = payload.data
       }
       
-      console.log(`✅ Local /api/users returned ${users.length} users`)
-      return users
-    } catch (error) {
-      console.error('❌ Local /api/users failed:', error)
-      
-      // Fallback to IAM service list
-      try {
-        console.log('📍 Falling back to IAM service /api/users/list')
-        return await this.getIamUsersList()
-      } catch (iamError) {
-        console.error('❌ IAM users list also failed:', iamError)
-        return []
+      if (users.length > 0) {
+        console.log(`✅ Local /api/users returned ${users.length} users`)
+        return users
       }
+    } catch (error) {
+      console.warn('❌ Local /api/users failed, trying IAM directly:', error)
+    }
+
+    // Fallback: Call IAM directly from frontend (has auth token)
+    try {
+      console.log('📍 Falling back to IAM service (direct)')
+      return await this.getIamUsersList()
+    } catch (iamError) {
+      console.error('❌ IAM users also failed:', iamError)
+      return []
     }
   }
 
@@ -114,9 +116,17 @@ export class UserAPIService {
         'Content-Type': 'application/json',
       }
       
+      let token = ''
       if (typeof window !== 'undefined') {
-        const token = useAuthStore.getState().token
-        if (token) headers.Authorization = `Bearer ${token}`
+        token = useAuthStore.getState().token || ''
+        if (token) {
+          headers.Authorization = `Bearer ${token}`
+          console.log(`✓ Auth token found (${token.substring(0, 20)}...)`)
+        } else {
+          console.warn('⚠️ No auth token available from AuthStore')
+        }
+      } else {
+        console.warn('⚠️ Not in browser environment (no window object)')
       }
 
       // Try multiple IAM endpoints
@@ -129,12 +139,15 @@ export class UserAPIService {
       for (const endpoint of endpoints) {
         try {
           console.log(`📍 Trying IAM endpoint: ${endpoint}`)
+          console.log(`   Headers:`, { ...headers, Authorization: headers.Authorization ? 'Bearer [***]' : 'none' })
           
           const res = await fetch(endpoint, {
             method: 'GET',
             headers,
           })
 
+          console.log(`   Response status: ${res.status}`)
+          
           if (res.ok) {
             const payload = await res.json().catch(() => null)
             let users: UserInfoFromAPI[] = []
@@ -148,7 +161,9 @@ export class UserAPIService {
             console.log(`✅ IAM endpoint ${endpoint} returned ${users.length} users`)
             return users
           } else {
+            const statusText = await res.text().catch(() => '')
             console.log(`⚠️ IAM endpoint ${endpoint} returned status ${res.status}`)
+            if (statusText) console.log(`   Error: ${statusText.substring(0, 100)}`)
           }
         } catch (error) {
           console.log(`⚠️ Failed to fetch from ${endpoint}:`, error)
