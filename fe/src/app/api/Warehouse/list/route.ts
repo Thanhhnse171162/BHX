@@ -4,8 +4,12 @@ export async function GET(req: NextRequest) {
   try {
     const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://13.229.29.52:5000'
     const authHeader = req.headers.get('authorization')
+    const endpoint = `${backendUrl}/warehouse/list`
     
-    const response = await fetch(`${backendUrl}/warehouse/list`, {
+    console.log('[Warehouse/list API] Calling:', endpoint)
+    console.log('[Warehouse/list API] Auth header:', authHeader ? 'Present' : 'Missing')
+    
+    const response = await fetch(endpoint, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
