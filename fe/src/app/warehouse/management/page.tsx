@@ -14,7 +14,6 @@ import type { AdminWarehouse } from '@/shared/types/warehouse.types'
 interface CreateWarehouseForm {
   name: string
   location: string
-  capacity: string
 }
 
 export default function WarehouseManagementPage() {
@@ -29,7 +28,6 @@ export default function WarehouseManagementPage() {
   const [formData, setFormData] = useState<CreateWarehouseForm>({
     name: '',
     location: '',
-    capacity: '',
   })
   const [toast, setToast] = useState<{
     show: boolean
@@ -73,7 +71,6 @@ export default function WarehouseManagementPage() {
     setFormData({
       name: '',
       location: '',
-      capacity: '',
     })
     setIsModalOpen(true)
   }
@@ -83,7 +80,6 @@ export default function WarehouseManagementPage() {
     setFormData({
       name: '',
       location: '',
-      capacity: '',
     })
   }
 
@@ -103,14 +99,8 @@ export default function WarehouseManagementPage() {
       return
     }
 
-    if (!formData.name || !formData.location || !formData.capacity) {
+    if (!formData.name || !formData.location) {
       showToast('Please fill in all required fields', 'error')
-      return
-    }
-
-    const capacity = parseInt(formData.capacity, 10)
-    if (isNaN(capacity) || capacity <= 0) {
-      showToast('Capacity must be a positive number', 'error')
       return
     }
 
@@ -119,7 +109,7 @@ export default function WarehouseManagementPage() {
       const payload = {
         name: formData.name,
         location: formData.location,
-        capacity: capacity,
+        capacity: 1,
         status: 'ACTIVE',
         parentId: user.workplaceId,
         // createdBy is auto-set from JWT token by backend
@@ -386,16 +376,6 @@ export default function WarehouseManagementPage() {
             value={formData.location}
             onChange={handleInputChange}
             placeholder="Nhập địa điểm..."
-          />
-
-          <Input
-            label="Dung Lượng"
-            type="number"
-            required
-            name="capacity"
-            value={formData.capacity}
-            onChange={handleInputChange}
-            placeholder="Nhập dung lượng..."
           />
 
           <div className="flex justify-end gap-3 pt-4">
