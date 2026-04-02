@@ -27,22 +27,20 @@ export async function PUT(request: NextRequest) {
     if (authHeader) {
       headers['Authorization'] = authHeader
     }
-
-    // Always handle as FormData (backend only accepts FormData)
-    const formData = await request.formData()
-    const backendFormData = new FormData()
-    
-    // Copy all fields from formData to backendFormData
-    for (const [key, value] of formData.entries()) {
-      backendFormData.append(key, value)
+    if (contentType) {
+      headers['Content-Type'] = contentType
     }
 
-    console.log('📦 Sending FormData to backend')
+    // Forward raw body to preserve multipart boundary and exact payload format.
+    const rawBody = await request.arrayBuffer()
+    const backendBody: BodyInit | undefined = rawBody.byteLength > 0 ? rawBody : undefined
+
+    console.log('📦 Forwarding update payload to backend')
     
     const response = await fetch(`${CATALOG_SERVICE_URL}/api/Product/Update-Product?id=${id}`, {
       method: 'PUT',
-      headers, // Don't set Content-Type for FormData, let fetch handle it
-      body: backendFormData,
+      headers,
+      body: backendBody,
     })
 
     if (!response.ok) {
