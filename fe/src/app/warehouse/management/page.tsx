@@ -330,19 +330,29 @@ export default function WarehouseManagementPage() {
                   </Button>
                   
                   <div className="flex items-center gap-1">
-                    {Array.from({ length: Math.ceil(warehouses.length / itemsPerPage) }, (_, i) => i + 1).map(page => (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                          currentPage === page
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    ))}
+                    {Array.from({ length: Math.ceil(warehouses.length / itemsPerPage) }, (_, i) => i + 1)
+                      .filter(page => {
+                        const totalPages = Math.ceil(warehouses.length / itemsPerPage)
+                        if (totalPages <= 5) return true
+                        if (page === 1 || page === totalPages) return true
+                        if (Math.abs(page - currentPage) <= 1) return true
+                        return false
+                      })
+                      .map((page, idx, arr) => (
+                        <div key={page}>
+                          {idx > 0 && arr[idx - 1] !== page - 1 && <span className="px-1 text-gray-500">...</span>}
+                          <button
+                            onClick={() => setCurrentPage(page)}
+                            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                              currentPage === page
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        </div>
+                      ))}
                   </div>
                   
                   <Button

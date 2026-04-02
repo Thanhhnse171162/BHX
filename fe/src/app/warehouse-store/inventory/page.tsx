@@ -482,20 +482,29 @@ export default function InventoryListPage() {
                     >
                       Trước
                     </Button>
-                    <div className="flex gap-1">
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                        <button
-                          key={page}
-                          onClick={() => setCurrentPage(page)}
-                          className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                            currentPage === page
-                              ? 'bg-green-600 text-white'
-                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      ))}
+                    <div className="flex gap-1 items-center">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter(page => {
+                          if (totalPages <= 5) return true
+                          if (page === 1 || page === totalPages) return true
+                          if (Math.abs(page - currentPage) <= 1) return true
+                          return false
+                        })
+                        .map((page, idx, arr) => (
+                          <div key={page}>
+                            {idx > 0 && arr[idx - 1] !== page - 1 && <span className="px-1 text-gray-500">...</span>}
+                            <button
+                              onClick={() => setCurrentPage(page)}
+                              className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                                currentPage === page
+                                  ? 'bg-green-600 text-white'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                            >
+                              {page}
+                            </button>
+                          </div>
+                        ))}
                     </div>
                     <Button
                       variant="outline"

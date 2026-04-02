@@ -67,6 +67,8 @@ export default function DispatchGoodsPage() {
   const [receiveNotes, setReceiveNotes] = useState('')
   const [nameMap, setNameMap] = useState<Record<string, string>>({})
   const [productNameMap, setProductNameMap] = useState<Record<string, string>>({})
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   const workplaceId = useMemo(
     () =>
@@ -184,6 +186,15 @@ export default function DispatchGoodsPage() {
                          order.source.toLowerCase().includes(searchTerm.toLowerCase())
     return matchesStatus && matchesSearch
   })
+
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const paginatedOrders = filteredOrders.slice(startIndex, startIndex + itemsPerPage)
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [statusFilter, searchTerm])
 
   const canInspectIncoming = (order: DispatchOrder) => {
     const toCurrentWorkplace = normalizeId(order.toLocationId) === workplaceKey
@@ -562,7 +573,7 @@ export default function DispatchGoodsPage() {
 
           <tbody>
 
-            {filteredOrders.map(order => (
+            {paginatedOrders.map(order => (
 
               <tr
                 key={order.code}
@@ -612,7 +623,7 @@ export default function DispatchGoodsPage() {
 
             ))}
 
-            {!isLoading && filteredOrders.length === 0 && (
+            {!isLoading && paginatedOrders.length === 0 && (
               <tr>
                 <td className="p-6 text-center text-slate-500" colSpan={10}>
                   Hiển thị 0 phiếu
@@ -628,34 +639,47 @@ export default function DispatchGoodsPage() {
         <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-slate-500">
 
           <p>
-            Hiển thị {filteredOrders.length} phiếu
+            Hiển thị {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredOrders.length)} của {filteredOrders.length} phiếu
           </p>
 
           <div className="flex items-center gap-2">
 
-            <button className="w-8 h-8 border rounded-md text-slate-500 hover:bg-slate-50">
+            <button 
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="w-8 h-8 border rounded-md text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               {'<'}
             </button>
 
-            <button className="w-8 h-8 rounded-md bg-emerald-600 text-white">
-              1
-            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(page => {
+                if (totalPages <= 5) return true
+                if (page === 1 || page === totalPages) return true
+                if (Math.abs(page - currentPage) <= 1) return true
+                return false
+              })
+              .map((page, idx, arr) => (
+                <div key={page}>
+                  {idx > 0 && arr[idx - 1] !== page - 1 && <span className="px-2">...</span>}
+                  <button
+                    onClick={() => setCurrentPage(page)}
+                    className={`w-8 h-8 rounded-md font-medium transition-colors ${
+                      currentPage === page
+                        ? 'bg-emerald-600 text-white'
+                        : 'border rounded-md hover:bg-slate-50'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                </div>
+              ))}
 
-            <button className="w-8 h-8 border rounded-md hover:bg-slate-50">
-              2
-            </button>
-
-            <button className="w-8 h-8 border rounded-md hover:bg-slate-50">
-              3
-            </button>
-
-            <span className="px-2">...</span>
-
-            <button className="w-8 h-8 border rounded-md hover:bg-slate-50">
-              30
-            </button>
-
-            <button className="w-8 h-8 border rounded-md text-slate-500 hover:bg-slate-50">
+            <button 
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages || totalPages === 0}
+              className="w-8 h-8 border rounded-md text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               {'>'}
             </button>
 

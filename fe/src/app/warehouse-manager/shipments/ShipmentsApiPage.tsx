@@ -60,6 +60,9 @@ export default function ShipmentsApiPage() {
   const [receiveBatchId, setReceiveBatchId] = useState('')
   const [receiveQuantity, setReceiveQuantity] = useState<number>(0)
 
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
+
   const workplaceId = useMemo(
     () =>
       normalizeId(
@@ -171,6 +174,15 @@ export default function ShipmentsApiPage() {
       return matchesStatus && matchesSearch
     })
   }, [batches, search, status])
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, status])
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const paginatedData = filtered.slice(startIndex, startIndex + itemsPerPage)
 
   const openDetail = async (batchId: string) => {
     setDetailOpen(true)
@@ -332,10 +344,10 @@ export default function ShipmentsApiPage() {
           <tbody>
             {loading ? (
               <tr><td className="p-6 text-center text-slate-500" colSpan={7}>Đang tải...</td></tr>
-            ) : filtered.length === 0 ? (
+            ) : paginatedData.length === 0 ? (
               <tr><td className="p-6 text-center text-slate-500" colSpan={7}>Không có lô hàng</td></tr>
             ) : (
-              filtered.map((b) => (
+              paginatedData.map((b) => (
                 <tr key={b.id} className="border-t border-slate-100">
                   <td className="p-3 font-mono text-xs text-emerald-700">{b.batchNumber || b.id}</td>
                   <td className="p-3">
@@ -377,6 +389,58 @@ export default function ShipmentsApiPage() {
             )}
           </tbody>
         </table>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="px-4 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+            <div className="text-sm text-slate-600">
+              Hiển thị {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filtered.length)} của {filtered.length} lô hàng
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                ← Trước
+              </button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(page => {
+                    if (totalPages <= 5) return true
+                    if (page === 1 || page === totalPages) return true
+                    if (Math.abs(page - currentPage) <= 1) return true
+                    return false
+                  })
+                  .map((page, idx, arr) => (
+                    <div key={page}>
+                      {idx > 0 && arr[idx - 1] !== page - 1 && <span className="px-1 text-slate-500">...</span>}
+                      <button
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                          currentPage === page
+                            ? 'bg-emerald-600 text-white'
+                            : 'border border-slate-200 bg-white hover:bg-slate-100'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    </div>
+                  ))}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Sau →
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {detailOpen && (
