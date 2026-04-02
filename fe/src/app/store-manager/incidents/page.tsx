@@ -57,7 +57,14 @@ function mapApiPriority(quality?: number): Priority {
 }
 
 function resolveUserDisplayName(user: { full_name?: string; fullName?: string; name?: string; userName?: string; email?: string } | null): string {
-  return (user?.full_name || user?.fullName || user?.name || user?.userName || user?.email || '').trim()
+  if (!user) {
+    console.log('[resolveUserDisplayName] User is null/undefined')
+    return ''
+  }
+
+  const result = (user?.full_name || user?.fullName || user?.name || user?.userName || user?.email || '').trim()
+  console.log('[resolveUserDisplayName] User object:', { user, result })
+  return result
 }
 
 function normalizeUuid(value?: string): string {
@@ -94,6 +101,9 @@ function resolveReporterDisplayNameFromReport(report: DamageReportFromAPI): stri
     userName?: string
     fullName?: string
     full_name?: string
+    createdByUserName?: string
+    createdByFullName?: string
+    createdBy?: string
     reporter?: {
       full_name?: string
       fullName?: string
@@ -101,6 +111,12 @@ function resolveReporterDisplayNameFromReport(report: DamageReportFromAPI): stri
       userName?: string
     }
     reportedByUser?: {
+      full_name?: string
+      fullName?: string
+      name?: string
+      userName?: string
+    }
+    createdByUser?: {
       full_name?: string
       fullName?: string
       name?: string
@@ -114,6 +130,8 @@ function resolveReporterDisplayNameFromReport(report: DamageReportFromAPI): stri
     raw.reporterFullName ||
     raw.reportedByFullName ||
     raw.createdByName ||
+    raw.createdByUserName ||
+    raw.createdByFullName ||
     raw.userName ||
     raw.fullName ||
     raw.full_name ||
@@ -125,6 +143,10 @@ function resolveReporterDisplayNameFromReport(report: DamageReportFromAPI): stri
     raw.reportedByUser?.fullName ||
     raw.reportedByUser?.name ||
     raw.reportedByUser?.userName ||
+    raw.createdByUser?.full_name ||
+    raw.createdByUser?.fullName ||
+    raw.createdByUser?.name ||
+    raw.createdByUser?.userName ||
     ''
   ).trim()
 }
@@ -171,24 +193,31 @@ async function buildReporterNameMap(reports: DamageReportFromAPI[]): Promise<Map
       try {
         const localUser = await UserAPIService.getById(id)
         const localName = resolveUserDisplayName(localUser)
-        if (localName) return [id, localName] as const
-      } catch {
-        // Ignore local user lookup errors and fallback to IAM lookup.
+        if (localName) {
+          console.log('[buildReporterNameMap] Local user found:', { id, localName })
+          return [id, localName] as const
+        }
+      } catch (err) {
+        console.log('[buildReporterNameMap] Local user lookup failed:', { id, error: err })
       }
 
       try {
         const iamUser = await UserAPIService.getIamDetailsById(id)
         const iamName = resolveUserDisplayName(iamUser)
-        if (iamName) return [id, iamName] as const
-      } catch {
-        // Keep UUID if all lookups fail.
+        if (iamName) {
+          console.log('[buildReporterNameMap] IAM user found:', { id, iamName })
+          return [id, iamName] as const
+        }
+      } catch (err) {
+        console.log('[buildReporterNameMap] IAM user lookup failed:', { id, error: err })
       }
 
-      return [id, id] as const
+      console.log('[buildReporterNameMap] No name found for user:', id)
+      return null
     })
   )
 
-  return new Map(resolved)
+  return new Map(resolved.filter(Boolean) as Array<readonly [string, string]>)
 }
 
 function mapDamageReportToIncident(
@@ -216,9 +245,9 @@ function mapDamageReportToIncident(
     }
   }
   
-  // Last resort: show the user ID if we have one, otherwise "—" (not "Hệ thống")
+  // Last resort: show "Không xác định" (Unknown) instead of UUID
   if (!reporter) {
-    reporter = reportedBy || '—'
+    reporter = 'Không xác định'
   }
 
   return {
