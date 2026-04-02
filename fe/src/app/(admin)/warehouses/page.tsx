@@ -16,10 +16,10 @@ import type {
 } from '@/shared/types/warehouse.types'
 
 const statusLabels = {
-  ACTIVE: 'Active',
-  INACTIVE: 'Inactive',
-  Active: 'Active',
-  Inactive: 'Inactive',
+  ACTIVE: 'ACTIVE',
+  INACTIVE: 'INACTIVE',
+  Active: 'ACTIVE',
+  Inactive: 'INACTIVE',
 }
 
 const statusColors = {
@@ -184,7 +184,7 @@ export default function WarehousesAdminPage() {
     setFormData({
       name: '',
       location: '',
-      capacity: 0,
+      capacity: 1,
       status: 'ACTIVE',
       parentId: undefined,
       isDeleted: false,
@@ -451,7 +451,6 @@ export default function WarehousesAdminPage() {
             size="sm"
             variant="outline"
             onClick={() => handleEditClick(item)}
-            disabled={item.isDeleted}
           >
             Edit
           </Button>
@@ -576,16 +575,18 @@ export default function WarehousesAdminPage() {
             placeholder="Nhập địa điểm..."
           />
 
-          <Input
-            label="Dung Lượng"
-            type="number"
-            required
-            value={formData.capacity}
-            onChange={(e) =>
-              setFormData({ ...formData, capacity: parseInt(e.target.value) || 0 })
-            }
-            placeholder="Nhập dung lượng..."
-          />
+          {mode === 'edit' && (
+            <Input
+              label="Dung Lượng"
+              type="number"
+              required
+              value={formData.capacity}
+              onChange={(e) =>
+                setFormData({ ...formData, capacity: parseInt(e.target.value) || 0 })
+              }
+              placeholder="Nhập dung lượng..."
+            />
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
