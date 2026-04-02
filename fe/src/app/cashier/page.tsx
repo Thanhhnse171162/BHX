@@ -212,7 +212,7 @@ export default function CashierDashboard() {
                 {loadingStats ? (
                   <span className="text-lg text-gray-400">—</span>
                 ) : (
-                  new Intl.NumberFormat('vi-VN', { notation: 'compact', maximumFractionDigits: 1 }).format(revenue)
+                  <span>{new Intl.NumberFormat('vi-VN').format(revenue)} <span className="text-lg font-semibold">đ</span></span>
                 )}
               </p>
             </div>

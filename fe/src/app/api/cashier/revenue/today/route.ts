@@ -22,13 +22,30 @@ function getForwardAuthHeader(request: NextRequest): string {
 
 function isToday(dateStr: string): boolean {
   try {
-    const date = new Date(dateStr)
+    // Parse date string more robustly
+    // Handle formats like: "2026-04-02T10:30:00", "2026-04-02", "2026-04-02T10:30:00Z", etc.
+    let date: Date
+    
+    if (dateStr.includes('T')) {
+      // ISO format with time
+      date = new Date(dateStr)
+    } else {
+      // Date-only format (YYYY-MM-DD)
+      // Parse manually to avoid timezone issues
+      const [year, month, day] = dateStr.split('-').map(Number)
+      if (!year || !month || !day) return false
+      date = new Date(year, month - 1, day)
+    }
+
+    if (isNaN(date.getTime())) return false
+
     const today = new Date()
 
+    // Compare using local dates to avoid timezone issues
     return (
-      date.getUTCFullYear() === today.getUTCFullYear() &&
-      date.getUTCMonth() === today.getUTCMonth() &&
-      date.getUTCDate() === today.getUTCDate()
+      date.getFullYear() === today.getFullYear() &&
+      date.getMonth() === today.getMonth() &&
+      date.getDate() === today.getDate()
     )
   } catch {
     return false

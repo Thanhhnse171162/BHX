@@ -7,6 +7,7 @@ import {
   ChevronRight, RotateCcw, ArrowRight, Loader2
 } from 'lucide-react'
 import { TransferAPIService, TransferFromAPI, TransferItemFromAPI } from '@/services/transfer-api.service'
+import { UserAPIService } from '@/services/user-api.service'
 import { useAuthStore } from '@/store/auth.store'
 import { localApiClient } from '@/shared/api/http'
 
@@ -141,6 +142,7 @@ export default function ReceiveGoodsPage() {
   const [confirmAction, setConfirmAction] = useState<'complete' | 'cancel' | null>(null)
   const [submitLoading, setSubmitLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [shippedByName, setShippedByName] = useState<string | null>(null)
 
   // ─── Fetch ────────────────────────────────────────────────────────────────
   const fetchTransfers = useCallback(async () => {
@@ -251,6 +253,24 @@ export default function ReceiveGoodsPage() {
     setViewOnly(readonly)
     setConfirmAction(null)
     setSubmitError(null)
+    
+    // Fetch the name of the person who shipped
+    if (transfer.shippedBy) {
+      UserAPIService.getById(transfer.shippedBy)
+        .then(userInfo => {
+          if (userInfo) {
+            const name = userInfo.fullName || userInfo.full_name || userInfo.name
+            setShippedByName(name || null)
+          } else {
+            setShippedByName(null)
+          }
+        })
+        .catch(() => {
+          setShippedByName(null)
+        })
+    } else {
+      setShippedByName(null)
+    }
   }
 
   const closeInspection = () => {
@@ -601,7 +621,7 @@ export default function ReceiveGoodsPage() {
                       {
                         icon: Package,
                         label: 'Người giao',
-                        value: inspectingOrder.shippedBy || '—',
+                        value: shippedByName || inspectingOrder.shippedBy || '—',
                         ring: 'ring-emerald-200',
                         iconCls: 'text-emerald-600 bg-emerald-50',
                       },
