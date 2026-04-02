@@ -190,6 +190,7 @@ export default function WarehouseManagerRequestsPage() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [requestsLoading, setRequestsLoading] = useState(false)
   const [locations, setLocations] = useState<WarehouseOption[]>([])
   const [productsForItems, setProductsForItems] = useState<ProductOption[]>([])
   const [items, setItems] = useState<FormItem[]>([])
@@ -260,6 +261,7 @@ export default function WarehouseManagerRequestsPage() {
 
   const loadRequests = useCallback(async () => {
     try {
+      setRequestsLoading(true)
       const warehouseId = user?.warehouseId ?? user?.storeId ?? user?.workplaceId ?? ''
       if (!warehouseId) {
         setRequests([])
@@ -366,6 +368,8 @@ export default function WarehouseManagerRequestsPage() {
       setPage(1)
     } catch {
       setRequests([])
+    } finally {
+      setRequestsLoading(false)
     }
   }, [user?.warehouseId, user?.storeId, user?.workplaceId])
 
@@ -1011,9 +1015,10 @@ export default function WarehouseManagerRequestsPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={loadRequests}
-                className="px-4 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors inline-flex items-center gap-2 disabled:opacity-60"
+                disabled={requestsLoading}
+                className="px-4 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors inline-flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <Filter className="w-4 h-4" />
+                {requestsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Filter className="w-4 h-4" />}
                 Làm mới
               </button>
             </div>
