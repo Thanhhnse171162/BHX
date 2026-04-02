@@ -17,7 +17,7 @@ async function parseResponseBody(response: Response) {
 
 /**
  * PUT /api/products/update-product?id={id} - Cập nhật product
- * Converts FormData to JSON and forwards to backend
+ * Forwards FormData or JSON payload to backend depending on incoming content-type
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -33,29 +33,38 @@ export async function PUT(request: NextRequest) {
 
     console.log('🔄 Forwarding PUT /api/products/update-product to:', CATALOG_SERVICE_URL)
 
-    // Parse FormData and convert to JSON object (skip files)
-    const formData = await request.formData()
-    const jsonPayload: Record<string, unknown> = {}
+    const contentType = request.headers.get('content-type') || ''
+    const isFormData = contentType.includes('multipart/form-data')
 
-    for (const [key, value] of formData.entries()) {
-      // Skip file fields, only include text fields
-      if (!(value instanceof File)) {
-        // Convert boolean string values back to actual booleans
-        if (value === 'true') {
-          jsonPayload[key] = true
-        } else if (value === 'false') {
-          jsonPayload[key] = false
-        } else {
-          jsonPayload[key] = value
-        }
+    let body: BodyInit
+    let logPayload: Record<string, unknown> = {}
+
+    if (isFormData) {
+      // Keep multipart body unchanged so backend model binding receives expected media type.
+      const formData = await request.formData()
+      body = formData
+
+      for (const [key, value] of formData.entries()) {
+        logPayload[key] = value instanceof File
+          ? `[File: ${value.name || 'unnamed'}]`
+          : value
       }
+      console.log('📋 Forwarding FormData fields:', JSON.stringify(logPayload, null, 2))
+    } else {
+      const jsonPayload = await request.json().catch(() => null)
+      if (!jsonPayload || typeof jsonPayload !== 'object') {
+        return NextResponse.json({ error: 'Invalid request payload' }, { status: 400 })
+      }
+
+      body = JSON.stringify(jsonPayload)
+      logPayload = jsonPayload as Record<string, unknown>
+      console.log('📋 Forwarding JSON payload:', JSON.stringify(logPayload, null, 2))
     }
 
-    console.log('📋 Converted FormData to JSON:', JSON.stringify(jsonPayload, null, 2))
-
     const authHeader = request.headers.get('authorization')
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
+    const headers: HeadersInit = {}
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json'
     }
     if (authHeader) {
       headers['Authorization'] = authHeader
@@ -64,7 +73,7 @@ export async function PUT(request: NextRequest) {
     const response = await fetch(`${CATALOG_SERVICE_URL}/api/Product/Update-Product?id=${id}`, {
       method: 'PUT',
       headers,
-      body: JSON.stringify(jsonPayload),
+      body,
     })
 
     const result = await parseResponseBody(response)
@@ -79,13 +88,14 @@ export async function PUT(request: NextRequest) {
 
     console.log('✅ Update success:', result)
     return NextResponse.json(result ?? { success: true }, { status: response.status })
-  } catch (error: any) {
-    console.error('❌ Update Product Error:', error.message)
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error('❌ Update Product Error:', message)
     return NextResponse.json(
       { 
         success: false,
         error: 'Không thể cập nhật product',
-        details: error.message
+        details: message
       },
       { status: 500 }
     )
