@@ -270,13 +270,16 @@ export default function WarehousesAdminPage() {
     try {
       if (mode === 'create') {
         // Create new warehouse - flat payload, backend auto-sets createdBy from JWT
-        const payload = {
+        const payload: any = {
           name: formData.name,
           location: formData.location,
           capacity: formData.capacity,
           status: formData.status === 'ACTIVE' ? 'Active' : 'Inactive', // .NET API expects "Active"/"Inactive"
-          parentId: formData.parentId || null,
-          // createdBy is auto-set from JWT token by backend
+        }
+        
+        // Only include parentId if it has a value
+        if (formData.parentId) {
+          payload.parentId = formData.parentId
         }
 
         const headers: HeadersInit = { 'Content-Type': 'application/json' }
@@ -291,6 +294,7 @@ export default function WarehousesAdminPage() {
         })
 
         console.log('POST Response status:', response.status, 'ok:', response.ok)
+        console.log('POST payload:', payload)
 
         if (response.ok || response.status === 200 || response.status === 201) {
           showToast('Warehouse created successfully', 'success')
@@ -309,13 +313,17 @@ export default function WarehousesAdminPage() {
         }
       } else if (mode === 'edit' && editingId) {
         // Update existing warehouse
-        const payload = {
+        const payload: any = {
           name: formData.name,
           location: formData.location,
           capacity: formData.capacity,
           status: formData.status === 'ACTIVE' ? 'Active' : 'Inactive',
-          parentId: formData.parentId || null,
           isDeleted: formData.isDeleted || false,
+        }
+        
+        // Only include parentId if it has a value
+        if (formData.parentId) {
+          payload.parentId = formData.parentId
         }
 
         const headers: HeadersInit = { 'Content-Type': 'application/json' }
@@ -330,6 +338,7 @@ export default function WarehousesAdminPage() {
         })
 
         console.log('PATCH Response status:', response.status, 'ok:', response.ok)
+        console.log('PATCH payload:', payload)
 
         if (response.ok || response.status === 200) {
           showToast('Warehouse updated successfully', 'success')
