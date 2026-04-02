@@ -21,6 +21,11 @@ import { RestockAPIService, RestockRequestFromAPI } from '@/services/restock-api
 import { ProductAPIService } from '@/services/product-api.service'
 import { UserAPIService } from '@/services/user-api.service'
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function normalizeId(value?: string | null): string {
+  return String(value ?? '').trim().toLowerCase()
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 type RequestStatus = 'Đã duyệt' | 'Chờ duyệt' | 'Từ chối' | 'Đã hoàn thành'
 
@@ -52,12 +57,13 @@ function getRequesterDisplayName(req: RestockRequestFromAPI, userMap: Record<str
     requestedByFullName?: string
   }
 
+  const normalizedId = normalizeId(req.requestedBy)
   return (
     raw.requestedByName ||
     raw.requesterName ||
     raw.requesterFullName ||
     raw.requestedByFullName ||
-    userMap[req.requestedBy] ||
+    userMap[normalizedId] ||
     req.requestedBy ||
     '--'
   )
@@ -202,7 +208,7 @@ export default function PurchaseRequestsPage() {
         const users = await UserAPIService.getAll()
         for (const u of users) {
           const userName = u.full_name || u.fullName || u.name || u.email || u.id
-          userMap[u.id] = userName
+          userMap[normalizeId(u.id)] = userName
         }
       } catch {
         // If users can't be loaded, continue without mapping
@@ -212,10 +218,11 @@ export default function PurchaseRequestsPage() {
       try {
         const iamUsers = await UserAPIService.getIamUsersList()
         for (const u of iamUsers) {
+          const normalizedId = normalizeId(u.id)
           // Only add if not already in map
-          if (!userMap[u.id]) {
+          if (!userMap[normalizedId]) {
             const userName = u.full_name || u.fullName || u.name || u.email || u.id
-            userMap[u.id] = userName
+            userMap[normalizedId] = userName
           }
         }
       } catch {
