@@ -35,11 +35,32 @@ export interface UserInfoFromAPI {
 
 export class UserAPIService {
   static async getAll(): Promise<UserInfoFromAPI[]> {
-    const res = await localApiClient.get('/users')
-    const payload = res.data
-    if (Array.isArray(payload)) return payload
-    if (payload?.data && Array.isArray(payload.data)) return payload.data
-    return []
+    try {
+      console.log('📍 UserAPIService.getAll() - Fetching from local /api/users')
+      const res = await localApiClient.get('/users')
+      const payload = res.data
+      
+      let users: UserInfoFromAPI[] = []
+      if (Array.isArray(payload)) {
+        users = payload
+      } else if (payload?.data && Array.isArray(payload.data)) {
+        users = payload.data
+      }
+      
+      console.log(`✅ Local /api/users returned ${users.length} users`)
+      return users
+    } catch (error) {
+      console.error('❌ Local /api/users failed:', error)
+      
+      // Fallback to IAM service list
+      try {
+        console.log('📍 Falling back to IAM service /api/users/list')
+        return await this.getIamUsersList()
+      } catch (iamError) {
+        console.error('❌ IAM users list also failed:', iamError)
+        return []
+      }
+    }
   }
 
   static async getById(id: string): Promise<UserInfoFromAPI | null> {
@@ -98,42 +119,47 @@ export class UserAPIService {
         if (token) headers.Authorization = `Bearer ${token}`
       }
 
-      // Prefer Next.js proxy to avoid browser CORS issues when calling IAM directly.
-      try {
-        const proxyRes = await fetch('/api/users', {
-          method: 'GET',
-          headers,
-        })
-
-        const proxyPayload = await proxyRes.json().catch(() => null)
-        if (proxyRes.ok) {
-          if (Array.isArray(proxyPayload)) return proxyPayload as UserInfoFromAPI[]
-          if (proxyPayload?.data && Array.isArray(proxyPayload.data)) return proxyPayload.data as UserInfoFromAPI[]
-        }
-      } catch {
-        // Fall back to direct IAM URL below.
-      }
-
-      // Call backend directly with full URL
+      // Try multiple IAM endpoints
       const iamBaseUrl = process.env.NEXT_PUBLIC_IAM_URL || 'http://13.229.29.52:5000'
-      const url = `${iamBaseUrl}/api/users`
+      const endpoints = [
+        `${iamBaseUrl}/api/users`,
+        `${iamBaseUrl}/api/users/list`,
+      ]
 
-      const res = await fetch(url, {
-        method: 'GET',
-        headers,
-      })
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`📍 Trying IAM endpoint: ${endpoint}`)
+          
+          const res = await fetch(endpoint, {
+            method: 'GET',
+            headers,
+          })
 
-      const payload = await res.json().catch(() => null)
-      if (!res.ok) {
-        // Silently return empty array on error
-        return []
+          if (res.ok) {
+            const payload = await res.json().catch(() => null)
+            let users: UserInfoFromAPI[] = []
+            
+            if (Array.isArray(payload)) {
+              users = payload
+            } else if (payload?.data && Array.isArray(payload.data)) {
+              users = payload.data
+            }
+            
+            console.log(`✅ IAM endpoint ${endpoint} returned ${users.length} users`)
+            return users
+          } else {
+            console.log(`⚠️ IAM endpoint ${endpoint} returned status ${res.status}`)
+          }
+        } catch (error) {
+          console.log(`⚠️ Failed to fetch from ${endpoint}:`, error)
+          continue
+        }
       }
 
-      if (Array.isArray(payload)) return payload as UserInfoFromAPI[]
-      if (payload?.data && Array.isArray(payload.data)) return payload.data as UserInfoFromAPI[]
+      console.log('❌ All IAM endpoints failed')
       return []
-    } catch {
-      // Silently return empty array on any error
+    } catch (error) {
+      console.error('❌ getIamUsersList error:', error)
       return []
     }
   }
