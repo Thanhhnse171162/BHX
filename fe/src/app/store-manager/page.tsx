@@ -156,7 +156,7 @@ export default function StoreManagerDashboard() {
     const initStores = async () => {
       try {
         const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
-        const res = await fetch('/api/warehouse/list', { headers })
+        const res = await fetch('/api/Warehouse/list', { headers })
         if (res.ok) {
           const data = await res.json()
           const storeList = Array.isArray(data) ? data : data.data || []
@@ -251,7 +251,7 @@ export default function StoreManagerDashboard() {
 
       // ── Fetch Inventory Data ────────────────────────────────────────────────
       try {
-        const invRes = await fetch(`/api/Inventory/low-stock-alerts${qs}`, { headers })
+        const invRes = await fetch(`/api/inventory/low-stock-alerts${qs}`, { headers })
         if (invRes.ok) {
           const data = await invRes.json()
           console.log('Inventory API Response:', data)
