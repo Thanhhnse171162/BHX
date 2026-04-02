@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { WarehouseAPIService } from '@/services/warehouse-api.service'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -333,6 +334,33 @@ export default function DashboardPage() {
   const [dateTo,          setDateTo]          = useState('24/05/2024')
 
   const storeName = selectedStore ? selectedStore.name : 'Tất cả cửa hàng'
+
+  // Fetch warehouses (stores) from API
+  useEffect(() => {
+    async function loadStores() {
+      try {
+        const warehouses = await WarehouseAPIService.getAll()
+        // Transform warehouse data to Store interface
+        const transformedStores: Store[] = warehouses
+          .map((w, idx) => ({
+            rank: idx + 1,
+            name: w.name,
+            loc: 'HCM', // Default location, adjust if you have location data
+            rev: '0đ', // This would come from actual revenue data
+            revNum: 0,
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+        
+        // Update the global ALL_STORES
+        ALL_STORES.length = 0
+        ALL_STORES.push(...transformedStores)
+      } catch (error) {
+        console.error('Failed to load stores:', error)
+      }
+    }
+
+    loadStores()
+  }, [])
 
   return (
     <div className="min-h-screen bg-gray-50 p-6 text-gray-900">

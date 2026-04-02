@@ -394,6 +394,42 @@ function CreateIncidentModal({
           {/* Image upload */}
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1.5">Photos</label>
+            
+            {/* Image previews with delete buttons */}
+            {photos.length > 0 && (
+              <div className="mb-3 grid grid-cols-3 gap-2">
+                {photos.map((photo, idx) => (
+                  <div key={idx} className="relative group">
+                    <img
+                      src={URL.createObjectURL(photo)}
+                      alt={`Preview ${idx}`}
+                      className="w-full h-24 object-cover rounded-lg border border-slate-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const input = document.createElement('input')
+                        input.type = 'file'
+                        input.accept = 'image/*'
+                        input.onchange = (e) => {
+                          const file = (e.target as HTMLInputElement).files?.[0]
+                          if (file) {
+                            const newPhotos = [...photos]
+                            newPhotos[idx] = file
+                            setPhotos(newPhotos)
+                          }
+                        }
+                        input.click()
+                      }}
+                      className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <span className="text-white text-xs font-medium">Xoá & Chọn lại</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            
             <div className="flex gap-2 items-center">
               <label className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-slate-200 hover:border-emerald-400 cursor-pointer transition-colors bg-slate-50 hover:bg-emerald-50">
                 <Upload className="w-4 h-4 text-slate-400" />
@@ -403,7 +439,7 @@ function CreateIncidentModal({
                   accept="image/*"
                   multiple
                   className="hidden"
-                  onChange={(e) => setPhotos(Array.from(e.target.files || []))}
+                  onChange={(e) => setPhotos([...photos, ...Array.from(e.target.files || [])])}
                 />
               </label>
               <span className="text-xs text-slate-500 whitespace-nowrap">{photos.length} ảnh</span>
