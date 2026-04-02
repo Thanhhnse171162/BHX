@@ -487,62 +487,52 @@ export default function ProductsPage() {
 
         alert('Tạo sản phẩm thành công!')
       } else if (mode === 'edit' && editingId) {
-        // Build update payload with all fields
+        // Build update payload with all fields matching backend API
         const updateData: any = {
-          sku,
+          barcode: barcode || null,
           name,
+          description: description || null,
           categoryId: category,
+          supplierId: suppliers.length > 0 ? suppliers[0].id : null, // Keep current supplier or first one
+          brand: brand || null,
+          origin: origin || null,
           price,
-          unit,
-          barcode,
-          description,
-          brand,
-          origin,
           originalPrice,
           costPrice,
+          unit,
           weight,
-          isActive: status === 'ACTIVE',
-          slug,
-          metaTitle,
-          metaDescription,
-          metaKeywords,
+          slug: slug || null,
+          metaTitle: metaTitle || null,
+          metaDescription: metaDescription || null,
+          metaKeywords: metaKeywords || null,
+          isAvailable: status === 'ACTIVE',
+          isFeatured: false,
+          isNew: false,
+          isOnSale: false,
         }
 
-        // Handle file uploads if new images are selected
-        if (mainImage || additionalImages.length > 0) {
-          const formData = new FormData()
-
-          // Add all text fields
-          Object.entries(updateData).forEach(([key, value]) => {
-            if (value !== undefined && value !== null && value !== '') {
-              formData.append(key, String(value))
-            }
-          })
-
-          // Add images
-          if (mainImage) {
-            formData.append('MainImage', mainImage)
+        // Remove undefined/null values
+        Object.keys(updateData).forEach(key => {
+          if (updateData[key] === undefined || updateData[key] === null || updateData[key] === '') {
+            delete updateData[key]
           }
-          additionalImages.forEach((file) => {
-            formData.append('AdditionalImages', file)
-          })
+        })
 
-          // Use fetch for FormData (axios doesn't handle multipart well)
-          const token = useAuthStore.getState().token
-          const response = await fetch(`/api/products/${editingId}`, {
-            method: 'PUT',
-            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-            body: formData,
-          })
+        // Use correct backend endpoint: PUT /api/Product/Update-Product?id={id}
+        const token = useAuthStore.getState().token
+        const response = await fetch(`/api/products/update-product?id=${editingId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+          body: JSON.stringify(updateData),
+        })
 
-          if (!response.ok) {
-            const errorPayload = await response.json().catch(() => null)
-            const errorMessage = parseApiErrorMessage(errorPayload) || `Update failed (${response.status})`
-            throw new Error(errorMessage)
-          }
-        } else {
-          // No file uploads, use axios service
-          await ProductAPIService.updateProduct(editingId, updateData)
+        if (!response.ok) {
+          const errorPayload = await response.json().catch(() => null)
+          const errorMessage = parseApiErrorMessage(errorPayload) || `Update failed (${response.status})`
+          throw new Error(errorMessage)
         }
 
         alert('Cập nhật sản phẩm thành công!')
