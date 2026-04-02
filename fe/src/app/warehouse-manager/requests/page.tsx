@@ -200,6 +200,7 @@ export default function WarehouseManagerRequestsPage() {
   const [batchesLoading, setBatchesLoading] = useState(false)
   const [availableQtyByProductId, setAvailableQtyByProductId] = useState<Record<string, number>>({})
   const [userMap, setUserMap] = useState<Record<string, string>>({})
+  const [productMap, setProductMap] = useState<Record<string, string>>({})
 
   // Dùng chung logic với loadRequests() để tránh lệch id "kho" theo dữ liệu user.
   const currentWarehouseId = String(user?.warehouseId ?? user?.storeId ?? user?.workplaceId ?? '').trim()
@@ -899,7 +900,16 @@ export default function WarehouseManagerRequestsPage() {
           )}
           {activeTab === 'inventory-check' && (
             <button
-              onClick={() => setIsInventoryCheckModalOpen(true)}
+              onClick={() => {
+                const warehouseId = user?.warehouseId ?? user?.storeId ?? user?.workplaceId ?? ''
+                setNewInventoryCheck({
+                  locationType: 'WAREHOUSE',
+                  locationId: warehouseId,
+                  checkType: 'PARTIAL',
+                  notes: '',
+                })
+                setIsInventoryCheckModalOpen(true)
+              }}
               className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#059669] text-white font-semibold hover:bg-[#047857] transition-colors"
             >
               <ClipboardList className="w-4 h-4" />
@@ -1458,8 +1468,34 @@ export default function WarehouseManagerRequestsPage() {
                               setIsInventoryCheckDetailOpen(true)
                               setIsLoadingCheckDetails(true)
                               try {
+                                // Fetch full check details
                                 const fullCheck = await getInventoryCheckById(check.id)
                                 setSelectedInventoryCheckFull(fullCheck)
+
+                                // Fetch products to get product names
+                                try {
+                                  const products = await ProductAPIService.getAllProducts()
+                                  const newProductMap: Record<string, string> = {}
+                                  products.forEach(p => {
+                                    newProductMap[p.id] = p.name
+                                  })
+                                  setProductMap(newProductMap)
+                                } catch (err) {
+                                  console.error('Error fetching products:', err)
+                                }
+
+                                // Fetch user info to get checker name
+                                if (check.checkedBy) {
+                                  try {
+                                    const user = await UserAPIService.getById(check.checkedBy)
+                                    setUserMap(prev => ({
+                                      ...prev,
+                                      [check.checkedBy]: user?.name || user?.email || check.checkedBy
+                                    }))
+                                  } catch (err) {
+                                    console.error('Error fetching user info:', err)
+                                  }
+                                }
                               } catch (err) {
                                 console.error('Error fetching inventory check details:', err)
                               } finally {
@@ -1880,25 +1916,12 @@ export default function WarehouseManagerRequestsPage() {
                 </label>
                 <label className="text-sm text-gray-600">
                   Chọn vị trí <span className="text-red-500">*</span>
-                  <div className="relative mt-1">
-                    <Search className="w-3 h-3 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <select
-                      value={newInventoryCheck.locationId}
-                      onChange={(e) =>
-                        setNewInventoryCheck((prev) => ({ ...prev, locationId: e.target.value }))
-                      }
-                      className="w-full pl-8 pr-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-200 text-sm"
-                    >
-                      <option value="">-- Chọn kho --</option>
-                      {locations
-                        .filter((loc) => normalizeId(loc.id) === normalizedCurrentWarehouseId)
-                        .map((loc) => (
-                          <option key={loc.id} value={loc.id}>
-                            {loc.name}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
+                  <input
+                    type="text"
+                    value={locations.find((loc) => normalizeId(loc.id) === normalizeId(newInventoryCheck.locationId))?.name || newInventoryCheck.locationId || ''}
+                    disabled
+                    className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-300 bg-gray-50 text-sm text-gray-600"
+                  />
                 </label>
                 <label className="text-sm text-gray-600">
                   Loại kiểm kê
@@ -2115,7 +2138,7 @@ export default function WarehouseManagerRequestsPage() {
                     <table className="w-full text-sm">
                       <thead className="bg-gray-50 border-b border-gray-200">
                         <tr>
-                          <th className="text-left px-4 py-2 font-semibold text-gray-700">Mã sản phẩm</th>
+                          <th className="text-left px-4 py-2 font-semibold text-gray-700">Tên sản phẩm</th>
                           <th className="text-center px-4 py-2 font-semibold text-gray-700">Số lượng hệ thống</th>
                           <th className="text-center px-4 py-2 font-semibold text-gray-700">Số lượng thực tế</th>
                           <th className="text-center px-4 py-2 font-semibold text-gray-700">Lệch</th>
@@ -2125,7 +2148,7 @@ export default function WarehouseManagerRequestsPage() {
                       <tbody>
                         {selectedInventoryCheckFull.items.map((item, idx) => (
                           <tr key={`${item.id}-${idx}`} className="border-b border-gray-100 hover:bg-gray-50">
-                            <td className="px-4 py-2 text-gray-700">{item.productId}</td>
+                            <td className="px-4 py-2 text-gray-700">{productMap[item.productId] || item.productId}</td>
                             <td className="px-4 py-2 text-center text-gray-700">{item.systemQuantity}</td>
                             <td className="px-4 py-2 text-center text-gray-700">{item.actualQuantity}</td>
                             <td className={`px-4 py-2 text-center font-semibold ${
