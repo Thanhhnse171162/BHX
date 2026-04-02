@@ -25,7 +25,7 @@ import { ProductBatchAPIService, type ProductBatchFromAPI } from '@/services/pro
 import { InventoryAPIService } from '@/services/inventory-api.service'
 import { UserAPIService } from '@/services/user-api.service'
 import { TransferAPIService, TransferFromAPI } from '@/services/transfer-api.service'
-import { createInventoryCheck, getInventoryChecks, type CreateInventoryCheckDto, type InventoryCheckListDto } from '@/services/inventory-check-api'
+import { createInventoryCheck, getInventoryChecks, getInventoryCheckById, type CreateInventoryCheckDto, type InventoryCheckListDto, type InventoryCheckDto } from '@/services/inventory-check-api'
 import { ToastContainer, type ToastItem } from '@/shared/ui/Toast'
 
 type RequestPriority = 'CAO' | 'TRUNG BÌNH' | 'THẤP'
@@ -227,6 +227,8 @@ export default function WarehouseManagerRequestsPage() {
   // Inventory Check Detail Modal
   const [isInventoryCheckDetailOpen, setIsInventoryCheckDetailOpen] = useState(false)
   const [selectedInventoryCheck, setSelectedInventoryCheck] = useState<InventoryCheckListDto | null>(null)
+  const [selectedInventoryCheckFull, setSelectedInventoryCheckFull] = useState<InventoryCheckDto | null>(null)
+  const [isLoadingCheckDetails, setIsLoadingCheckDetails] = useState(false)
 
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const pushToast = useCallback((toast: Omit<ToastItem, 'id' | 'onClose'>) => {
@@ -1451,9 +1453,18 @@ export default function WarehouseManagerRequestsPage() {
                         <td className="px-5 py-4 text-gray-500 whitespace-nowrap">{formatDateVI(check.createdAt)}</td>
                         <td className="px-5 py-4">
                           <button 
-                            onClick={() => {
+                            onClick={async () => {
                               setSelectedInventoryCheck(check)
                               setIsInventoryCheckDetailOpen(true)
+                              setIsLoadingCheckDetails(true)
+                              try {
+                                const fullCheck = await getInventoryCheckById(check.id)
+                                setSelectedInventoryCheckFull(fullCheck)
+                              } catch (err) {
+                                console.error('Error fetching inventory check details:', err)
+                              } finally {
+                                setIsLoadingCheckDetails(false)
+                              }
                             }}
                             className="text-gray-400 hover:text-gray-700 p-1.5 rounded-lg hover:bg-gray-100 transition-colors" 
                             title="Xem chi tiết"
@@ -2031,6 +2042,7 @@ export default function WarehouseManagerRequestsPage() {
                 onClick={() => {
                   setIsInventoryCheckDetailOpen(false)
                   setSelectedInventoryCheck(null)
+                  setSelectedInventoryCheckFull(null)
                 }}
                 className="text-gray-400 hover:text-gray-600"
               >
@@ -2089,6 +2101,50 @@ export default function WarehouseManagerRequestsPage() {
                 <p className="text-xs text-gray-500 uppercase font-semibold">Tổng số lệch</p>
                 <p className="text-sm font-medium text-gray-700">{selectedInventoryCheck.totalDiscrepancies || 0}</p>
               </div>
+
+              {/* Items Table */}
+              {isLoadingCheckDetails ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-gray-600 mr-2" />
+                  <span className="text-sm text-gray-600">Đang tải chi tiết sản phẩm...</span>
+                </div>
+              ) : selectedInventoryCheckFull?.items && selectedInventoryCheckFull.items.length > 0 ? (
+                <div className="mt-6">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Chi tiết sản phẩm kiểm kê</h3>
+                  <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="text-left px-4 py-2 font-semibold text-gray-700">Mã sản phẩm</th>
+                          <th className="text-center px-4 py-2 font-semibold text-gray-700">Số lượng hệ thống</th>
+                          <th className="text-center px-4 py-2 font-semibold text-gray-700">Số lượng thực tế</th>
+                          <th className="text-center px-4 py-2 font-semibold text-gray-700">Lệch</th>
+                          <th className="text-left px-4 py-2 font-semibold text-gray-700">Ghi chú</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedInventoryCheckFull.items.map((item, idx) => (
+                          <tr key={`${item.id}-${idx}`} className="border-b border-gray-100 hover:bg-gray-50">
+                            <td className="px-4 py-2 text-gray-700">{item.productId}</td>
+                            <td className="px-4 py-2 text-center text-gray-700">{item.systemQuantity}</td>
+                            <td className="px-4 py-2 text-center text-gray-700">{item.actualQuantity}</td>
+                            <td className={`px-4 py-2 text-center font-semibold ${
+                              item.difference === 0 ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              {item.difference}
+                            </td>
+                            <td className="px-4 py-2 text-gray-700">{item.note || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-6 py-4 bg-gray-50 rounded-lg text-center text-sm text-gray-500">
+                  Không có chi tiết sản phẩm
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-200">
@@ -2096,6 +2152,7 @@ export default function WarehouseManagerRequestsPage() {
                 onClick={() => {
                   setIsInventoryCheckDetailOpen(false)
                   setSelectedInventoryCheck(null)
+                  setSelectedInventoryCheckFull(null)
                 }}
                 className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-semibold"
               >
