@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { executeQuery } from '@/lib/db/config'
-import bcrypt from 'bcryptjs'
 
 const IAM_SERVICE_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://13.229.29.52:5000'
+
+async function proxyIamRequest(request: NextRequest, path: string, init: RequestInit = {}) {
+  const authHeader = request.headers.get('authorization') || ''
+
+  const response = await fetch(`${IAM_SERVICE_URL}${path}`, {
+    ...init,
+    headers: {
+      ...(init.headers || {}),
+      Authorization: authHeader,
+    },
+  })
+
+  const data = await response.json().catch(() => ({}))
+
+  return { response, data }
+}
 
 // GET /api/users/[id] - Get user by ID
 export async function GET(
@@ -10,65 +24,24 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Try local database first
-    const query = `
-      SELECT 
-        u.id,
-        u.email,
-        u.full_name as name,
-        u.status,
-        r.name as role,
-        u.created_at as createdAt
-      FROM users u
-      LEFT JOIN roles r ON u.role_id = r.id
-      WHERE u.id = @id
-    `
+    const { response, data } = await proxyIamRequest(
+      request,
+      `/api/users/details/${encodeURIComponent(params.id)}`
+    )
 
-    const users = await executeQuery(query, { id: params.id })
-
-    if (users.length === 0) {
-      // Fall back to IAM service if not found locally
-      const authHeader = request.headers.get('authorization') || ''
-      const iamRes = await fetch(`${IAM_SERVICE_URL}/api/users/details/${encodeURIComponent(params.id)}`, {
-        headers: {
-          Authorization: authHeader,
-        },
-      })
-      
-      if (iamRes.ok) {
-        const iamData = await iamRes.json()
-        return NextResponse.json(iamData.data || iamData)
-      }
-      
+    if (!response.ok) {
+      const status = response.status === 404 ? 404 : response.status
       return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
+        { error: data.error || 'Failed to fetch user' },
+        { status }
       )
     }
 
-    return NextResponse.json(users[0])
+    return NextResponse.json(data.data || data)
   } catch (error) {
     console.error('Get user error:', error)
-    
-    // Try fallback to IAM service
-    try {
-      const authHeader = request.headers.get('authorization') || ''
-      const iamRes = await fetch(`${IAM_SERVICE_URL}/api/users/details/${encodeURIComponent(params.id)}`, {
-        headers: {
-          Authorization: authHeader,
-        },
-      })
-      
-      if (iamRes.ok) {
-        const iamData = await iamRes.json()
-        return NextResponse.json(iamData.data || iamData)
-      }
-    } catch (iamError) {
-      console.error('IAM fallback error:', iamError)
-    }
-    
     return NextResponse.json(
-      { error: 'Failed to fetch user' },
+      { error: 'Failed to fetch user from IAM service' },
       { status: 500 }
     )
   }
@@ -81,110 +54,33 @@ export async function PUT(
 ) {
   try {
     const body = await request.json()
-    const { name, email, password, role, status } = body
-
-    console.log('PUT /api/users/[id] - Request:', { id: params.id, body })
-
-    // Get role_id if role is provided
-    let roleId = null
-    if (role) {
-      const roleQuery = `SELECT id FROM roles WHERE name = @role`
-      const roles = await executeQuery<{ id: string }>(roleQuery, { role })
-      if (roles.length > 0) {
-        roleId = roles[0].id
+    const { response, data } = await proxyIamRequest(
+      request,
+      `/api/users/update/${encodeURIComponent(params.id)}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
       }
-    }
+    )
 
-    // Build update query dynamically
-    const updates: string[] = []
-    const queryParams: Record<string, any> = { id: params.id }
-
-    if (name) {
-      updates.push('full_name = @name')
-      queryParams.name = name
-    }
-    if (email) {
-      updates.push('email = @email')
-      queryParams.email = email
-    }
-    if (password) {
-      const passwordHash = await bcrypt.hash(password, 10)
-      updates.push('password_hash = @password_hash')
-      queryParams.password_hash = passwordHash
-    }
-    if (roleId) {
-      updates.push('role_id = @role_id')
-      queryParams.role_id = roleId
-    }
-    if (status) {
-      updates.push('status = @status')
-      queryParams.status = status
-    }
-
-    console.log('Update query params:', { updates, queryParams })
-
-    if (updates.length === 0) {
+    if (!response.ok) {
       return NextResponse.json(
-        { error: 'No fields to update' },
-        { status: 400 }
+        { error: data.error || `IAM service returned ${response.status}` },
+        { status: response.status }
       )
     }
 
-    const updateQuery = `
-      UPDATE users
-      SET ${updates.join(', ')}
-      OUTPUT INSERTED.id, INSERTED.email, INSERTED.full_name, INSERTED.status
-      WHERE id = @id
-    `
-
-    const result = await executeQuery<{
-      id: string
-      email: string
-      full_name: string
-      status: string
-    }>(updateQuery, queryParams)
-
-    if (result.length === 0) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
-    }
-
-    const updatedUser = result[0]
-
-    // Get role name
-    const roleQuery = roleId 
-      ? `SELECT name FROM roles WHERE id = @role_id`
-      : `SELECT r.name FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id = @id`
-    
-    const roleParams = roleId ? { role_id: roleId } : { id: params.id }
-    const roles = await executeQuery<{ name: string }>(roleQuery, roleParams)
-    const roleName = roles[0]?.name || role
-
-    return NextResponse.json({
-      id: updatedUser.id,
-      name: updatedUser.full_name,
-      email: updatedUser.email,
-      role: roleName,
-      status: updatedUser.status,
-    })
+    return NextResponse.json(data, { status: response.status })
   } catch (error: any) {
     console.error('Update user error:', error)
     const errorMessage = error.message || String(error)
     const errorCode = error.code
-    
-    if (error.number === 2627 || errorMessage.includes('UNIQUE')) {
-      return NextResponse.json(
-        { error: 'Email already exists' },
-        { status: 409 }
-      )
-    }
 
-    // Detect database connection issues (both Vercel and local)
     const isConnectionError = 
       errorMessage.includes('connect') ||
-      errorMessage.includes('localhost') ||
       errorMessage.includes('ENOTFOUND') ||
       errorMessage.includes('ECONNREFUSED') ||
       errorMessage.includes('ETIMEDOUT') ||
@@ -196,15 +92,15 @@ export async function PUT(
       errorCode === 'ETIMEDOUT'
 
     if (isConnectionError) {
-      console.warn('⚠️  Database connection unavailable on Vercel:', errorMessage)
+      console.warn('⚠️  IAM service unavailable on Vercel:', errorMessage)
       return NextResponse.json(
-        { error: 'Database connection failed. User update is only available in local development.' },
+        { error: 'IAM service unavailable. User update is only available when the backend service is reachable.' },
         { status: 503 }
       )
     }
 
     return NextResponse.json(
-      { error: 'Failed to update user' },
+      { error: `Failed to update user: ${errorMessage}` },
       { status: 500 }
     )
   }
@@ -212,24 +108,32 @@ export async function PUT(
 
 // DELETE /api/users/[id] - Delete user
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const deleteQuery = `DELETE FROM users WHERE id = @id`
+    const { response, data } = await proxyIamRequest(
+      request,
+      `/api/users/${encodeURIComponent(params.id)}`,
+      { method: 'DELETE' }
+    )
 
-    await executeQuery(deleteQuery, { id: params.id })
+    if (!response.ok) {
+      return NextResponse.json(
+        { error: data.error || `IAM service returned ${response.status}` },
+        { status: response.status }
+      )
+    }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json(data, { status: response.status || 200 })
   } catch (error: any) {
     console.error('Delete user error:', error)
     const errorMessage = error.message || String(error)
     const errorCode = error.code
     
-    // Detect database connection issues (both Vercel and local)
+    // Detect backend service connection issues
     const isConnectionError = 
       errorMessage.includes('connect') ||
-      errorMessage.includes('localhost') ||
       errorMessage.includes('ENOTFOUND') ||
       errorMessage.includes('ECONNREFUSED') ||
       errorMessage.includes('ETIMEDOUT') ||
@@ -241,15 +145,15 @@ export async function DELETE(
       errorCode === 'ETIMEDOUT'
 
     if (isConnectionError) {
-      console.warn('⚠️  Database connection unavailable on Vercel:', errorMessage)
+      console.warn('⚠️  IAM service unavailable on Vercel:', errorMessage)
       return NextResponse.json(
-        { error: 'Database connection failed. User deletion is only available in local development.' },
+        { error: 'IAM service unavailable. User deletion is only available when the backend service is reachable.' },
         { status: 503 }
       )
     }
     
     return NextResponse.json(
-      { error: 'Failed to delete user' },
+      { error: `Failed to delete user: ${errorMessage}` },
       { status: 500 }
     )
   }
