@@ -56,8 +56,16 @@ function mapApiPriority(quality?: number): Priority {
   return 'low'
 }
 
-function resolveUserDisplayName(user: { full_name?: string; fullName?: string; name?: string; userName?: string; email?: string } | null): string {
-  return (user?.full_name || user?.fullName || user?.name || user?.userName || user?.email || '').trim()
+function resolveUserDisplayName(user: {
+  full_name?: string
+  fullName?: string
+  name?: string
+  userName?: string
+  username?: string
+  preferred_username?: string
+  email?: string
+} | null): string {
+  return (user?.full_name || user?.fullName || user?.name || user?.userName || user?.username || user?.preferred_username || user?.email || '').trim()
 }
 
 function normalizeUuid(value?: string): string {
@@ -190,14 +198,16 @@ async function buildReporterNameMap(reports: DamageReportFromAPI[]): Promise<Map
           console.warn(`IAM lookup failed for ${id}:`, error)
         }
 
-        // If all lookups fail, keep the UUID
-        return [id, id] as const
+        // Keep unresolved IDs unmapped so a later retry can still resolve names.
+        return null
       })
     )
 
     // Add resolved names to map
-    resolved.forEach(([id, name]) => {
-      if (id && !idToName.has(id)) {
+    resolved.forEach((entry) => {
+      if (!entry) return
+      const [id, name] = entry
+      if (id && name && !idToName.has(id)) {
         idToName.set(id, name)
       }
     })
@@ -466,7 +476,7 @@ export default function IncidentsPage() {
       )
     )
 
-    if (missingUserIds.length === 0 || Object.keys(reporterNames).length === 0) return
+    if (missingUserIds.length === 0) return
 
     void (async () => {
       const resolved = await Promise.all(
