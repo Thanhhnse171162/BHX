@@ -205,17 +205,20 @@ function mapDamageReportToIncident(
 
   const reportedBy = (report.reportedBy || '').trim()
   
-  // Try to get name from map first (from API lookup)
-  let reporter = reportedBy ? reporterNameMap.get(normalizeUuid(reportedBy)) : null
+  // Priority 1: Try to extract name directly from report object (backend might populate it)
+  let reporter = resolveReporterDisplayNameFromReport(report).trim()
   
-  // Fallback: try to extract name directly from report object
-  if (!reporter || looksLikeUuid(reporter)) {
-    reporter = resolveReporterDisplayNameFromReport(report)
+  // Priority 2: Try to get name from lookup map (from IAM/user API)
+  if (!reporter && reportedBy) {
+    const mappedName = reporterNameMap.get(normalizeUuid(reportedBy))
+    if (mappedName && !looksLikeUuid(mappedName)) {
+      reporter = mappedName
+    }
   }
   
-  // Last resort: show "Hệ thống" if no name found
+  // Last resort: show the user ID if we have one, otherwise "—" (not "Hệ thống")
   if (!reporter) {
-    reporter = 'Hệ thống'
+    reporter = reportedBy || '—'
   }
 
   return {
