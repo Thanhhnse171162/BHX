@@ -29,7 +29,7 @@ const PRIMARY_NAV = [
   { href: '/store-manager/inventory-check',          label: 'Kiểm kê',             icon: ClipboardCheck,  exact: false },
   { href: '/store-manager/purchase-requests',        label: 'Yêu cầu nhập hàng',   icon: PackagePlus,     exact: false },
   { href: '/store-manager/transfers',                label: 'Di chuyển hàng',      icon: ArrowLeftRight,  exact: false },
-  { href: '/store-manager/incidents',                label: 'Báo cáo sự cố',       icon: AlertTriangle,   exact: false, badge: 'incident' },
+  { href: '/store-manager/incidents',                label: 'Báo cáo sự cố',       icon: AlertTriangle,   exact: false },
 ]
 
 const MANAGEMENT_NAV: any[] = []
@@ -138,7 +138,6 @@ export default function StoreManagerLayout({ children }: StoreManagerLayoutProps
             const isActive = item.exact
               ? pathname === item.href
               : pathname === item.href || pathname.startsWith(item.href + '/')
-            const badgeCount = item.badge === 'incident' ? incidentCount : null
             return (
               <Link
                 key={item.label}
@@ -155,11 +154,6 @@ export default function StoreManagerLayout({ children }: StoreManagerLayoutProps
                   strokeWidth={isActive ? 2.2 : 1.8}
                 />
                 <span className="flex-1 truncate">{item.label}</span>
-                {badgeCount != null && badgeCount > 0 && (
-                  <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
-                    {badgeCount}
-                  </span>
-                )}
               </Link>
             )
           })}

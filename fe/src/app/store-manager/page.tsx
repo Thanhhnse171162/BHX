@@ -192,18 +192,18 @@ export default function StoreManagerDashboard() {
       }
       const qs = params.toString() ? `?${params}` : ''
 
-      // Sales
-      const salesRes = await fetch(`/api/sales${qs}`, { headers })
-      if (salesRes.ok) {
-        const s = await salesRes.json()
+      // Revenue
+      const revenueRes = await fetch(`/api/reports/manager/revenue${qs}`, { headers })
+      if (revenueRes.ok) {
+        const data = await revenueRes.json()
         setRevenue(
-          (s.totalRevenue || 0).toLocaleString('vi-VN', { style: 'currency', currency: 'VND' })
+          (data.totalRevenue || 0).toLocaleString('vi-VN', { style: 'currency', currency: 'VND' })
         )
         setChartData(
-          (s.chartData || []).map((d: any) => ({ day: d.day || d.label, value: d.value }))
+          (data.chartData || []).map((d: any) => ({ day: d.day || d.date || d.label, value: d.value || d.revenue || 0 }))
         )
         setProducts(
-          (s.topProducts || []).slice(0, 5).map((p: any, _: number, arr: any[]) => {
+          (data.topProducts || []).slice(0, 5).map((p: any, _: number, arr: any[]) => {
             const maxRev = arr[0]?.revenue || 1
             return {
               name: p.productName || p.name,
@@ -261,7 +261,7 @@ export default function StoreManagerDashboard() {
     {
       label: 'Tổng doanh thu',
       value: revenue,
-      sub: 'So với kỳ trước',
+      sub: '',
       color: 'green',
       icon: DollarSign,
     },
@@ -317,9 +317,6 @@ export default function StoreManagerDashboard() {
       <div className="mb-4 flex flex-wrap items-end gap-4 rounded-xl border border-[#e4edd9] bg-white px-5 py-4">
         {/* Store selection */}
         <div className="flex flex-col gap-1 relative">
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-[#7a8a6e]">
-            Cửa hàng
-          </label>
           {stores.length > 0 && (
             <div className="relative">
               <button
