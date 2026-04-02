@@ -18,15 +18,11 @@ import type {
 const statusLabels = {
   ACTIVE: 'ACTIVE',
   INACTIVE: 'INACTIVE',
-  Active: 'ACTIVE',
-  Inactive: 'INACTIVE',
 }
 
 const statusColors = {
   ACTIVE: 'bg-green-100 text-green-800',
   INACTIVE: 'bg-gray-100 text-gray-800',
-  Active: 'bg-green-100 text-green-800',
-  Inactive: 'bg-gray-100 text-gray-800',
 }
 
 // Normalize status value to handle both ACTIVE/INACTIVE and Active/Inactive
@@ -274,7 +270,7 @@ export default function WarehousesAdminPage() {
           name: formData.name,
           location: formData.location,
           capacity: formData.capacity,
-          status: formData.status, // Keep as ACTIVE or INACTIVE
+          status: normalizeStatus(formData.status), // Ensure ACTIVE or INACTIVE
         }
         
         // Only include parentId if it has a value
@@ -317,7 +313,7 @@ export default function WarehousesAdminPage() {
           name: formData.name,
           location: formData.location,
           capacity: formData.capacity,
-          status: formData.status, // Keep as ACTIVE or INACTIVE
+          status: normalizeStatus(formData.status), // Ensure ACTIVE or INACTIVE
           isDeleted: formData.isDeleted || false,
         }
         
