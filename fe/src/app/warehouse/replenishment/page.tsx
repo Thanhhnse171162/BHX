@@ -1419,11 +1419,6 @@ export default function ReplenishmentPage() {
                 ))}
               </div>
             </div>
-
-            <button className="flex items-center gap-2 border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 text-xs font-bold px-3.5 py-2 rounded-xl transition-colors flex-shrink-0">
-              <SlidersHorizontal size={13} />
-              Lọc nâng cao
-            </button>
           </div>
         </div>
 

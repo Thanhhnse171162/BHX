@@ -148,6 +148,15 @@ function mapReportToView(report: DamageReportFromAPI, products: ProductFromAPI[]
   const productId = String(report.productId || '')
   const product = products.find((item) => item.id.toLowerCase() === productId.toLowerCase())
 
+  // Try multiple field names for approvedBy (backend might use different names)
+  const approvedByValue = 
+    report.approvedBy || 
+    (report as any).approverName ||
+    (report as any).approverUserName ||
+    (report as any).approvedByName ||
+    (report as any).reviewedBy ||
+    undefined
+
   return {
     id: report.id,
     reportNumber: report.reportNumber || report.id,
@@ -158,7 +167,7 @@ function mapReportToView(report: DamageReportFromAPI, products: ProductFromAPI[]
     damageType: String(report.damageType || ''),
     quantity: Number(report.quality || 0),
     status: normalizeStatus(report.status),
-    approvedBy: report.approvedBy || undefined,
+    approvedBy: approvedByValue,
     reportDate: report.reportedDate || report.createdAt || '',
     description: String(report.description || ''),
     photos: extractReportPhotos(report),

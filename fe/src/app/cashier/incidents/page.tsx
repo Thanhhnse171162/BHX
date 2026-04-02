@@ -478,7 +478,12 @@ function buildIncidentFromDamageReport(report: DamageReportFromAPI, products: Pr
         done: true,
       },
       {
-        label: safeStatus.toUpperCase() === 'PENDING' ? 'Đang chờ phân công xử lý' : 'Đang xử lý',
+        label: (() => {
+          const status = safeStatus.toUpperCase()
+          if (status === 'PENDING') return 'Đang chờ phân công xử lý'
+          if (status === 'APPROVED' || status === 'COMPLETED' || status === 'RESOLVED') return 'Đã duyệt'
+          return 'Đang xử lý'
+        })(),
         time: '',
         author: '',
         done: safeStatus.toUpperCase() !== 'PENDING',
