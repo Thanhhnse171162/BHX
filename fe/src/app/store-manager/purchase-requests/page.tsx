@@ -262,7 +262,7 @@ export default function PurchaseRequestsPage() {
       const unresolvedRequesterIds = Array.from(new Set(
         merged
           .map((r) => r.requestedBy)
-          .filter((id) => !!id && !userMap[id])
+          .filter((id) => !!id && !userMap[normalizeId(id)])
       ))
 
       await Promise.all(
@@ -270,7 +270,7 @@ export default function PurchaseRequestsPage() {
           try {
             const u = await UserAPIService.getById(id)
             const userName = u?.full_name || u?.fullName || u?.name || u?.email || ''
-            if (userName) userMap[id] = userName
+            if (userName) userMap[normalizeId(id)] = userName
           } catch {
             // Ignore per-user lookup failure and keep fallback display.
           }
