@@ -582,7 +582,15 @@ export default function ProductsPage() {
       }
 
       setIsModalOpen(false)
-      await fetchProducts() // Reload lại danh sách
+      // Update local state immediately to reflect status change
+      if (mode === 'edit' && editingId) {
+        setProducts(prev => prev.map(p => 
+          p.id === editingId 
+            ? { ...p, status: status }
+            : p
+        ))
+      }
+      await fetchProducts() // Reload for full refresh
     } catch (err) {
       console.error('Error saving product:', err)
       const detailedError = getReadableErrorMessage(err)
