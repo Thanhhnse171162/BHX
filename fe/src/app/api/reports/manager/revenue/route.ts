@@ -6,6 +6,7 @@ export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams
     const storeId = searchParams.get('storeId')
+    const staffId = searchParams.get('staffId')
     const range = searchParams.get('range') || '7days'
     const from = searchParams.get('from')
     const to = searchParams.get('to')
@@ -14,6 +15,7 @@ export async function GET(req: NextRequest) {
     
     const params = new URLSearchParams()
     if (storeId) params.set('storeId', storeId)
+    if (staffId) params.set('staffId', staffId)
     params.set('range', range)
     if (from) params.set('from', from)
     if (to) params.set('to', to)
