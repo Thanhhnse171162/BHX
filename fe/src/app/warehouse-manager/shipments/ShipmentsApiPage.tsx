@@ -391,54 +391,56 @@ export default function ShipmentsApiPage() {
         </table>
 
         {/* Pagination */}
-        {totalPages > 1 && (
+        {filtered.length > 0 && (
           <div className="px-4 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
             <div className="text-sm text-slate-600">
-              Hiển thị {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filtered.length)} của {filtered.length} lô hàng
+              Hiển thị {filtered.length === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + itemsPerPage, filtered.length)} của {filtered.length} lô hàng
             </div>
             
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                ← Trước
-              </button>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  ← Trước
+                </button>
 
-              <div className="flex items-center gap-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter(page => {
-                    if (totalPages <= 5) return true
-                    if (page === 1 || page === totalPages) return true
-                    if (Math.abs(page - currentPage) <= 1) return true
-                    return false
-                  })
-                  .map((page, idx, arr) => (
-                    <div key={page}>
-                      {idx > 0 && arr[idx - 1] !== page - 1 && <span className="px-1 text-slate-500">...</span>}
-                      <button
-                        onClick={() => setCurrentPage(page)}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                          currentPage === page
-                            ? 'bg-emerald-600 text-white'
-                            : 'border border-slate-200 bg-white hover:bg-slate-100'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    </div>
-                  ))}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(page => {
+                      if (totalPages <= 5) return true
+                      if (page === 1 || page === totalPages) return true
+                      if (Math.abs(page - currentPage) <= 1) return true
+                      return false
+                    })
+                    .map((page, idx, arr) => (
+                      <div key={page}>
+                        {idx > 0 && arr[idx - 1] !== page - 1 && <span className="px-1 text-slate-500">...</span>}
+                        <button
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                            currentPage === page
+                              ? 'bg-emerald-600 text-white'
+                              : 'border border-slate-200 bg-white hover:bg-slate-100'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      </div>
+                    ))}
+                </div>
+
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Sau →
+                </button>
               </div>
-
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Sau →
-              </button>
-            </div>
+            )}
           </div>
         )}
       </div>
