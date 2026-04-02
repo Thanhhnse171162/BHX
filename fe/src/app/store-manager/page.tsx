@@ -226,6 +226,7 @@ export default function StoreManagerDashboard() {
 
       const headers: HeadersInit = { Authorization: `Bearer ${token}` }
 
+      // Revenue params - include staffId if selected
       const params = new URLSearchParams()
       params.set('storeId', selectedStoreId)
       if (selectedStaffId) {
@@ -281,9 +282,18 @@ export default function StoreManagerDashboard() {
         console.error('Revenue fetch error:', revErr)
       }
 
-      // ── Fetch Inventory Data ────────────────────────────────────────────────
+      // ── Fetch Inventory Data (no staffId filter) ────────────────────────────
       try {
-        const invRes = await fetch(`/api/inventory/low-stock-alerts${qs}`, { headers })
+        const invParams = new URLSearchParams()
+        invParams.set('storeId', selectedStoreId)
+        if (activeRange !== 'custom') {
+          invParams.set('range', activeRange)
+        } else {
+          if (dateFrom) invParams.set('from', dateFrom)
+          if (dateTo) invParams.set('to', dateTo)
+        }
+        const invQs = `?${invParams.toString()}`
+        const invRes = await fetch(`/api/inventory/low-stock-alerts${invQs}`, { headers })
         if (invRes.ok) {
           const data = await invRes.json()
           console.log('Inventory API Response:', data)
