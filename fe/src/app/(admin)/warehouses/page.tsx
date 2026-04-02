@@ -603,7 +603,7 @@ export default function WarehousesAdminPage() {
             >
               <option value="">Không chọn (Kho gốc)</option>
               {availableWarehouses
-                .filter((w) => w.id !== editingId) // Exclude current warehouse from being its own parent
+                .filter((w) => w.id !== editingId && !w.isDeleted) // Exclude current warehouse and deleted warehouses
                 .map((warehouse) => (
                   <option key={warehouse.id} value={warehouse.id}>
                     {warehouse.name} ({warehouse.location})
