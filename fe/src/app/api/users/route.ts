@@ -66,7 +66,6 @@ export async function GET(request: NextRequest) {
         console.log(`✅ Users fetched from IAM service (${endpoint}): ${Array.isArray(iamData) ? iamData.length : '?'} items`)
         return NextResponse.json(Array.isArray(iamData) ? iamData : iamData.data || [])
       } else if (iamRes.status === 404) {
-        const responseText = await iamRes.text()
         console.log(`⚠️ Endpoint not found (404): ${endpoint}. Trying next endpoint...`)
         continue
       } else {
