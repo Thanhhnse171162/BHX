@@ -988,24 +988,18 @@ export default function WarehouseManagerRequestsPage() {
             icon={<ClipboardList className="w-5 h-5 text-[#f97316]" />}
             title="Tổng yêu cầu chờ"
             value={waitingCount}
-            delta="+5%"
-            deltaClass="text-emerald-600"
             iconBg="bg-orange-100"
           />
           <StatCard
             icon={<AlertTriangle className="w-5 h-5 text-red-500" />}
             title="Ưu tiên cao"
             value={urgentCount}
-            delta="-2%"
-            deltaClass="text-red-500"
             iconBg="bg-red-100"
           />
           <StatCard
             icon={<CheckCircle2 className="w-5 h-5 text-emerald-600" />}
             title="Đã duyệt hôm nay"
             value={approvedToday}
-            delta="+10%"
-            deltaClass="text-emerald-600"
             iconBg="bg-emerald-100"
           />
         </div>
@@ -1016,13 +1010,12 @@ export default function WarehouseManagerRequestsPage() {
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
             <h2 className="text-2xl font-bold text-gray-900">Danh sách yêu cầu gần đây</h2>
             <div className="flex items-center gap-2">
-              <button className="px-4 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors inline-flex items-center gap-2">
+              <button
+                onClick={loadRequests}
+                className="px-4 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors inline-flex items-center gap-2 disabled:opacity-60"
+              >
                 <Filter className="w-4 h-4" />
-                Bộ lọc
-              </button>
-              <button className="px-4 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors inline-flex items-center gap-2">
-                <Download className="w-4 h-4" />
-                Xuất Excel
+                Làm mới
               </button>
             </div>
           </div>
@@ -1152,10 +1145,6 @@ export default function WarehouseManagerRequestsPage() {
               >
                 {incomingLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Filter className="w-4 h-4" />}
                 Làm mới
-              </button>
-              <button className="px-4 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors inline-flex items-center gap-2">
-                <Download className="w-4 h-4" />
-                Xuất Excel
               </button>
             </div>
           </div>
@@ -1368,10 +1357,6 @@ export default function WarehouseManagerRequestsPage() {
               >
                 {inventoryCheckLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Filter className="w-4 h-4" />}
                 Làm mới
-              </button>
-              <button className="px-4 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors inline-flex items-center gap-2">
-                <Download className="w-4 h-4" />
-                Xuất Excel
               </button>
             </div>
           </div>
@@ -2230,15 +2215,11 @@ function StatCard({
   icon,
   title,
   value,
-  delta,
-  deltaClass,
   iconBg,
 }: {
   icon: React.ReactNode
   title: string
   value: number
-  delta: string
-  deltaClass: string
   iconBg: string
 }) {
   return (
@@ -2247,10 +2228,7 @@ function StatCard({
         <div className={`w-11 h-11 rounded-xl ${iconBg} flex items-center justify-center`}>{icon}</div>
         <div className="flex-1">
           <p className="text-sm text-gray-500 font-medium">{title}</p>
-          <div className="flex items-end gap-2 mt-1">
-            <p className="text-4xl font-bold text-gray-900 leading-none">{value}</p>
-            <span className={`text-sm font-semibold ${deltaClass}`}>{delta}</span>
-          </div>
+          <p className="text-4xl font-bold text-gray-900 leading-none mt-1">{value}</p>
         </div>
       </div>
     </article>
