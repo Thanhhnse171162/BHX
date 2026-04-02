@@ -18,7 +18,6 @@ export async function PUT(request: NextRequest) {
     }
 
     const contentType = request.headers.get('content-type') || ''
-    let body: any
     
     console.log('🔄 Forwarding PUT /api/products/update-product to:', CATALOG_SERVICE_URL)
     console.log('📋 Content-Type:', contentType)
@@ -29,57 +28,32 @@ export async function PUT(request: NextRequest) {
       headers['Authorization'] = authHeader
     }
 
-    // Handle both JSON and FormData
-    if (contentType.includes('multipart/form-data')) {
-      // Forward FormData as-is (with file uploads)
-      const formData = await request.formData()
-      const backendFormData = new FormData()
-      
-      // Copy all fields from formData to backendFormData
-      for (const [key, value] of formData.entries()) {
-        backendFormData.append(key, value)
-      }
-
-      console.log('📦 Update with files')
-      
-      const response = await fetch(`${CATALOG_SERVICE_URL}/api/Product/Update-Product?id=${id}`, {
-        method: 'PUT',
-        headers, // Don't set Content-Type for FormData, let fetch handle it
-        body: backendFormData,
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('❌ Backend error:', response.status, errorData)
-        return NextResponse.json(errorData, { status: response.status })
-      }
-
-      const result = await response.json()
-      console.log('✅ Update success:', result)
-      return NextResponse.json(result, { status: 200 })
-    } else {
-      // JSON payload
-      body = await request.json()
-      headers['Content-Type'] = 'application/json'
-      
-      console.log('📦 Update payload:', body)
-
-      const response = await fetch(`${CATALOG_SERVICE_URL}/api/Product/Update-Product?id=${id}`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(body),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('❌ Backend error:', response.status, errorData)
-        return NextResponse.json(errorData, { status: response.status })
-      }
-
-      const result = await response.json()
-      console.log('✅ Update success:', result)
-      return NextResponse.json(result, { status: 200 })
+    // Always handle as FormData (backend only accepts FormData)
+    const formData = await request.formData()
+    const backendFormData = new FormData()
+    
+    // Copy all fields from formData to backendFormData
+    for (const [key, value] of formData.entries()) {
+      backendFormData.append(key, value)
     }
+
+    console.log('📦 Sending FormData to backend')
+    
+    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Product/Update-Product?id=${id}`, {
+      method: 'PUT',
+      headers, // Don't set Content-Type for FormData, let fetch handle it
+      body: backendFormData,
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      console.error('❌ Backend error:', response.status, errorData)
+      return NextResponse.json(errorData, { status: response.status })
+    }
+
+    const result = await response.json()
+    console.log('✅ Update success:', result)
+    return NextResponse.json(result, { status: 200 })
   } catch (error: any) {
     console.error('❌ Update Product Error:', error.message)
     return NextResponse.json(
