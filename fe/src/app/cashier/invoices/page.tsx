@@ -4,11 +4,11 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Search, X, Printer, ChevronLeft, ChevronRight,
   AlertCircle,
-  CheckCircle2, XCircle, RefreshCw, Info, ChevronDown, Filter, Loader2,
+  CheckCircle2, Info, ChevronDown, Filter, Loader2,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 
-type OrderStatus = 'Thành công' | 'Đã trả hàng' | 'Đã hủy' | 'Đang xử lý'
+type OrderStatus = 'Thành công' | 'Đang xử lý'
 type DateFilter = 'all' | 'today' | 'week'
 
 interface SaleItemFromApi {
@@ -113,16 +113,6 @@ const statusCfg: Record<OrderStatus, { label: string; cls: string; icon: React.R
     label: 'Thành công',
     cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
     icon: <CheckCircle2 className="w-3.5 h-3.5" />,
-  },
-  'Đã trả hàng': {
-    label: 'Đã trả hàng',
-    cls: 'bg-amber-50 text-amber-700 border border-amber-200',
-    icon: <RefreshCw className="w-3.5 h-3.5" />,
-  },
-  'Đã hủy': {
-    label: 'Đã hủy',
-    cls: 'bg-red-50 text-red-700 border border-red-200',
-    icon: <XCircle className="w-3.5 h-3.5" />,
   },
   'Đang xử lý': {
     label: 'Đang xử lý',
@@ -295,8 +285,8 @@ const mapOrderStatus = (status: string, paymentStatus: string): OrderStatus => {
   const s = String(status || '').toUpperCase()
   const p = String(paymentStatus || '').toUpperCase()
 
-  if (s.includes('CANCEL') || s.includes('VOID')) return 'Đã hủy'
-  if (s.includes('RETURN') || s.includes('REFUND') || p.includes('REFUND')) return 'Đã trả hàng'
+  if (s.includes('CANCEL') || s.includes('VOID')) return 'Thành công'
+  if (s.includes('RETURN') || s.includes('REFUND') || p.includes('REFUND')) return 'Thành công'
   if (s.includes('COMPLETE') || s.includes('SUCCESS') || p === 'PAID' || p === 'COMPLETED' || p === 'SUCCESS') return 'Thành công'
   return 'Đang xử lý'
 }
@@ -341,13 +331,6 @@ function OrderDetailModal({ order, onClose, onPrint }: { order: Order; onClose: 
     { label: order.status === 'Thành công' ? 'Thanh toán thành công' : 'Đơn hàng đang xử lý', time: `${order.time}, ${order.date}`, done: order.status === 'Thành công' },
     { label: 'Đã xuất hóa đơn', time: `${order.time}, ${order.date}`, done: order.status === 'Thành công' },
   ]
-  if (order.status === 'Đã trả hàng') {
-    timeline.push({ label: 'Khách trả hàng', time: `${order.time}, ${order.date}`, done: true })
-  }
-  if (order.status === 'Đã hủy') {
-    timeline[0] = { label: 'Đơn hàng đã hủy', time: `${order.time}, ${order.date}`, done: false }
-    timeline.splice(1)
-  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -638,8 +621,7 @@ export default function InvoicesPage() {
   }
 
   const totalOrders = orders.length
-  const revenue = orders.filter((o) => o.status === 'Thành công').reduce((s, o) => s + o.total, 0)
-  const returned = orders.filter((o) => o.status === 'Đã trả hàng' || o.status === 'Đã hủy').length
+  const revenue = orders.filter((o) => o.status === 'Thành công' || o.status === 'Đang xử lý').reduce((s, o) => s + o.total, 0)
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -661,12 +643,6 @@ export default function InvoicesPage() {
               <span className="text-2xl font-extrabold text-gray-900">
                 {new Intl.NumberFormat('vi-VN', { notation: 'compact', maximumFractionDigits: 1 }).format(revenue)}
               </span>
-            </div>
-          </div>
-          <div className="bg-white rounded-2xl px-5 py-4 shadow-sm border border-gray-100">
-            <p className="text-xs font-medium text-gray-400 mb-1">Hủy / Trả hàng</p>
-            <div className="flex items-end justify-between">
-              <span className="text-2xl font-extrabold text-gray-900">{returned}</span>
             </div>
           </div>
         </div>
@@ -714,8 +690,6 @@ export default function InvoicesPage() {
               >
                 <option value="all">Trạng thái: Tất cả</option>
                 <option value="Thành công">Thành công</option>
-                <option value="Đã trả hàng">Đã trả hàng</option>
-                <option value="Đã hủy">Đã hủy</option>
                 <option value="Đang xử lý">Đang xử lý</option>
               </select>
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
