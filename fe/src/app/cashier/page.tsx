@@ -201,13 +201,13 @@ export default function CashierDashboard() {
             </div>
           </div>
 
-          {/* Doanh thu ca */}
+          {/* Doanh thu*/}
           <div className="bg-white rounded-xl border border-gray-200 px-6 py-6 flex items-center gap-4">
             <div className="w-11 h-11 rounded-xl bg-purple-100 flex items-center justify-center flex-shrink-0">
               <TrendingUp className="w-5 h-5 text-purple-500" />
             </div>
             <div>
-              <p className="text-sm text-gray-500 mb-1">Doanh thu ca</p>
+              <p className="text-sm text-gray-500 mb-1">Doanh thu</p>
               <p className="text-3xl font-bold text-gray-900 leading-tight">
                 {loadingStats ? (
                   <span className="text-lg text-gray-400">—</span>
