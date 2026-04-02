@@ -2,6 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import {
+  DollarSign,
+  Package,
+  AlertTriangle,
+  XCircle,
   Download,
   Search,
   RefreshCw,
@@ -127,7 +131,6 @@ export default function StoreManagerDashboard() {
   // Store selection
   const [stores, setStores] = useState<Store[]>([])
   const [selectedStoreId, setSelectedStoreId] = useState('')
-  const [userStoreName, setUserStoreName] = useState('')
 
   // Time filters
   const [activeRange, setActiveRange] = useState<TimeRange>('7days')
@@ -160,10 +163,8 @@ export default function StoreManagerDashboard() {
           // If user has workplace, set it as default; otherwise use first store
           if (user?.workplaceId && storeList.some((s: Store) => s.id === user.workplaceId)) {
             setSelectedStoreId(user.workplaceId)
-            setUserStoreName(storeList.find((s: Store) => s.id === user.workplaceId)?.name || '')
           } else if (storeList.length > 0) {
             setSelectedStoreId(storeList[0].id)
-            setUserStoreName(storeList[0].name)
           }
         }
       } catch (err) {
@@ -253,280 +254,281 @@ export default function StoreManagerDashboard() {
     { label: 'Tuỳ chỉnh', value: 'custom' },
   ]
 
+  // ── KPI cards config ───────────────────────────────────────────────────────
+  const kpis = [
+    {
+      label: 'Tổng doanh thu',
+      value: revenue,
+      sub: 'So với kỳ trước',
+      color: 'green',
+      icon: DollarSign,
+    },
+    {
+      label: 'Còn hàng',
+      value: stockCount.toLocaleString('vi-VN'),
+      sub: 'Sản phẩm khả dụng',
+      color: 'blue',
+      icon: Package,
+    },
+    {
+      label: 'Sắp hết',
+      value: String(lowCount),
+      sub: 'Cần nhập thêm ngay',
+      color: 'amber',
+      icon: AlertTriangle,
+    },
+    {
+      label: 'Hết hàng',
+      value: String(outCount),
+      sub: 'Đang tạm ngừng bán',
+      color: 'red',
+      icon: XCircle,
+    },
+  ]
+
+  const colorMap: Record<string, { border: string; iconBg: string; iconColor: string }> = {
+    green: { border: 'border-l-[#3b8c2a]', iconBg: 'bg-[#e8f5e2]', iconColor: 'text-[#3b8c2a]' },
+    blue:  { border: 'border-l-[#2a6eb0]', iconBg: 'bg-[#e2edf8]', iconColor: 'text-[#2a6eb0]' },
+    amber: { border: 'border-l-[#e09a1a]', iconBg: 'bg-[#fdf3de]', iconColor: 'text-[#e09a1a]' },
+    red:   { border: 'border-l-[#c03030]', iconBg: 'bg-[#fce8e8]', iconColor: 'text-[#c03030]' },
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#f5f7f2] p-5 font-['Be_Vietnam_Pro',sans-serif]">
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-        
-        {/* LEFT SIDEBAR - Doanh thu ────────────────────────────────────────────*/}
-        <div className="lg:col-span-1 sticky top-5 h-fit">
-          <div className="rounded-xl border border-[#e4edd9] bg-white p-5">
-            {/* Title */}
-            <h2 className="mb-4 text-sm font-bold text-[#1a2e10]">Doanh thu</h2>
 
-            {/* Store selection */}
-            {stores.length > 1 && (
-              <div className="mb-4 flex flex-col gap-1.5">
-                <label className="text-[10px] font-semibold uppercase tracking-wider text-[#7a8a6e]">
-                  Cửa hàng
-                </label>
-                <select 
-                  value={selectedStoreId} 
-                  onChange={(e) => setSelectedStoreId(e.target.value)}
-                  className="rounded-lg border border-[#d4e0c8] px-3 py-1.5 text-sm text-[#2d4a1a] outline-none focus:border-[#3b8c2a]"
-                >
-                  {stores.map(store => (
-                    <option key={store.id} value={store.id}>
-                      {store.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+      {/* Top bar */}
+      <div className="mb-4 flex items-start justify-between">
+        <div>
+          <h1 className="text-lg font-bold text-[#1a2e10]">Doanh thu cửa hàng</h1>
+          <p className="mt-0.5 text-xs text-[#7a8a6e]">
+            Theo dõi doanh thu theo ngày và theo khoảng thời gian
+          </p>
+        </div>
+        <button className="flex items-center gap-2 rounded-lg border border-[#d4e0c8] bg-white px-4 py-2 text-xs font-semibold text-[#3b6b22] transition hover:bg-[#f0f5eb]">
+          <Download size={13} />
+          Xuất báo cáo
+        </button>
+      </div>
 
-            {/* Main revenue box */}
-            <div className="mb-4 rounded-lg bg-gradient-to-br from-[#f5fdf1] to-[#eefde8] p-4 border border-[#d4e0c8]">
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#7a8a6e]">
-                Tổng doanh thu
-              </p>
-              <p className="text-2xl font-bold text-[#3b8c2a]">{revenue}</p>
-              <p className="mt-1 text-[11px] text-[#9aaa8e]">Khoảng thời gian được chọn</p>
-            </div>
+      {/* Filter bar */}
+      <div className="mb-4 flex flex-wrap items-end gap-4 rounded-xl border border-[#e4edd9] bg-white px-5 py-4">
+        {/* Store select */}
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-semibold uppercase tracking-wider text-[#7a8a6e]">
+            Cửa hàng
+          </label>
+          <select 
+            value={selectedStoreId}
+            onChange={(e) => setSelectedStoreId(e.target.value)}
+            className="rounded-lg border border-[#d4e0c8] px-3 py-1.5 text-sm text-[#2d4a1a] outline-none focus:border-[#3b8c2a]"
+          >
+            {stores.map(store => (
+              <option key={store.id} value={store.id}>
+                {store.name}
+              </option>
+            ))}
+          </select>
+        </div>
 
-            {/* Quick stats boxes */}
-            <div className="space-y-2.5">
-              {/* Stock */}
-              <div className="rounded-lg border border-[#e4edd9] bg-[#fafcf8] p-3 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#e8f5e2]">
-                  <span className="text-[13px] font-bold text-[#3b8c2a]">📦</span>
-                </div>
-                <div className="flex-1">
-                  <p className="text-[10px] font-semibold uppercase text-[#7a8a6e]">Còn hàng</p>
-                  <p className="text-sm font-bold text-[#2d4a1a]">{stockCount.toLocaleString('vi-VN')}</p>
-                </div>
-              </div>
-
-              {/* Low stock */}
-              <div className="rounded-lg border border-[#e4edd9] bg-[#fffbf0] p-3 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#fdf3de]">
-                  <span className="text-[13px] font-bold text-[#e09a1a]">⚠️</span>
-                </div>
-                <div className="flex-1">
-                  <p className="text-[10px] font-semibold uppercase text-[#7a8a6e]">Sắp hết</p>
-                  <p className="text-sm font-bold text-[#2d4a1a]">{lowCount}</p>
-                </div>
-              </div>
-
-              {/* Out of stock */}
-              <div className="rounded-lg border border-[#e4edd9] bg-[#fef8f8] p-3 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#fce8e8]">
-                  <span className="text-[13px] font-bold text-[#c03030]">❌</span>
-                </div>
-                <div className="flex-1">
-                  <p className="text-[10px] font-semibold uppercase text-[#7a8a6e]">Hết hàng</p>
-                  <p className="text-sm font-bold text-[#2d4a1a]">{outCount}</p>
-                </div>
-              </div>
-            </div>
+        {/* Time tabs */}
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-semibold uppercase tracking-wider text-[#7a8a6e]">
+            Khoảng thời gian
+          </label>
+          <div className="flex gap-1.5">
+            {timeOptions.map(t => (
+              <button
+                key={t.value}
+                onClick={() => setActiveRange(t.value)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  activeRange === t.value
+                    ? 'bg-[#3b8c2a] text-white'
+                    : 'bg-[#f0f4eb] text-[#6a7c5a] hover:bg-[#e4edda]'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* MAIN CONTENT - Chart & Products ─────────────────────────────────────*/}
-        <div className="lg:col-span-3 space-y-4">
-          
-          {/* Top bar */}
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-lg font-bold text-[#1a2e10]">Phân tích doanh thu cửa hàng</h1>
-              <p className="mt-0.5 text-xs text-[#7a8a6e]">
-                {userStoreName || 'Theo dõi doanh thu theo ngày và khoảng thời gian'}
-              </p>
-            </div>
-            <button className="flex items-center gap-2 rounded-lg border border-[#d4e0c8] bg-white px-4 py-2 text-xs font-semibold text-[#3b6b22] transition hover:bg-[#f0f5eb]">
-              <Download size={13} />
-              Xuất báo cáo
-            </button>
-          </div>
-
-          {/* Filter bar */}
-          <div className="flex flex-wrap items-end gap-4 rounded-xl border border-[#e4edd9] bg-white px-5 py-4">
-            {/* Time tabs */}
+        {/* Date pickers */}
+        {activeRange === 'custom' && (
+          <>
             <div className="flex flex-col gap-1">
               <label className="text-[10px] font-semibold uppercase tracking-wider text-[#7a8a6e]">
-                Khoảng thời gian
+                Từ ngày
               </label>
-              <div className="flex gap-1.5 flex-wrap">
-                {timeOptions.map(t => (
-                  <button
-                    key={t.value}
-                    onClick={() => setActiveRange(t.value)}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                      activeRange === t.value
-                        ? 'bg-[#3b8c2a] text-white'
-                        : 'bg-[#f0f4eb] text-[#6a7c5a] hover:bg-[#e4edda]'
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={e => setDateFrom(e.target.value)}
+                className="rounded-lg border border-[#d4e0c8] px-3 py-1.5 text-xs text-[#4a6040] outline-none focus:border-[#3b8c2a]"
+              />
             </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-semibold uppercase tracking-wider text-[#7a8a6e]">
+                Đến ngày
+              </label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={e => setDateTo(e.target.value)}
+                className="rounded-lg border border-[#d4e0c8] px-3 py-1.5 text-xs text-[#4a6040] outline-none focus:border-[#3b8c2a]"
+              />
+            </div>
+          </>
+        )}
 
-            {/* Date pickers */}
-            {activeRange === 'custom' && (
-              <>
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-[#7a8a6e]">
-                    Từ ngày
-                  </label>
-                  <input
-                    type="date"
-                    value={dateFrom}
-                    onChange={e => setDateFrom(e.target.value)}
-                    className="rounded-lg border border-[#d4e0c8] px-3 py-1.5 text-xs text-[#4a6040] outline-none focus:border-[#3b8c2a]"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-[#7a8a6e]">
-                    Đến ngày
-                  </label>
-                  <input
-                    type="date"
-                    value={dateTo}
-                    onChange={e => setDateTo(e.target.value)}
-                    className="rounded-lg border border-[#d4e0c8] px-3 py-1.5 text-xs text-[#4a6040] outline-none focus:border-[#3b8c2a]"
-                  />
-                </div>
-              </>
+        {/* Actions */}
+        <div className="ml-auto flex gap-2">
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-1.5 rounded-lg border border-[#d4e0c8] bg-[#f0f4eb] px-4 py-1.5 text-xs font-semibold text-[#6a7c5a] transition hover:bg-[#e4edda]"
+          >
+            <RefreshCw size={12} />
+            Đặt lại
+          </button>
+          <button
+            onClick={handleApply}
+            className="flex items-center gap-1.5 rounded-lg bg-[#3b8c2a] px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-[#2f7020]"
+          >
+            <Check size={12} />
+            Áp dụng
+          </button>
+        </div>
+      </div>
+
+      {/* KPI cards */}
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {kpis.map(card => {
+          const c = colorMap[card.color]
+          const Icon = card.icon
+          return (
+            <div
+              key={card.label}
+              className={`relative overflow-hidden rounded-xl border border-[#e4edd9] bg-white p-4 border-l-4 ${c.border}`}
+            >
+              <div className={`mb-2.5 flex h-9 w-9 items-center justify-center rounded-lg ${c.iconBg}`}>
+                <Icon size={17} className={c.iconColor} />
+              </div>
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#7a8a6e]">
+                {card.label}
+              </p>
+              <p className="mb-1.5 text-xl font-bold leading-none text-[#1a2e10]">{card.value}</p>
+              <p className="text-[11px] text-[#9aaa8e]">{card.sub}</p>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Chart + Products grid */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+
+        {/* Revenue Chart */}
+        <div className="rounded-xl border border-[#e4edd9] bg-white p-5">
+          <div className="mb-3 flex items-start justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-[#1a2e10]">Biểu đồ xu hướng doanh thu</h2>
+            </div>
+            <span className="flex items-center gap-1.5 text-[11px] text-[#7a8a6e]">
+              <span className="inline-block h-2 w-2 rounded-full bg-[#3b8c2a]" />
+              Doanh thu thực tế
+            </span>
+          </div>
+          <div className="h-56">
+            {loading ? (
+              <div className="flex h-full items-center justify-center text-xs text-[#9aaa8e]">
+                Đang tải...
+              </div>
+            ) : (
+              <RevenueChart chartData={chartData} />
             )}
+          </div>
+        </div>
 
-            {/* Actions */}
-            <div className="ml-auto flex gap-2">
-              <button
-                onClick={handleReset}
-                className="flex items-center gap-1.5 rounded-lg border border-[#d4e0c8] bg-[#f0f4eb] px-4 py-1.5 text-xs font-semibold text-[#6a7c5a] transition hover:bg-[#e4edda]"
-              >
-                <RefreshCw size={12} />
-                Đặt lại
-              </button>
-              <button
-                onClick={handleApply}
-                className="flex items-center gap-1.5 rounded-lg bg-[#3b8c2a] px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-[#2f7020]"
-              >
-                <Check size={12} />
-                Áp dụng
-              </button>
+        {/* Top products */}
+        <div className="rounded-xl border border-[#e4edd9] bg-white p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-[#1a2e10]">Top 5 sản phẩm bán chạy nhất</h2>
+            </div>
+            <div className="flex items-center gap-1.5 rounded-lg border border-[#d4e0c8] px-2.5 py-1.5">
+              <Search size={12} className="text-[#9aaa8e]" />
+              <input
+                type="text"
+                placeholder="Tìm kiếm sản phẩm..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-32 border-none bg-transparent text-xs text-[#4a6040] outline-none placeholder:text-[#b8c8aa]"
+              />
             </div>
           </div>
 
-          {/* Chart + Products grid */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-
-            {/* Revenue Chart */}
-            <div className="rounded-xl border border-[#e4edd9] bg-white p-5">
-              <div className="mb-3 flex items-start justify-between">
-                <div>
-                  <h2 className="text-sm font-bold text-[#1a2e10]">Xu hướng doanh thu</h2>
-                </div>
-                <span className="flex items-center gap-1.5 text-[11px] text-[#7a8a6e]">
-                  <span className="inline-block h-2 w-2 rounded-full bg-[#3b8c2a]" />
-                  Doanh thu thực tế
-                </span>
-              </div>
-              <div className="h-56">
-                {loading ? (
-                  <div className="flex h-full items-center justify-center text-xs text-[#9aaa8e]">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-[#eef2e9]">
+                <th className="pb-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#9aaa8e]">
+                  Tên sản phẩm
+                </th>
+                <th className="pb-2.5 text-center text-[10px] font-semibold uppercase tracking-wider text-[#9aaa8e]">
+                  Số lượng đã bán
+                </th>
+                <th className="pb-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#9aaa8e]">
+                  Tổng doanh thu
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#f4f7f0]">
+              {loading ? (
+                <tr>
+                  <td colSpan={3} className="py-6 text-center text-xs text-[#9aaa8e]">
                     Đang tải...
-                  </div>
-                ) : (
-                  <RevenueChart chartData={chartData} />
-                )}
-              </div>
-            </div>
-
-            {/* Top products */}
-            <div className="rounded-xl border border-[#e4edd9] bg-white p-5">
-              <div className="mb-3 flex items-center justify-between">
-                <div>
-                  <h2 className="text-sm font-bold text-[#1a2e10]">Top 5 sản phẩm bán chạy</h2>
-                </div>
-                <div className="flex items-center gap-1.5 rounded-lg border border-[#d4e0c8] px-2.5 py-1.5">
-                  <Search size={12} className="text-[#9aaa8e]" />
-                  <input
-                    type="text"
-                    placeholder="Tìm kiếm..."
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    className="w-32 border-none bg-transparent text-xs text-[#4a6040] outline-none placeholder:text-[#b8c8aa]"
-                  />
-                </div>
-              </div>
-
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-[#eef2e9]">
-                    <th className="pb-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#9aaa8e]">
-                      Sản phẩm
-                    </th>
-                    <th className="pb-2.5 text-center text-[10px] font-semibold uppercase tracking-wider text-[#9aaa8e]">
-                      Số lượng
-                    </th>
-                    <th className="pb-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#9aaa8e]">
-                      Doanh thu
-                    </th>
+                  </td>
+                </tr>
+              ) : filteredProducts.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="py-6 text-center text-xs text-[#9aaa8e]">
+                    Không có dữ liệu
+                  </td>
+                </tr>
+              ) : (
+                filteredProducts.map((p, i) => (
+                  <tr key={i} className="transition hover:bg-[#fafcf8]">
+                    <td className="py-2.5 text-[13px] text-[#2d4a1a]">
+                      <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded bg-[#eef5e9] text-[11px] font-bold text-[#5a8a40]">
+                        {i + 1}
+                      </span>
+                      {p.name}
+                    </td>
+                    <td className="py-2.5 text-center">
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#eef2e9]">
+                          <div
+                            className="h-full rounded-full bg-[#3b8c2a]"
+                            style={{ width: `${p.pct}%` }}
+                          />
+                        </div>
+                        <span className="min-w-[36px] text-right text-xs font-semibold text-[#3b8c2a]">
+                          {p.units.toLocaleString('vi-VN')}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-2.5 text-right text-[13px] font-semibold text-[#1a2e10]">
+                      {p.revenue}₫
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-[#f4f7f0]">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={3} className="py-6 text-center text-xs text-[#9aaa8e]">
-                        Đang tải...
-                      </td>
-                    </tr>
-                  ) : filteredProducts.length === 0 ? (
-                    <tr>
-                      <td colSpan={3} className="py-6 text-center text-xs text-[#9aaa8e]">
-                        Không có dữ liệu
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredProducts.map((p, i) => (
-                      <tr key={i} className="transition hover:bg-[#fafcf8]">
-                        <td className="py-2.5 text-[13px] text-[#2d4a1a]">
-                          <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded bg-[#eef5e9] text-[11px] font-bold text-[#5a8a40]">
-                            {i + 1}
-                          </span>
-                          {p.name}
-                        </td>
-                        <td className="py-2.5 text-center">
-                          <div className="flex items-center gap-2">
-                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#eef2e9]">
-                              <div
-                                className="h-full rounded-full bg-[#3b8c2a]"
-                                style={{ width: `${p.pct}%` }}
-                              />
-                            </div>
-                            <span className="min-w-[36px] text-right text-xs font-semibold text-[#3b8c2a]">
-                              {p.units.toLocaleString('vi-VN')}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="py-2.5 text-right text-[13px] font-semibold text-[#1a2e10]">
-                          {p.revenue}₫
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
       {/* Footer */}
-      <p className="mt-8 text-center text-[10px] text-[#b8c8aa]">
-        © 2025 Hệ thống quản lý bán lẻ Bách Hoá Xanh
+      <p className="mt-5 text-center text-[10px] text-[#b8c8aa]">
+        © 2025 Hệ thống quản lý bán lẻ. Bảng điều khiển quản trị viên.
       </p>
     </div>
   )
