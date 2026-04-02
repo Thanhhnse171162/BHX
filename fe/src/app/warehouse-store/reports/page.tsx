@@ -11,6 +11,10 @@ function normalizeId(value?: string | null): string {
   return String(value ?? '').trim().toLowerCase()
 }
 
+function looksLikeUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+}
+
 type LocationType = 'STORE' | 'WAREHOUSE'
 type StatusType = 'PENDING' | 'APPROVED' | 'REJECTED' | 'PROCESSING' | 'COMPLETED'
 
@@ -148,14 +152,55 @@ function mapReportToView(report: DamageReportFromAPI, products: ProductFromAPI[]
   const productId = String(report.productId || '')
   const product = products.find((item) => item.id.toLowerCase() === productId.toLowerCase())
 
-  // Try multiple field names for approvedBy (backend might use different names)
-  const approvedByValue = 
-    report.approvedBy || 
-    (report as any).approverName ||
-    (report as any).approverUserName ||
-    (report as any).approvedByName ||
-    (report as any).reviewedBy ||
-    undefined
+  // Try multiple field names and nested objects for approver name
+  let approvedByValue: string | undefined
+  
+  // Direct string fields
+  if (report.approvedBy) {
+    approvedByValue = String(report.approvedBy).trim()
+  }
+  if (!approvedByValue) {
+    const anyReport = report as any
+    // Field alias patterns
+    const directFields = [
+      anyReport.approverName,
+      anyReport.approverUserName,
+      anyReport.approvedByName,
+      anyReport.reviewedBy,
+      anyReport.approverDisplayName,
+      anyReport.approvedByDisplayName,
+    ]
+    for (const field of directFields) {
+      const val = String(field || '').trim()
+      if (val) {
+        approvedByValue = val
+        break
+      }
+    }
+  }
+  
+  // Nested object patterns
+  if (!approvedByValue) {
+    const anyReport = report as any
+    const nested = [
+      anyReport.approver?.name,
+      anyReport.approver?.fullName,
+      anyReport.approver?.displayName,
+      anyReport.approvedByUser?.name,
+      anyReport.approvedByUser?.fullName,
+      anyReport.approvedByUser?.displayName,
+      anyReport.reviewer?.name,
+      anyReport.reviewer?.fullName,
+      anyReport.reviewer?.displayName,
+    ]
+    for (const field of nested) {
+      const val = String(field || '').trim()
+      if (val) {
+        approvedByValue = val
+        break
+      }
+    }
+  }
 
   return {
     id: report.id,
@@ -177,6 +222,22 @@ function mapReportToView(report: DamageReportFromAPI, products: ProductFromAPI[]
 function DetailModal({ report, onClose, nameMap }: { report: DamageReportView; onClose: () => void; nameMap: Record<string, string> }) {
   function getLocationName(locationId: string): string {
     return nameMap[normalizeId(locationId)] || locationId
+  }
+
+  // Display reviewer name or show approved status if no name available
+  const reviewerDisplay = () => {
+    if (report.approvedBy) {
+      // If it's a UUID, indicate it's approved but show the ID truncated
+      if (looksLikeUuid(report.approvedBy)) {
+        return <span className="text-slate-600">Đã duyệt (ID: {report.approvedBy.slice(0, 8)}...)</span>
+      }
+      return report.approvedBy
+    }
+    // If no name but report is approved, show generic message
+    if (report.status === 'APPROVED' || report.status === 'COMPLETED') {
+      return <span className="text-slate-600 italic">Đã duyệt</span>
+    }
+    return <span className="text-slate-400">—</span>
   }
 
   return (
@@ -203,7 +264,7 @@ function DetailModal({ report, onClose, nameMap }: { report: DamageReportView; o
               { label: 'Loại thiệt hại', value: <DamageTypeBadge type={report.damageType} /> },
               { label: 'Trạng thái', value: <StatusBadge status={report.status} /> },
               { label: 'Số lượng', value: report.quantity },
-              { label: 'Người duyệt', value: report.approvedBy || <span className="text-slate-400">—</span> },
+              { label: 'Người duyệt', value: reviewerDisplay() },
             ].map(({ label, value }) => (
               <div key={label} className="bg-slate-50 rounded-xl p-3">
                 <p className="text-xs text-slate-500 mb-1">{label}</p>

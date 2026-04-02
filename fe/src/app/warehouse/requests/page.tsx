@@ -502,6 +502,18 @@ export default function WarehouseRequestsPage() {
     return () => { cancelled = true }
   }, [transferFromLocationId, showTransferModal, token])
 
+  // ── Load batches for transfer detail view ──────────────────────────────────
+  useEffect(() => {
+    if (!selectedTransfer || !selectedTransfer.fromLocationId || !token) { setBatches([]); return }
+    let cancelled = false
+    setIsLoadingBatches(true)
+    ProductBatchAPIService.getByWarehouse(selectedTransfer.fromLocationId)
+      .then(data => { if (!cancelled) setBatches(data) })
+      .catch(() => { if (!cancelled) setBatches([]) })
+      .finally(() => { if (!cancelled) setIsLoadingBatches(false) })
+    return () => { cancelled = true }
+  }, [selectedTransfer?.fromLocationId, selectedTransfer, token])
+
   // ── Auto-fill transfer form from selected request ─────────────────────────
   useEffect(() => {
     if (!showTransferModal) return

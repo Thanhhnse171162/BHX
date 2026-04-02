@@ -10,13 +10,12 @@ import {
   Settings,
   Search,
   Monitor,
-  UserPlus,
   ReceiptText,
   Info,
   TrendingUp,
 } from 'lucide-react'
 
-// Mock data for demonstration
+// Mock data for demonstration — TODO: Replace with real API
 const allTransactions = [
   { id: 'HD-2938', time: '10:45', customer: 'Trần Minh Tuấn',       itemCount: 5,  status: 'Thành công' },
   { id: 'HD-2937', time: '10:32', customer: 'Nguyễn Thị Ngọc Anh',  itemCount: 12, status: 'Thành công' },
@@ -68,6 +67,13 @@ export default function CashierDashboard() {
   const router = useRouter()
   const [txSearch, setTxSearch] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  
+  // Real data states
+  const [invoiceCount, setInvoiceCount] = useState(0)
+  const [productCount, setProductCount] = useState(0)
+  const [revenue, setRevenue] = useState(0)
+  const [revenuePercent, setRevenuePercent] = useState(0)
+  const [loadingStats, setLoadingStats] = useState(true)
 
   // F1 shortcut to open POS
   useEffect(() => {
@@ -80,6 +86,44 @@ export default function CashierDashboard() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [router])
+
+  // Fetch daily statistics
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoadingStats(true)
+        // Call API endpoints for real data
+        // These endpoints should be created in the backend
+        const [invoiceRes, productRes, revenueRes] = await Promise.allSettled([
+          fetch('/api/cashier/invoices/today/count'),
+          fetch('/api/cashier/products/today/count'),
+          fetch('/api/cashier/revenue/today'),
+        ])
+
+        if (invoiceRes.status === 'fulfilled' && invoiceRes.value.ok) {
+          const data = await invoiceRes.value.json()
+          setInvoiceCount(data.count || 0)
+        }
+
+        if (productRes.status === 'fulfilled' && productRes.value.ok) {
+          const data = await productRes.value.json()
+          setProductCount(data.count || 0)
+        }
+
+        if (revenueRes.status === 'fulfilled' && revenueRes.value.ok) {
+          const data = await revenueRes.value.json()
+          setRevenue(data.total || 0)
+          setRevenuePercent(data.percentChange || 0)
+        }
+      } catch (error) {
+        console.error('Failed to fetch stats:', error)
+      } finally {
+        setLoadingStats(false)
+      }
+    }
+
+    fetchStats()
+  }, [])
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -108,7 +152,13 @@ export default function CashierDashboard() {
             </div>
             <div>
               <p className="text-sm text-gray-500 mb-1">Số hóa đơn hôm nay</p>
-              <p className="text-3xl font-bold text-gray-900 leading-tight">42</p>
+              <p className="text-3xl font-bold text-gray-900 leading-tight">
+                {loadingStats ? (
+                  <span className="text-lg text-gray-400">—</span>
+                ) : (
+                  invoiceCount
+                )}
+              </p>
             </div>
           </div>
 
@@ -119,7 +169,13 @@ export default function CashierDashboard() {
             </div>
             <div>
               <p className="text-sm text-gray-500 mb-1">Số sản phẩm đã bán</p>
-              <p className="text-3xl font-bold text-gray-900 leading-tight">156</p>
+              <p className="text-3xl font-bold text-gray-900 leading-tight">
+                {loadingStats ? (
+                  <span className="text-lg text-gray-400">—</span>
+                ) : (
+                  productCount
+                )}
+              </p>
             </div>
           </div>
 
@@ -131,10 +187,19 @@ export default function CashierDashboard() {
             <div>
               <p className="text-sm text-gray-500 mb-1">Doanh thu ca</p>
               <div className="flex items-end gap-2">
-                <p className="text-3xl font-bold text-gray-900 leading-tight">12.5M</p>
-                <span className="text-sm font-semibold text-green-600 flex items-center gap-0.5 pb-1">
-                  <TrendingUp className="w-3.5 h-3.5" />+12%
-                </span>
+                <p className="text-3xl font-bold text-gray-900 leading-tight">
+                  {loadingStats ? (
+                    <span className="text-lg text-gray-400">—</span>
+                  ) : (
+                    `${(revenue / 1000000).toFixed(1)}M`
+                  )}
+                </p>
+                {!loadingStats && (
+                  <span className={`text-sm font-semibold flex items-center gap-0.5 pb-1 ${revenuePercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    {revenuePercent >= 0 ? '+' : ''}{revenuePercent}%
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -289,14 +354,7 @@ export default function CashierDashboard() {
               </Link>
 
               {/* Secondary actions row */}
-              <div className="grid grid-cols-2 gap-3">
-                <Link
-                  href="/cashier/customers"
-                  className="bg-gray-50 border border-gray-200 rounded-xl py-4 flex flex-col items-center gap-2 hover:bg-gray-100 hover:border-gray-300 transition-all"
-                >
-                  <UserPlus className="w-5 h-5 text-gray-600" />
-                  <span className="text-sm font-medium text-gray-700">Thêm khách</span>
-                </Link>
+              <div className="flex flex-col gap-3">
                 <Link
                   href="/cashier/invoices"
                   className="bg-gray-50 border border-gray-200 rounded-xl py-4 flex flex-col items-center gap-2 hover:bg-gray-100 hover:border-gray-300 transition-all"
