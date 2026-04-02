@@ -1,13 +1,15 @@
 'use client'
 
 import { PageHeader } from '@/shared/ui/PageHeader'
-import { DashboardKpis } from '@/features/reporting/components/admin/DashboardKpis'
 import { useAuthStore } from '@/store/auth.store'
 import { ROLE_ID_MAP } from '@/shared/types'
-import { RecentActivityPanel } from '@/features/reporting/components/admin/RecentActivityPanel'
-import { SystemAlertsPanel } from '@/features/reporting/components/admin/SystemAlertsPanel'
-import { QuickActions } from '@/features/reporting/components/admin/QuickActions'
-import { ModuleShortcuts } from '@/features/reporting/components/admin/ModuleShortcuts'
+import {
+  DashboardKpis,
+  RecentActivityPanel,
+  SystemAlertsPanel,
+  QuickActions,
+  ModuleShortcuts,
+} from '@/features/reporting/components/admin/DashboardComponents'
 
 export default function AdminDashboard() {
   const user = useAuthStore((state) => state.user)
