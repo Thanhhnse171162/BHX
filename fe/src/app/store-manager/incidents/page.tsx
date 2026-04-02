@@ -64,6 +64,10 @@ function normalizeUuid(value?: string): string {
   return String(value || '').trim().toLowerCase()
 }
 
+function looksLikeUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || '').trim())
+}
+
 function getUserIdCandidates(user: unknown): string[] {
   if (!user || typeof user !== 'object') return []
 
@@ -150,10 +154,13 @@ async function buildReporterNameMap(reports: DamageReportFromAPI[]): Promise<Map
       })
     })
 
-    const resolved = ids.map((id) => {
-      const name = idToName.get(id) || id
-      return [id, name] as const
-    })
+    const resolved = ids
+      .map((id) => {
+        const name = idToName.get(id) || ''
+        return name ? [id, name] as const : null
+      })
+      .filter(Boolean) as Array<readonly [string, string]>
+
     return new Map(resolved)
   } catch {
     // Fallback to per-user lookup below when users list endpoint is unavailable.
@@ -202,7 +209,7 @@ function mapDamageReportToIncident(
   let reporter = reportedBy ? reporterNameMap.get(normalizeUuid(reportedBy)) : null
   
   // Fallback: try to extract name directly from report object
-  if (!reporter) {
+  if (!reporter || looksLikeUuid(reporter)) {
     reporter = resolveReporterDisplayNameFromReport(report)
   }
   
