@@ -284,10 +284,11 @@ export default function WarehouseManagerRequestsPage() {
       try {
         const allUsers = await UserAPIService.getAll()
         
-        // Map tất cả users để hiển thị tên của requestedBy
+        // Map tất cả users để hiển thị tên của requestedBy (sử dụng normalized id làm key)
         for (const u of allUsers) {
           const userName = u.full_name || u.fullName || u.name || u.email || u.id
-          userMap[u.id] = userName
+          const normalizedUserId = normalizeId(u.id)
+          userMap[normalizedUserId] = userName
         }
         setUserMap(userMap)
       } catch {
@@ -318,7 +319,8 @@ export default function WarehouseManagerRequestsPage() {
         .filter((req) => String(req.fromWarehouseId ?? '').trim().toLowerCase() === String(warehouseId ?? '').trim().toLowerCase())
         .map((req) => {
           const productNames = req.items?.map((item) => item.productName || productMap[item.productId] || '--').join(', ') || '--'
-          const userName = userMap[req.requestedBy] || req.requestedBy || '--'
+          const normalizedRequestedById = normalizeId(req.requestedBy)
+          const userName = userMap[normalizedRequestedById] || req.requestedBy || '--'
           const createdAtDate = req.requestedDate ? new Date(req.requestedDate).toLocaleDateString('vi-VN') : '--/--/----'
 
           return {
@@ -346,7 +348,8 @@ export default function WarehouseManagerRequestsPage() {
         })
         .map((req) => {
           const productNames = req.items?.map((item) => item.productName || productMap[item.productId] || '--').join(', ') || '--'
-          const userName = userMap[req.requestedBy] || req.requestedBy || '--'
+          const normalizedRequestedById = normalizeId(req.requestedBy)
+          const userName = userMap[normalizedRequestedById] || req.requestedBy || '--'
           const createdAtDate = req.requestedDate ? new Date(req.requestedDate).toLocaleDateString('vi-VN') : '--/--/----'
 
           return {
@@ -2024,7 +2027,7 @@ export default function WarehouseManagerRequestsPage() {
               <div>
                 <p className="text-xs text-gray-500 uppercase font-semibold">Nguồn / Người yêu cầu</p>
                 <p className="text-sm font-medium text-gray-700">
-                  {selectedFullRequest ? userMap[selectedFullRequest.requestedBy] || selectedFullRequest.requestedBy || '—' : selectedRequest.source}
+                  {selectedFullRequest ? userMap[normalizeId(selectedFullRequest.requestedBy)] || selectedFullRequest.requestedBy || '—' : selectedRequest.source}
                 </p>
               </div>
 
