@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Search, X, Printer, ChevronLeft, ChevronRight,
-  TrendingUp, TrendingDown, AlertCircle,
+  AlertCircle,
   CheckCircle2, XCircle, RefreshCw, Info, ChevronDown, Filter, Loader2,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
@@ -653,9 +653,6 @@ export default function InvoicesPage() {
             <p className="text-xs font-medium text-gray-400 mb-1">Tổng đơn hàng</p>
             <div className="flex items-end justify-between">
               <span className="text-2xl font-extrabold text-gray-900">{totalOrders}</span>
-              <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                <TrendingUp className="w-3 h-3" /> API
-              </span>
             </div>
           </div>
           <div className="bg-white rounded-2xl px-5 py-4 shadow-sm border border-gray-100">
@@ -664,18 +661,12 @@ export default function InvoicesPage() {
               <span className="text-2xl font-extrabold text-gray-900">
                 {new Intl.NumberFormat('vi-VN', { notation: 'compact', maximumFractionDigits: 1 }).format(revenue)}
               </span>
-              <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                <TrendingUp className="w-3 h-3" /> API
-              </span>
             </div>
           </div>
           <div className="bg-white rounded-2xl px-5 py-4 shadow-sm border border-gray-100">
             <p className="text-xs font-medium text-gray-400 mb-1">Hủy / Trả hàng</p>
             <div className="flex items-end justify-between">
               <span className="text-2xl font-extrabold text-gray-900">{returned}</span>
-              <span className="flex items-center gap-1 text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">
-                <TrendingDown className="w-3 h-3" /> API
-              </span>
             </div>
           </div>
         </div>

@@ -8,8 +8,6 @@ import Image from 'next/image'
 import {
   LayoutDashboard,
   Monitor,
-  Users,
-  Package,
   ClipboardCheck,
   ClipboardList,
   AlertTriangle,
@@ -31,18 +29,6 @@ const navItems = [
     href: '/cashier/pos',
     label: 'POS Bán hàng',
     icon: Monitor,
-    badge: null,
-  },
-  {
-    href: '/cashier/customers',
-    label: 'Khách hàng',
-    icon: Users,
-    badge: null,
-  },
-  {
-    href: '/cashier/products',
-    label: 'Sản phẩm',
-    icon: Package,
     badge: null,
   },
   {

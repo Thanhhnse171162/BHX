@@ -3,13 +3,27 @@ import axios from 'axios'
 
 const SALES_SERVICE_URL = process.env.SALES_URL || process.env.NEXT_PUBLIC_SALES_URL || 'http://13.229.29.52:5006'
 
+interface SaleItemFromApi {
+  quantity: number
+}
+
 interface SaleFromApi {
   id: string
+  saleNumber: string
+  customerId: string | null
   saleDate: string
-  status?: string
-  paymentStatus?: string
-  totalAmount?: number
-  subtotal?: number
+  status: string
+  paymentStatus: string
+  items: SaleItemFromApi[]
+}
+
+interface InvoiceListItem {
+  id: string
+  invoiceNumber: string
+  customerName: string
+  itemCount: number
+  time: string
+  status: string
 }
 
 function getForwardAuthHeader(request: NextRequest): string {
@@ -18,6 +32,20 @@ function getForwardAuthHeader(request: NextRequest): string {
 
   const cookieToken = request.cookies.get('auth_token')?.value
   return cookieToken ? `Bearer ${cookieToken}` : ''
+}
+
+function mapOrderStatus(status: string | null, paymentStatus: string | null): string {
+  if (!status) return 'Đang xử lý'
+
+  const s = String(status).toUpperCase()
+  const p = String(paymentStatus || '').toUpperCase()
+
+  if (s.includes('CANCEL')) return 'Đã hủy'
+  if (s.includes('RETURN')) return 'Đã trả'
+  if (s.includes('COMPLETE') || s.includes('SUCCESS') || p === 'PAID' || p === 'COMPLETED' || p === 'SUCCESS')
+    return 'Thành công'
+
+  return 'Đang xử lý'
 }
 
 function isToday(dateStr: string): boolean {
@@ -35,20 +63,6 @@ function isToday(dateStr: string): boolean {
   }
 }
 
-function mapOrderStatus(status: string | null, paymentStatus: string | null): string {
-  if (!status) return 'Đang xử lý'
-
-  const s = String(status).toUpperCase()
-  const p = String(paymentStatus || '').toUpperCase()
-
-  if (s.includes('CANCEL')) return 'Đã hủy'
-  if (s.includes('RETURN')) return 'Đã trả'
-  if (s.includes('COMPLETE') || s.includes('SUCCESS') || p === 'PAID' || p === 'COMPLETED' || p === 'SUCCESS')
-    return 'Thành công'
-
-  return 'Đang xử lý'
-}
-
 export async function GET(request: NextRequest) {
   try {
     const authHeader = getForwardAuthHeader(request)
@@ -61,7 +75,7 @@ export async function GET(request: NextRequest) {
       `${SALES_SERVICE_URL}/api/sales`,
     ].filter(Boolean) as string[]
 
-    let total = 0
+    let invoices: InvoiceListItem[] = []
     let found = false
 
     for (const url of urls) {
@@ -80,14 +94,24 @@ export async function GET(request: NextRequest) {
           const data = response.data
           const sales = Array.isArray(data) ? data : data?.data || []
 
-          // Calculate revenue from today's successful orders
-          total = sales
+          // Filter today's invoices and format
+          invoices = sales
             .filter((sale: SaleFromApi) => isToday(sale.saleDate))
-            .filter((sale: SaleFromApi) => {
-              const status = mapOrderStatus(sale.status || null, sale.paymentStatus || null)
-              return status === 'Thành công'
+            .sort((a: SaleFromApi, b: SaleFromApi) => new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime())
+            .map((sale: SaleFromApi) => {
+              const d = new Date(sale.saleDate)
+              const itemCount = (sale.items || []).reduce((sum, item) => sum + (item.quantity || 0), 0)
+              const customerName = sale.customerId ? `KH ${sale.customerId.slice(0, 8)}` : 'Khách vãng lai'
+
+              return {
+                id: sale.id,
+                invoiceNumber: sale.saleNumber || sale.id,
+                customerName,
+                itemCount,
+                time: d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+                status: mapOrderStatus(sale.status, sale.paymentStatus),
+              }
             })
-            .reduce((sum: number, sale: SaleFromApi) => sum + (sale.totalAmount || sale.subtotal || 0), 0)
 
           found = true
           break
@@ -105,11 +129,15 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      total,
-      percentChange: 0,
+      invoices,
+      count: invoices.length,
     })
   } catch (error) {
-    console.error('Error fetching revenue:', error)
-    return NextResponse.json({ total: 0, percentChange: 0, error: 'Failed to fetch revenue' }, { status: 200 })
+    console.error('Error fetching invoice list:', error)
+    return NextResponse.json({
+      invoices: [],
+      count: 0,
+      error: 'Failed to fetch invoices',
+    })
   }
 }

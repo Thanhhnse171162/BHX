@@ -13,47 +13,18 @@ import {
   ReceiptText,
   Info,
   TrendingUp,
+  Loader2,
 } from 'lucide-react'
+import { useAuthStore } from '@/store/auth.store'
 
-// Mock data for demonstration — TODO: Replace with real API
-const allTransactions = [
-  { id: 'HD-2938', time: '10:45', customer: 'Trần Minh Tuấn',       itemCount: 5,  status: 'Thành công' },
-  { id: 'HD-2937', time: '10:32', customer: 'Nguyễn Thị Ngọc Anh',  itemCount: 12, status: 'Thành công' },
-  { id: 'HD-2936', time: '10:15', customer: 'Lê Hoàng Phúc',        itemCount: 2,  status: 'Thành công' },
-  { id: 'HD-2935', time: '09:58', customer: 'Phạm Gia Huy',         itemCount: 8,  status: 'Thành công' },
-  { id: 'HD-2934', time: '09:40', customer: 'Đặng Thảo My',         itemCount: 1,  status: 'Thành công' },
-  { id: 'HD-2933', time: '09:22', customer: 'Võ Quang Huy',         itemCount: 6,  status: 'Thành công' },
-  { id: 'HD-2932', time: '09:10', customer: 'Bùi Thanh Tâm',        itemCount: 3,  status: 'Thành công' },
-  { id: 'HD-2931', time: '08:55', customer: 'Hồ Minh Khôi',         itemCount: 4,  status: 'Thành công' },
-  { id: 'HD-2930', time: '08:40', customer: 'Lý Thị Thu Hương',     itemCount: 1,  status: 'Thành công' },
-  { id: 'HD-2929', time: '08:25', customer: 'Vũ Đức Anh',           itemCount: 7,  status: 'Thành công' },
-  { id: 'HD-2928', time: '08:10', customer: 'Trịnh Minh Châu',      itemCount: 2,  status: 'Đã hủy'     },
-  { id: 'HD-2927', time: '07:55', customer: 'Đinh Thị Lan Anh',     itemCount: 5,  status: 'Thành công' },
-  { id: 'HD-2926', time: '07:40', customer: 'Phan Văn Đức',         itemCount: 4,  status: 'Thành công' },
-  { id: 'HD-2925', time: '07:25', customer: 'Mai Thị Hồng Nhung',   itemCount: 1,  status: 'Đã trả'     },
-  { id: 'HD-2924', time: '07:10', customer: 'Cao Xuân Trường',      itemCount: 8,  status: 'Thành công' },
-  { id: 'HD-2923', time: '06:55', customer: 'Lâm Thị Bảo Châu',    itemCount: 3,  status: 'Thành công' },
-  { id: 'HD-2922', time: '06:40', customer: 'Đỗ Quốc Bảo',         itemCount: 2,  status: 'Thành công' },
-  { id: 'HD-2921', time: '06:25', customer: 'Hà Thị Thu Thảo',     itemCount: 6,  status: 'Đã hủy'     },
-  { id: 'HD-2920', time: '06:10', customer: 'Trần Thùy Dương',      itemCount: 4,  status: 'Thành công' },
-  { id: 'HD-2919', time: '05:55', customer: 'Phạm Trí Tính',        itemCount: 9,  status: 'Thành công' },
-  { id: 'HD-2918', time: '05:40', customer: 'Hồ Ngọc Thanh',        itemCount: 2,  status: 'Thành công' },
-  { id: 'HD-2917', time: '05:25', customer: 'Nguyễn Hữu Nghĩa',    itemCount: 5,  status: 'Đã trả'     },
-  { id: 'HD-2916', time: '05:10', customer: 'Lê Thị Mỹ Linh',      itemCount: 3,  status: 'Thành công' },
-  { id: 'HD-2915', time: '04:55', customer: 'Vũ Thị Phương Linh',   itemCount: 7,  status: 'Thành công' },
-  { id: 'HD-2914', time: '04:40', customer: 'Bùi Công Minh',        itemCount: 1,  status: 'Thành công' },
-  { id: 'HD-2913', time: '04:25', customer: 'Đoàn Thị Ánh Tuyết',  itemCount: 4,  status: 'Đã hủy'     },
-  { id: 'HD-2912', time: '04:10', customer: 'Hoàng Trọng Nghĩa',   itemCount: 6,  status: 'Thành công' },
-  { id: 'HD-2911', time: '03:55', customer: 'Tô Thị Ngân Hà',      itemCount: 2,  status: 'Thành công' },
-  { id: 'HD-2910', time: '03:40', customer: 'Dương Văn Khánh',      itemCount: 8,  status: 'Thành công' },
-  { id: 'HD-2909', time: '03:25', customer: 'Châu Ngọc Bích',       itemCount: 3,  status: 'Thành công' },
-  { id: 'HD-2908', time: '03:10', customer: 'Lưu Thị Diễm My',     itemCount: 5,  status: 'Đã trả'     },
-  { id: 'HD-2907', time: '02:55', customer: 'Tạ Quang Vinh',        itemCount: 2,  status: 'Thành công' },
-  { id: 'HD-2906', time: '02:40', customer: 'Ngô Thị Thanh Vân',   itemCount: 4,  status: 'Thành công' },
-  { id: 'HD-2905', time: '02:25', customer: 'Kiều Minh Đức',        itemCount: 1,  status: 'Thành công' },
-  { id: 'HD-2904', time: '02:10', customer: 'Trương Thị Cẩm Nhung', itemCount: 7,  status: 'Đã hủy'     },
-  { id: 'HD-2903', time: '01:55', customer: 'Phùng Xuân Hải',       itemCount: 3,  status: 'Thành công' },
-]
+interface InvoiceListItem {
+  id: string
+  invoiceNumber: string
+  customerName: string
+  itemCount: number
+  time: string
+  status: string
+}
 
 const PAGE_SIZE = 9
 
@@ -61,10 +32,12 @@ const statusConfig: Record<string, { dot: string; badge: string }> = {
   'Thành công': { dot: 'bg-green-500',  badge: 'bg-green-100 text-green-700' },
   'Đã hủy':     { dot: 'bg-red-500',    badge: 'bg-red-100 text-red-700' },
   'Đã trả':     { dot: 'bg-yellow-500', badge: 'bg-yellow-100 text-yellow-700' },
+  'Đang xử lý': { dot: 'bg-blue-500',   badge: 'bg-blue-100 text-blue-700' },
 }
 
 export default function CashierDashboard() {
   const router = useRouter()
+  const { token, user } = useAuthStore()
   const [txSearch, setTxSearch] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   
@@ -74,6 +47,10 @@ export default function CashierDashboard() {
   const [revenue, setRevenue] = useState(0)
   const [revenuePercent, setRevenuePercent] = useState(0)
   const [loadingStats, setLoadingStats] = useState(true)
+  
+  // Invoice list states
+  const [invoices, setInvoices] = useState<InvoiceListItem[]>([])
+  const [loadingInvoices, setLoadingInvoices] = useState(false)
 
   // F1 shortcut to open POS
   useEffect(() => {
@@ -92,12 +69,26 @@ export default function CashierDashboard() {
     const fetchStats = async () => {
       try {
         setLoadingStats(true)
+        const storeId = user?.workplaceType === 'STORE' ? user?.workplaceId : user?.storeId
+        const query = storeId ? `?storeId=${encodeURIComponent(String(storeId))}` : ''
+
         // Call API endpoints for real data
-        // These endpoints should be created in the backend
         const [invoiceRes, productRes, revenueRes] = await Promise.allSettled([
-          fetch('/api/cashier/invoices/today/count'),
-          fetch('/api/cashier/products/today/count'),
-          fetch('/api/cashier/revenue/today'),
+          fetch(`/api/cashier/invoices/today/count${query}`, {
+            headers: {
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          }),
+          fetch(`/api/cashier/products/today/count${query}`, {
+            headers: {
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          }),
+          fetch(`/api/cashier/revenue/today${query}`, {
+            headers: {
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          }),
         ])
 
         if (invoiceRes.status === 'fulfilled' && invoiceRes.value.ok) {
@@ -123,7 +114,40 @@ export default function CashierDashboard() {
     }
 
     fetchStats()
-  }, [])
+  }, [token, user?.storeId, user?.workplaceId, user?.workplaceType])
+
+  // Fetch today's invoices
+  useEffect(() => {
+    const fetchInvoices = async () => {
+      try {
+        setLoadingInvoices(true)
+        const storeId = user?.workplaceType === 'STORE' ? user?.workplaceId : user?.storeId
+        const query = storeId ? `?storeId=${encodeURIComponent(String(storeId))}` : ''
+        
+        const res = await fetch(`/api/cashier/invoices/list${query}`, {
+          headers: {
+            accept: 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          cache: 'no-store',
+        })
+
+        if (res.ok) {
+          const data = await res.json()
+          setInvoices(data.invoices || [])
+        } else {
+          setInvoices([])
+        }
+      } catch (error) {
+        console.error('Failed to fetch invoices:', error)
+        setInvoices([])
+      } finally {
+        setLoadingInvoices(false)
+      }
+    }
+
+    fetchInvoices()
+  }, [token, user?.storeId, user?.workplaceId, user?.workplaceType])
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -191,7 +215,7 @@ export default function CashierDashboard() {
                   {loadingStats ? (
                     <span className="text-lg text-gray-400">—</span>
                   ) : (
-                    `${(revenue / 1000000).toFixed(1)}M`
+                    new Intl.NumberFormat('vi-VN', { notation: 'compact', maximumFractionDigits: 1 }).format(revenue)
                   )}
                 </p>
                 {!loadingStats && (
@@ -209,10 +233,10 @@ export default function CashierDashboard() {
         <div className="grid grid-cols-[3fr_2fr] gap-6 items-start">
           {/* Recent Transactions */}
           {(() => {
-            const filtered = allTransactions.filter(
+            const filtered = invoices.filter(
               (tx) =>
-                tx.id.toLowerCase().includes(txSearch.toLowerCase()) ||
-                tx.customer.toLowerCase().includes(txSearch.toLowerCase())
+                tx.invoiceNumber.toLowerCase().includes(txSearch.toLowerCase()) ||
+                tx.customerName.toLowerCase().includes(txSearch.toLowerCase())
             )
             const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
             const safePage = Math.min(currentPage, Math.max(1, totalPages))
@@ -265,22 +289,31 @@ export default function CashierDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {paged.length === 0 ? (
+                    {loadingInvoices ? (
                       <tr>
-                        <td colSpan={5} className="text-center py-10 text-base text-gray-400">Không tìm thấy giao dịch phù hợp</td>
+                        <td colSpan={5} className="text-center py-10">
+                          <div className="flex items-center justify-center gap-2 text-gray-500">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span className="text-sm">Đang tải dữ liệu...</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : paged.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="text-center py-10 text-base text-gray-400">{invoices.length === 0 ? 'Chưa có giao dịch hôm nay' : 'Không tìm thấy giao dịch phù hợp'}</td>
                       </tr>
                     ) : paged.map((tx, idx) => {
                       const cfg = statusConfig[tx.status] ?? { dot: 'bg-gray-400', badge: 'bg-gray-100 text-gray-700' }
                       return (
                         <tr key={tx.id} className={`hover:bg-gray-50 transition-colors ${idx < paged.length - 1 ? 'border-b border-gray-200' : ''}`}>
                           <td className="px-4 py-3.5 border-r border-gray-200 text-center">
-                            <span className="text-base font-semibold text-green-600">{tx.id}</span>
+                            <span className="text-base font-semibold text-green-600">{tx.invoiceNumber}</span>
                           </td>
                           <td className="px-4 py-3.5 border-r border-gray-200 text-center">
                             <span className="text-base text-gray-700">{tx.time}</span>
                           </td>
                           <td className="px-4 py-3.5 border-r border-gray-200 text-center">
-                            <span className="text-base text-gray-800 font-medium">{tx.customer}</span>
+                            <span className="text-base text-gray-800 font-medium">{tx.customerName}</span>
                           </td>
                           <td className="px-4 py-3.5 border-r border-gray-200 text-center">
                             <span className="text-base text-gray-700">{tx.itemCount}</span>
