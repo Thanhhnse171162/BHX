@@ -19,7 +19,6 @@
     "resolveJsonModule": true,
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": false,
-    "ignoreDeprecations": "6.0",
     "noEmit": true,
     "jsx": "preserve",
     "incremental": true,
