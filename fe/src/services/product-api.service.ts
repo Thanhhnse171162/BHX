@@ -45,6 +45,7 @@ export interface ProductFromAPI {
   metaKeywords?: string
   isFeatured: boolean
   isActive: boolean
+  isAvailable: boolean
   createdAt: string
   updatedAt: string
 }

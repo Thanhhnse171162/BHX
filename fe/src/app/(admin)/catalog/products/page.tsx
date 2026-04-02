@@ -205,7 +205,7 @@ export default function ProductsPage() {
           category: p.categoryName || 'Unknown',
           price: p.price,
           unit: p.unit || '',
-          status: p.isActive ? 'ACTIVE' : 'INACTIVE',
+          status: p.isAvailable ? 'ACTIVE' : 'INACTIVE',
           createdAt: p.createdAt,
           totalQuantity: inventory?.totalQuantity ?? 0,
           availableQuantity: inventory?.availableQuantity ?? 0,
@@ -292,7 +292,7 @@ export default function ProductsPage() {
       
       setPrice(fullProduct.price || 0)
       setUnit(fullProduct.unit || '')
-      setStatus(fullProduct.isActive ? 'ACTIVE' : 'INACTIVE')
+      setStatus(fullProduct.isAvailable ? 'ACTIVE' : 'INACTIVE')
       
       // Map supplier ID
       setSupplierId((fullProduct as any).supplierId || (fullProduct as any).SupplierId || '')
