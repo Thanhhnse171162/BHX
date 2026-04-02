@@ -1488,9 +1488,16 @@ export default function WarehouseManagerRequestsPage() {
                                 if (check.checkedBy) {
                                   try {
                                     const user = await UserAPIService.getById(check.checkedBy)
+                                    // Try multiple name property variations
+                                    const userName = 
+                                      user?.name || 
+                                      user?.fullName || 
+                                      (user as any)?.full_name ||
+                                      user?.email || 
+                                      check.checkedBy
                                     setUserMap(prev => ({
                                       ...prev,
-                                      [check.checkedBy]: user?.name || user?.email || check.checkedBy
+                                      [check.checkedBy]: userName
                                     }))
                                   } catch (err) {
                                     console.error('Error fetching user info:', err)
@@ -2117,7 +2124,12 @@ export default function WarehouseManagerRequestsPage() {
 
               <div>
                 <p className="text-xs text-gray-500 uppercase font-semibold">Người kiểm kê</p>
-                <p className="text-sm font-medium text-gray-700">{userMap[selectedInventoryCheck.checkedBy] || selectedInventoryCheck.checkedBy || '—'}</p>
+                <p className="text-sm font-medium text-gray-700">
+                  {selectedInventoryCheck.checkedBy 
+                    ? (userMap[selectedInventoryCheck.checkedBy] || selectedInventoryCheck.checkedBy)
+                    : (selectedInventoryCheck.status === 'PENDING' ? 'Chưa được kiểm kê' : '—')
+                  }
+                </p>
               </div>
 
               <div>
