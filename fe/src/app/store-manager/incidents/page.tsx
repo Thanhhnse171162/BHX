@@ -158,66 +158,112 @@ async function buildReporterNameMap(reports: DamageReportFromAPI[]): Promise<Map
 
   if (ids.length === 0) return new Map()
 
+  console.log('[buildReporterNameMap] Building map for user IDs:', ids)
+
+  const idToName = new Map<string, string>()
+
+  // Strategy 1: Fetch all users at once (efficient)
   try {
+    console.log('[buildReporterNameMap] Fetching all users via /api/users/list...')
     const [iamUsers, localUsers] = await Promise.all([
-      UserAPIService.getIamUsersList().catch(() => []),
-      UserAPIService.getAll().catch(() => []),
+      UserAPIService.getIamUsersList().catch((err) => {
+        console.warn('[buildReporterNameMap] IAM list failed:', err)
+        return []
+      }),
+      UserAPIService.getAll().catch((err) => {
+        console.warn('[buildReporterNameMap] Local list failed:', err)
+        return []
+      }),
     ])
 
-    const users = [...iamUsers, ...localUsers]
-    const idToName = new Map<string, string>()
+    const allUsers = [...iamUsers, ...localUsers]
+    console.log('[buildReporterNameMap] Fetched users:', { iamCount: iamUsers.length, localCount: localUsers.length })
 
-    users.forEach((user) => {
+    // Build lookup map
+    allUsers.forEach((user) => {
       const name = resolveUserDisplayName(user)
-      if (!name) return
+      if (!name) {
+        console.log('[buildReporterNameMap] User has no name:', user)
+        return
+      }
 
-      getUserIdCandidates(user).forEach((id) => {
-        idToName.set(normalizeUuid(id), name)
+      // Try all possible ID fields
+      const userIds = [
+        user.id,
+        (user as any).userId,
+        (user as any).user_id,
+        (user as any).sub,
+        (user as any).uid,
+      ]
+        .map((v) => String(v || '').trim())
+        .filter(Boolean)
+
+      console.log('[buildReporterNameMap] Mapping user:', { name, userIds })
+
+      userIds.forEach((uid) => {
+        idToName.set(normalizeUuid(uid), name)
       })
     })
 
-    const resolved = ids
-      .map((id) => {
-        const name = idToName.get(id) || ''
-        return name ? [id, name] as const : null
-      })
-      .filter(Boolean) as Array<readonly [string, string]>
+    const found = ids.filter((id) => idToName.has(id))
+    const missing = ids.filter((id) => !idToName.has(id))
+    console.log('[buildReporterNameMap] After batch lookup:', { found: found.length, missing: missing.length, missing })
 
-    return new Map(resolved)
-  } catch {
-    // Fallback to per-user lookup below when users list endpoint is unavailable.
+    // If all IDs found, return early
+    if (missing.length === 0) {
+      const result = new Map(ids.map((id) => [id, idToName.get(id) || ''] as const).filter(([, name]) => name))
+      console.log('[buildReporterNameMap] All users found in batch fetch')
+      return result
+    }
+
+    // Strategy 2: Individual lookups for remaining users
+    console.log('[buildReporterNameMap] Attempting individual lookups for:', missing)
+    const resolved = await Promise.all(
+      missing.map(async (id) => {
+        try {
+          const localUser = await UserAPIService.getById(id)
+          const localName = resolveUserDisplayName(localUser)
+          if (localName) {
+            console.log('[buildReporterNameMap] Local lookup SUCCESS:', { id, localName })
+            return [id, localName] as const
+          }
+        } catch (err) {
+          console.warn('[buildReporterNameMap] Local lookup FAILED:', { id, error: err })
+        }
+
+        try {
+          const iamUser = await UserAPIService.getIamDetailsById(id)
+          const iamName = resolveUserDisplayName(iamUser)
+          if (iamName) {
+            console.log('[buildReporterNameMap] IAM lookup SUCCESS:', { id, iamName })
+            return [id, iamName] as const
+          }
+        } catch (err) {
+          console.warn('[buildReporterNameMap] IAM lookup FAILED:', { id, error: err })
+        }
+
+        console.warn('[buildReporterNameMap] All lookups FAILED for:', id)
+        return null
+      })
+    )
+
+    resolved.forEach((entry) => {
+      if (entry) {
+        const [id, name] = entry
+        idToName.set(id, name)
+      }
+    })
+
+    const finalMap = new Map(
+      ids.map((id) => [id, idToName.get(id) || ''] as const).filter(([, name]) => name)
+    )
+    console.log('[buildReporterNameMap] Final map size:', finalMap.size)
+    return finalMap
+  } catch (err) {
+    console.error('[buildReporterNameMap] Critical error:', err)
+    return new Map()
   }
-
-  const resolved = await Promise.all(
-    ids.map(async (id) => {
-      try {
-        const localUser = await UserAPIService.getById(id)
-        const localName = resolveUserDisplayName(localUser)
-        if (localName) {
-          console.log('[buildReporterNameMap] Local user found:', { id, localName })
-          return [id, localName] as const
-        }
-      } catch (err) {
-        console.log('[buildReporterNameMap] Local user lookup failed:', { id, error: err })
-      }
-
-      try {
-        const iamUser = await UserAPIService.getIamDetailsById(id)
-        const iamName = resolveUserDisplayName(iamUser)
-        if (iamName) {
-          console.log('[buildReporterNameMap] IAM user found:', { id, iamName })
-          return [id, iamName] as const
-        }
-      } catch (err) {
-        console.log('[buildReporterNameMap] IAM user lookup failed:', { id, error: err })
-      }
-
-      console.log('[buildReporterNameMap] No name found for user:', id)
-      return null
-    })
-  )
-
-  return new Map(resolved.filter(Boolean) as Array<readonly [string, string]>)
+}
 }
 
 function mapDamageReportToIncident(
