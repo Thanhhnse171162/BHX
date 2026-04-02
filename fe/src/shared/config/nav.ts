@@ -73,7 +73,7 @@ export const getAdminNavigation = (): NavGroup[] => {
       label: 'Doanh thu',
       items: [
         {
-          label: 'Bảng điều khiển',
+          label: 'Doanh thu',
           href: '/admin/dashboard',
           icon: 'LayoutDashboard',
         },

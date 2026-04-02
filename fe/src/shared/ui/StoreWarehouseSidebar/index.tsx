@@ -103,18 +103,6 @@ export function StoreWarehouseSidebar() {
           })}
         </ul>
       </nav>
-
-      <div className="mx-3 mb-3 rounded-xl bg-slate-100 px-3 py-2.5">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-200 text-emerald-700 text-sm font-bold">
-            JD
-          </div>
-          <div className="min-w-0">
-            <p className="truncate text-[15px] font-semibold text-slate-800">John Doe</p>
-            <p className="truncate text-[12px] text-slate-500">Nhân viên kho hàng</p>
-          </div>
-        </div>
-      </div>
     </aside>
   )
 }
