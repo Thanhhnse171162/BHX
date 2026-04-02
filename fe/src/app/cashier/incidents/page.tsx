@@ -577,10 +577,6 @@ export default function CashierIncidentsPage() {
     resolved: incidents.filter(i => i.status === 'resolved').length,
   }
 
-  const clearFilters = () => {
-    setSearch(''); setPriorityFilter(''); setActiveFilter('all'); setPage(1)
-  }
-
   const handleCreate = async (payload: CreateIncidentPayload) => {
     if (!locationId) {
       throw new Error('Không tìm thấy workplace_id của user đăng nhập.')
