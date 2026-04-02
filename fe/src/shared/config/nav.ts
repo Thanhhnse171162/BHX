@@ -70,7 +70,7 @@ export const getOpsNavigation = (userPermissions: Permission[]): NavItem[] => {
 export const getAdminNavigation = (): NavGroup[] => {
   return [
     {
-      label: 'Tổng quan',
+      label: 'Doanh thu',
       items: [
         {
           label: 'Bảng điều khiển',
