@@ -52,6 +52,16 @@ function resolveShippedByDisplay(
   return userNameById[normalizeId(raw)] ?? raw
 }
 
+function normalizeUserDisplayName(user: {
+  full_name?: string
+  fullName?: string
+  name?: string
+  email?: string
+  id?: string
+} | null | undefined): string {
+  return String(user?.full_name ?? user?.fullName ?? user?.name ?? user?.email ?? user?.id ?? '').trim()
+}
+
 function sumExpectedQty(t: TransferFromAPI) {
   const items = Array.isArray(t.items) ? t.items : []
   return items.reduce((sum, it) => {
@@ -914,12 +924,32 @@ export default function WarehouseManagerTransfersPage() {
     const next: Record<string, string> = {}
     for (const u of users ?? []) {
       const id = normalizeId(u?.id)
-      const name = String(u?.full_name ?? u?.fullName ?? u?.name ?? u?.email ?? u?.id ?? '').trim()
+      const name = normalizeUserDisplayName(u)
       if (id && name) {
         next[id] = name
       }
     }
     setUserNameById(next)
+  }, [])
+
+  const hydrateMissingUserNames = useCallback(async (ids: string[]) => {
+    const resolved = await Promise.all(
+      ids.map(async (id) => {
+        const user = await UserAPIService.getById(id)
+        const name = normalizeUserDisplayName(user)
+        return name ? [normalizeId(id), name] as const : null
+      })
+    )
+
+    setUserNameById((prev) => {
+      const next = { ...prev }
+      for (const entry of resolved) {
+        if (!entry) continue
+        const [id, name] = entry
+        if (!next[id]) next[id] = name
+      }
+      return next
+    })
   }, [])
 
   useEffect(() => {
@@ -943,6 +973,19 @@ export default function WarehouseManagerTransfersPage() {
   useEffect(() => {
     void loadUsers()
   }, [loadUsers])
+
+  useEffect(() => {
+    const missingUserIds = Array.from(
+      new Set(
+        transfers
+          .map((t) => String(t.shippedBy ?? '').trim())
+          .filter((id) => id && !userNameById[normalizeId(id)])
+      )
+    )
+
+    if (missingUserIds.length === 0) return
+    void hydrateMissingUserNames(missingUserIds)
+  }, [hydrateMissingUserNames, transfers, userNameById])
 
   const derived = useMemo(() => {
     const q = search.trim().toLowerCase()
