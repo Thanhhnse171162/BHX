@@ -1,589 +1,500 @@
 ﻿'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 import {
-  DollarSign,
-  ShoppingCart,
-  Package,
-  ClipboardList,
-  AlertTriangle,
-  TrendingUp,
-  TrendingDown,
-  ArrowUpRight,
   Download,
+  Search,
+  RefreshCw,
+  Check,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 
-// Types
-interface KPICard {
-  label: string
-  value: string
-  trend?: string
-  trendUp?: boolean
-  sub: string
-  icon: any
-  accent: string
-  iconBg: string
-  iconColor: string
-  border: string
-  warning?: boolean
-}
+// ─── Types ────────────────────────────────────────────────────────────────────
+interface ChartPoint { day: string; value: number }
+interface Product { name: string; units: number; revenue: string; pct: number }
 
-interface ChartPoint {
-  day: string
-  value: number
-}
+type TimeRange = 'today' | 'yesterday' | '7days' | 'month' | 'custom'
 
-interface Product {
-  name: string
-  units: number
-  revenue: number
-  pct: number
-}
-
-interface LowStockItem {
-  product: string
-  shelf: number
-  back: number
-  status: string
-}
-
-interface Incident {
-  reporter: string
-  type: string
-  date: string
-  severity: string
-}
-
-// SVG smooth line chart
-// SVG smooth line chart
-function SalesChart({ chartData }: { chartData: ChartPoint[] }) {
-  if (!chartData || chartData.length === 0) {
-    return <div className="text-center text-gray-400">Loading chart data...</div>
+// ─── Revenue Line Chart (SVG) ─────────────────────────────────────────────────
+function RevenueChart({ chartData }: { chartData: ChartPoint[] }) {
+  if (!chartData.length) {
+    return (
+      <div className="flex h-full items-center justify-center text-sm text-[#9aaa8e]">
+        Đang tải biểu đồ...
+      </div>
+    )
   }
 
-  const MAX_VAL = Math.max(...chartData.map(d => d.value), 6000)
-  const SVG_W   = 680
-  const SVG_H   = 300
-  const PAD_L   = 50
-  const PAD_B   = 32
-  const PAD_T   = 16
-  const PAD_R   = 20
-
-  const chartW = SVG_W - PAD_L - PAD_R
-  const chartH = SVG_H - PAD_B - PAD_T
-
-  const pts = chartData.map((d, i) => ({
-    x: PAD_L + (i / (chartData.length - 1)) * chartW,
-    y: PAD_T + chartH - (d.value / MAX_VAL) * chartH,
+  const maxValue = Math.max(...chartData.map(d => d.value), 1)
+  const width = 600
+  const height = 200
+  const padding = { top: 20, right: 20, bottom: 40, left: 50 }
+  
+  const chartWidth = width - padding.left - padding.right
+  const chartHeight = height - padding.top - padding.bottom
+  
+  const points = chartData.map((d, i) => ({
+    x: padding.left + (i / (chartData.length - 1 || 1)) * chartWidth,
+    y: padding.top + chartHeight - (d.value / maxValue) * chartHeight,
+    value: d.value,
+    day: d.day,
   }))
 
-  let lineD = `M${pts[0].x},${pts[0].y}`
-  for (let i = 1; i < pts.length; i++) {
-    const prev = pts[i - 1]
-    const curr = pts[i]
-    const cpx = (prev.x + curr.x) / 2
-    lineD += ` C${cpx},${prev.y} ${cpx},${curr.y} ${curr.x},${curr.y}`
+  // Create path
+  let pathData = `M ${points[0]?.x || 0} ${points[0]?.y || 0}`
+  for (let i = 1; i < points.length; i++) {
+    const curr = points[i]
+    const prev = points[i - 1]
+    const midX = (prev.x + curr.x) / 2
+    pathData += ` C ${midX} ${prev.y} ${midX} ${curr.y} ${curr.x} ${curr.y}`
   }
-  const areaD = `${lineD} L${pts[pts.length - 1].x},${PAD_T + chartH} L${pts[0].x},${PAD_T + chartH} Z`
 
-  const yTicks = [
-    { v: 0, label: '$0' },
-    { v: MAX_VAL * 0.25, label: `$${(MAX_VAL * 0.25 / 1000).toFixed(1)}k` },
-    { v: MAX_VAL * 0.5, label: `$${(MAX_VAL * 0.5 / 1000).toFixed(1)}k` },
-    { v: MAX_VAL * 0.75, label: `$${(MAX_VAL * 0.75 / 1000).toFixed(1)}k` },
-    { v: MAX_VAL, label: `$${(MAX_VAL / 1000).toFixed(1)}k` },
-  ]
+  // Fill area
+  const areaPath = `${pathData} L ${points[points.length - 1]?.x || 0} ${padding.top + chartHeight} L ${padding.left} ${padding.top + chartHeight} Z`
 
   return (
-    <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full block" preserveAspectRatio="xMidYMid meet">
-      <defs>
-        <linearGradient id="chartGrad2" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor="#3B82F6" stopOpacity="0.18" />
-          <stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
-        </linearGradient>
-        <filter id="dot-shadow">
-          <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#3B82F6" floodOpacity="0.4" />
-        </filter>
-      </defs>
-
-      {yTicks.map(({ v, label }) => {
-        const y = PAD_T + chartH - (v / MAX_VAL) * chartH
+    <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
+      {/* Grid lines */}
+      {[0, 0.25, 0.5, 0.75, 1].map((pct, i) => {
+        const y = padding.top + chartHeight * (1 - pct)
+        const label = (maxValue * pct).toLocaleString('vi-VN', {
+          notation: 'compact',
+          compactDisplay: 'short',
+        })
         return (
-          <g key={label}>
-            <line
-              x1={PAD_L} y1={y} x2={SVG_W - PAD_R} y2={y}
-              stroke={v === 0 ? '#CBD5E1' : '#F1F5F9'}
-              strokeWidth={v === 0 ? 1.5 : 1}
-              strokeDasharray={v !== 0 ? '4 4' : undefined}
-            />
-            <text x={PAD_L - 6} y={y + 4} textAnchor="end" fontSize="10" fill="#94A3B8" fontFamily="system-ui">
+          <g key={i}>
+            <line x1={padding.left} y1={y} x2={width - padding.right} y2={y} stroke="#eef2e9" strokeWidth="1" />
+            <text x={padding.left - 8} y={y + 4} textAnchor="end" className="text-[10px] fill-[#9aaa8e]">
               {label}
             </text>
           </g>
         )
       })}
 
-      <path d={areaD} fill="url(#chartGrad2)" />
-      <path d={lineD} fill="none" stroke="#3B82F6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Area fill */}
+      <path d={areaPath} fill="rgba(59,140,42,0.08)" />
 
-      {pts.map((pt, i) => (
+      {/* Line */}
+      <path d={pathData} fill="none" stroke="#3b8c2a" strokeWidth="2.5" strokeLinecap="round" />
+
+      {/* Points */}
+      {points.map((p, i) => (
         <g key={i}>
-          <circle cx={pt.x} cy={pt.y} r="5" fill="white" stroke="#3B82F6" strokeWidth="2.5" filter="url(#dot-shadow)" />
+          <circle cx={p.x} cy={p.y} r="4" fill="white" stroke="#3b8c2a" strokeWidth="2" />
         </g>
       ))}
 
-      {chartData.map((d, i) => (
-        <text key={d.day} x={pts[i].x} y={SVG_H - 6} textAnchor="middle" fontSize="11" fill="#94A3B8" fontFamily="system-ui">
-          {d.day}
+      {/* X-axis labels */}
+      {points.map((p, i) => (
+        <text
+          key={i}
+          x={p.x}
+          y={padding.top + chartHeight + 25}
+          textAnchor="middle"
+          className="text-[10px] fill-[#9aaa8e]"
+        >
+          {p.day}
         </text>
       ))}
     </svg>
   )
 }
 
-// Page component
+// ─── Main Component ────────────────────────────────────────────────────────────
 export default function StoreManagerDashboard() {
-  const token = useAuthStore((state) => state.token)
-  const [activeFilter, setActiveFilter] = useState<'Today' | 'Yesterday' | 'Last 7 Days'>('Today')
-
-  // State for data
-  const [todayRevenue, setTodayRevenue] = useState<string>('$0.00')
-  const [totalOrders, setTotalOrders] = useState<number>(0)
-  const [lowStockCount, setLowStockCount] = useState<number>(0)
-  const [stockRequests, setStockRequests] = useState<number>(0)
-  const [incidentCount, setIncidentCount] = useState<number>(0)
-
-  const [chartData, setChartData] = useState<ChartPoint[]>([])
-  const [topProducts, setTopProducts] = useState<Product[]>([])
-  const [lowStockItems, setLowStockItems] = useState<LowStockItem[]>([])
-  const [incidents, setIncidents] = useState<Incident[]>([])
+  const { token, user } = useAuthStore()
+  const [activeRange, setActiveRange] = useState<TimeRange>('7days')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [stores, setStores] = useState<{ id: string; name: string }[]>([])
+  const [selectedStoreId, setSelectedStoreId] = useState<string>('')
+  const [userStoreName, setUserStoreName] = useState<string>('')
 
-  // Fetch all data
+  // KPI
+  const [revenue, setRevenue] = useState('—')
+  const [stockCount, setStockCount] = useState(0)
+  const [lowCount, setLowCount] = useState(0)
+  const [outCount, setOutCount] = useState(0)
+
+  // Chart & Products
+  const [chartData, setChartData] = useState<ChartPoint[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+
+  // ── Initialize stores ──────────────────────────────────────────────────────
   useEffect(() => {
-    const fetchData = async () => {
+    const initStores = async () => {
+      const userWorkplaceId = String(user?.workplaceId || '').trim()
+      if (!userWorkplaceId) return
+
       try {
-        setLoading(true)
         const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
-
-        // 1. Fetch Sales data - for revenue, orders, and chart
-        console.log('📊 Fetching sales data...')
-        const salesResponse = await fetch('/api/sales', { headers })
-        if (salesResponse.ok) {
-          const salesData = await salesResponse.json()
-          console.log('✅ Sales data:', salesData)
-
-          // Process sales data
-          const revenue = (salesData.totalRevenue || 4250).toLocaleString('en-US', {
-            style: 'currency',
-            currency: 'USD',
-          })
-          setTodayRevenue(revenue)
-
-          setTotalOrders(salesData.totalOrders || 124)
-
-          // Build chart data from sales data
-          if (salesData.chartData && Array.isArray(salesData.chartData)) {
-            setChartData(salesData.chartData)
-          } else {
-            // Fallback chart data
-            setChartData([
-              { day: 'Mon', value: 900 },
-              { day: 'Tue', value: 1500 },
-              { day: 'Wed', value: 2100 },
-              { day: 'Thu', value: 2700 },
-              { day: 'Fri', value: 4200 },
-              { day: 'Sat', value: 3800 },
-              { day: 'Sun', value: 5400 },
-            ])
-          }
-
-          // Top products from sales data
-          if (salesData.topProducts && Array.isArray(salesData.topProducts)) {
-            const mapped = salesData.topProducts.slice(0, 5).map((p: any) => ({
-              name: p.productName || p.name,
-              units: p.unitsSold || p.units || 0,
-              revenue: p.revenue || '$0',
-              pct: (p.percentage || 0) * 100,
-            }))
-            setTopProducts(mapped)
+        
+        // Fetch stores from warehouse lookup API
+        const res = await fetch(`/api/warehouse/list`, { headers })
+        if (res.ok) {
+          const data = await res.json()
+          const storeList = Array.isArray(data) ? data : data.data || []
+          
+          // Filter stores based on user's workspace
+          const userStores = storeList.filter((s: any) => 
+            s.id?.toLowerCase() === userWorkplaceId.toLowerCase()
+          )
+          
+          setStores(userStores.length > 0 ? userStores : storeList)
+          setSelectedStoreId(userWorkplaceId)
+          
+          // Set user's store name
+          const userStore = storeList.find((s: any) => 
+            s.id?.toLowerCase() === userWorkplaceId.toLowerCase()
+          )
+          if (userStore) {
+            setUserStoreName(userStore.name || userWorkplaceId)
           }
         }
-
-        // 2. Fetch Low Stock data
-        console.log('📦 Fetching low stock alerts...')
-        const lowStockResponse = await fetch('/api/Inventory/low-stock-alerts', { headers })
-        if (lowStockResponse.ok) {
-          const lowStockData = await lowStockResponse.json()
-          console.log('✅ Low stock data:', lowStockData)
-
-          const items = Array.isArray(lowStockData) ? lowStockData : lowStockData.data || []
-          setLowStockCount(items.length)
-
-          const mapped = items.slice(0, 4).map((item: any) => ({
-            product: item.productName || item.product,
-            shelf: item.shelfQuantity || 0,
-            back: item.backQuantity || 0,
-            status: item.quantity === 0 ? 'Out' : 'Low',
-          }))
-          setLowStockItems(mapped)
-        }
-
-        // 3. Fetch Stock Requests
-        console.log('📋 Fetching restock requests...')
-        const restockResponse = await fetch('/api/restock-requests', { headers })
-        if (restockResponse.ok) {
-          const restockData = await restockResponse.json()
-          console.log('✅ Restock requests:', restockData)
-
-          const requests = Array.isArray(restockData) ? restockData : restockData.data || []
-          setStockRequests(requests.filter((r: any) => r.status === 'pending' || r.status === 'Pending').length)
-        }
-
-        // 4. Fetch Incident Reports
-        console.log('🚨 Fetching incident reports...')
-        const incidentResponse = await fetch('/api/damage-reports/Get-All-Damage-Reports', { headers })
-        if (incidentResponse.ok) {
-          const incidentData = await incidentResponse.json()
-          console.log('✅ Incident data:', incidentData)
-
-          const incidentList = Array.isArray(incidentData) ? incidentData : incidentData.data || []
-          setIncidentCount(incidentList.length)
-
-          const mapped = incidentList.slice(0, 3).map((inc: any) => ({
-            reporter: inc.createdBy || inc.reporter || 'Unknown',
-            type: inc.type || inc.damageType || 'General',
-            date: new Date(inc.createdAt || inc.date).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-            }),
-            severity: inc.severity || 'Low',
-          }))
-          setIncidents(mapped)
-        }
-      } catch (error) {
-        console.error('❌ Error fetching data:', error)
-      } finally {
-        setLoading(false)
+      } catch (err) {
+        console.error('Error fetching stores:', err)
+        setSelectedStoreId(userWorkplaceId)
       }
     }
 
-    fetchData()
-  }, [token])
+    initStores()
+  }, [user?.workplaceId, token])
 
-  // Build KPI cards dynamically
-  const kpiCards: KPICard[] = [
-    {
-      label: "Today's Revenue",
-      value: todayRevenue,
-      trend: '+12.5%',
-      trendUp: true,
-      sub: 'vs yesterday',
-      icon: DollarSign,
-      accent: 'from-blue-500 to-blue-600',
-      iconBg: 'bg-blue-50',
-      iconColor: 'text-blue-600',
-      border: 'border-blue-100',
-    },
-    {
-      label: 'Total Orders',
-      value: String(totalOrders),
-      trend: '+8.2%',
-      trendUp: true,
-      sub: 'vs yesterday',
-      icon: ShoppingCart,
-      accent: 'from-violet-500 to-violet-600',
-      iconBg: 'bg-violet-50',
-      iconColor: 'text-violet-600',
-      border: 'border-violet-100',
-    },
-    {
-      label: 'Low Stock Products',
-      value: String(lowStockCount),
-      warning: true,
-      sub: 'Need restocking',
-      icon: Package,
-      accent: 'from-amber-400 to-amber-500',
-      iconBg: 'bg-amber-50',
-      iconColor: 'text-amber-500',
-      border: 'border-amber-100',
-    },
-    {
-      label: 'Stock Requests',
-      value: String(stockRequests),
-      sub: 'Pending approval',
-      icon: ClipboardList,
-      accent: 'from-cyan-500 to-cyan-600',
-      iconBg: 'bg-cyan-50',
-      iconColor: 'text-cyan-600',
-      border: 'border-cyan-100',
-    },
-    {
-      label: 'Incidents',
-      value: String(incidentCount),
-      sub: 'Unresolved',
-      icon: AlertTriangle,
-      accent: 'from-red-400 to-red-500',
-      iconBg: 'bg-red-50',
-      iconColor: 'text-red-500',
-      border: 'border-red-100',
-    },
+  // ── Fetch ──────────────────────────────────────────────────────────────────
+  const fetchAll = async () => {
+    try {
+      setLoading(true)
+      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
+
+      const params = new URLSearchParams()
+      if (selectedStoreId) params.set('storeId', selectedStoreId)
+      if (activeRange !== 'custom') params.set('range', activeRange)
+      else {
+        if (dateFrom) params.set('from', dateFrom)
+        if (dateTo) params.set('to', dateTo)
+      }
+      const qs = params.toString() ? `?${params}` : ''
+
+      // Sales
+      const salesRes = await fetch(`/api/sales${qs}`, { headers })
+      if (salesRes.ok) {
+        const s = await salesRes.json()
+        setRevenue(
+          (s.totalRevenue || 0).toLocaleString('vi-VN', { style: 'currency', currency: 'VND' })
+        )
+        setChartData(
+          (s.chartData || []).map((d: any) => ({ day: d.day || d.label, value: d.value }))
+        )
+        setProducts(
+          (s.topProducts || []).slice(0, 5).map((p: any, _: number, arr: any[]) => {
+            const maxRev = arr[0]?.revenue || 1
+            return {
+              name: p.productName || p.name,
+              units: p.unitsSold || p.units || 0,
+              revenue: (p.revenue || 0).toLocaleString('vi-VN'),
+              pct: Math.round(((p.revenue || 0) / maxRev) * 100),
+            }
+          })
+        )
+      }
+
+      // Inventory
+      const invRes = await fetch(`/api/Inventory/low-stock-alerts${qs}`, { headers })
+      if (invRes.ok) {
+        const items: any = await invRes.json()
+        const arr = Array.isArray(items) ? items : items.data || []
+        setLowCount(arr.filter((i: any) => i.quantity > 0).length)
+        setOutCount(arr.filter((i: any) => i.quantity === 0).length)
+        setStockCount(arr.reduce((sum: number, i: any) => sum + (i.totalQuantity || 0), 0))
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { 
+    fetchAll() 
+  }, [token, activeRange, selectedStoreId])
+
+  const handleApply = () => fetchAll()
+
+  const handleReset = () => {
+    setDateFrom('')
+    setDateTo('')
+    setActiveRange('7days')
+  }
+
+  // ── Filtered products ──────────────────────────────────────────────────────
+  const filteredProducts = products.filter(p =>
+    p.name.toLowerCase().includes(search.toLowerCase())
+  )
+
+  const timeOptions: { label: string; value: TimeRange }[] = [
+    { label: 'Hôm nay', value: 'today' },
+    { label: 'Hôm qua', value: 'yesterday' },
+    { label: '7 ngày qua', value: '7days' },
+    { label: 'Tháng này', value: 'month' },
+    { label: 'Tuỳ chỉnh', value: 'custom' },
   ]
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 space-y-5 min-h-full">
+    <div className="min-h-screen bg-[#f5f7f2] p-5 font-['Be_Vietnam_Pro',sans-serif]">
 
-      <div className="flex items-center justify-end gap-3">
-        <Link
-          href="/store-manager/inventory-check"
-          className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors"
-        >
-          <ClipboardList size={16} />
-          Tạo đơn kiểm kê
-        </Link>
-      </div>
+      {/* Main layout with sidebar */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
+        
+        {/* Sidebar - Revenue */}
+        <div className="lg:col-span-1">
+          <div className="sticky top-5 rounded-xl border border-[#e4edd9] bg-white p-5 shadow-sm">
+            <div className="mb-4">
+              <h2 className="text-sm font-bold text-[#1a2e10] mb-1">Doanh thu hiện tại</h2>
+              <p className="text-xs text-[#7a8a6e]">{userStoreName || 'Cửa hàng'}</p>
+            </div>
+            
+            <div className="mb-4 pb-4 border-b border-[#eef2e9]">
+              <p className="text-xs text-[#7a8a6e] mb-2">Tổng doanh thu</p>
+              <p className="text-2xl font-bold text-[#3b8c2a]">{revenue}</p>
+            </div>
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-5 gap-4">
-        {kpiCards.map((card) => {
-          const Icon = card.icon
-          return (
-            <div
-              key={card.label}
-              className={`bg-white rounded-2xl border ${card.border} p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden`}
-            >
-              <div className={`absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r ${card.accent}`} />
-
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider leading-tight mt-1">
-                  {card.label}
-                </p>
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${card.iconBg} flex-shrink-0`}>
-                  <Icon size={17} className={card.iconColor} />
-                </div>
+            {/* Quick stats */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-lg bg-[#f0f4eb] p-3">
+                <span className="text-xs font-semibold text-[#7a8a6e]">Còn hàng</span>
+                <span className="text-sm font-bold text-[#2d4a1a]">{stockCount.toLocaleString('vi-VN')}</span>
               </div>
-
-              <p className="text-[26px] font-bold text-gray-900 leading-none mb-2">{card.value}</p>
-
-              <div className="flex items-center gap-1.5">
-                {card.trend && (
-                  <>
-                    <span className={`inline-flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded-md ${
-                      card.trendUp ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
-                    }`}>
-                      {card.trendUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                      {card.trend}
-                    </span>
-                    <span className="text-[11px] text-gray-400">{card.sub}</span>
-                  </>
-                )}
-                {card.warning && (
-                  <span className="inline-flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-600">
-                    <AlertTriangle size={10} />
-                    {card.sub}
-                  </span>
-                )}
-                {!card.trend && !card.warning && (
-                  <span className="text-[11px] text-gray-400">{card.sub}</span>
-                )}
+              <div className="flex items-center justify-between rounded-lg bg-[#fdf3de] p-3">
+                <span className="text-xs font-semibold text-[#7a8a6e]">Sắp hết</span>
+                <span className="text-sm font-bold text-[#e09a1a]">{lowCount}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg bg-[#fce8e8] p-3">
+                <span className="text-xs font-semibold text-[#7a8a6e]">Hết hàng</span>
+                <span className="text-sm font-bold text-[#c03030]">{outCount}</span>
               </div>
             </div>
-          )
-        })}
-      </div>
+          </div>
+        </div>
 
-      {/* Chart + Top Products */}
-      <div className="grid grid-cols-5 gap-4 items-stretch">
-        <div className="col-span-3 bg-white rounded-2xl border border-gray-100 p-6 shadow-sm flex flex-col">
-          <div className="flex items-start justify-between mb-4 flex-shrink-0">
+        {/* Main content */}
+        <div className="lg:col-span-3">
+          {/* Top bar */}
+          <div className="mb-4 flex items-start justify-between">
             <div>
-              <h2 className="text-[15px] font-bold text-gray-900">Sales Performance</h2>
-              <p className="text-[12px] text-gray-400 mt-0.5">Daily revenue trend</p>
+              <h1 className="text-lg font-bold text-[#1a2e10]">Doanh thu cửa hàng</h1>
+              <p className="mt-0.5 text-xs text-[#7a8a6e]">
+                Theo dõi doanh thu theo ngày và theo khoảng thời gian
+              </p>
             </div>
-            <div className="flex items-center gap-2">
-              {(['Today', 'Yesterday', 'Last 7 Days'] as const).map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setActiveFilter(f)}
-                  className={`text-[12px] px-3 py-1.5 rounded-lg font-semibold transition-all ${
-                    activeFilter === f
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                  }`}
+            <button className="flex items-center gap-2 rounded-lg border border-[#d4e0c8] bg-white px-4 py-2 text-xs font-semibold text-[#3b6b22] transition hover:bg-[#f0f5eb]">
+              <Download size={13} />
+              Xuất báo cáo
+            </button>
+          </div>
+
+          {/* Filter bar */}
+          <div className="mb-4 flex flex-wrap items-end gap-4 rounded-xl border border-[#e4edd9] bg-white px-5 py-4">
+            {/* Store select - Only show if user has multiple stores */}
+            {stores.length > 1 && (
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-[#7a8a6e]">
+                  Cửa hàng
+                </label>
+                <select 
+                  value={selectedStoreId} 
+                  onChange={(e) => setSelectedStoreId(e.target.value)}
+                  className="rounded-lg border border-[#d4e0c8] px-3 py-1.5 text-sm text-[#2d4a1a] outline-none focus:border-[#3b8c2a]"
                 >
-                  {f}
-                </button>
-              ))}
-              <button className="inline-flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-lg font-semibold bg-gray-100 text-gray-500 hover:bg-gray-200 transition-all">
-                <Download size={12} />
-                Export
+                  {stores.map(store => (
+                    <option key={store.id} value={store.id}>
+                      {store.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Time tabs */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-semibold uppercase tracking-wider text-[#7a8a6e]">
+                Khoảng thời gian
+              </label>
+              <div className="flex gap-1.5">
+                {timeOptions.map(t => (
+                  <button
+                    key={t.value}
+                    onClick={() => setActiveRange(t.value)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                      activeRange === t.value
+                        ? 'bg-[#3b8c2a] text-white'
+                        : 'bg-[#f0f4eb] text-[#6a7c5a] hover:bg-[#e4edda]'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Date pickers */}
+            {activeRange === 'custom' && (
+              <>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-[#7a8a6e]">
+                    Từ ngày
+                  </label>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={e => setDateFrom(e.target.value)}
+                    className="rounded-lg border border-[#d4e0c8] px-3 py-1.5 text-xs text-[#4a6040] outline-none focus:border-[#3b8c2a]"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-[#7a8a6e]">
+                    Đến ngày
+                  </label>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={e => setDateTo(e.target.value)}
+                    className="rounded-lg border border-[#d4e0c8] px-3 py-1.5 text-xs text-[#4a6040] outline-none focus:border-[#3b8c2a]"
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Actions */}
+            <div className="ml-auto flex gap-2">
+              <button
+                onClick={handleReset}
+                className="flex items-center gap-1.5 rounded-lg border border-[#d4e0c8] bg-[#f0f4eb] px-4 py-1.5 text-xs font-semibold text-[#6a7c5a] transition hover:bg-[#e4edda]"
+              >
+                <RefreshCw size={12} />
+                Đặt lại
+              </button>
+              <button
+                onClick={handleApply}
+                className="flex items-center gap-1.5 rounded-lg bg-[#3b8c2a] px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-[#2f7020]"
+              >
+                <Check size={12} />
+                Áp dụng
               </button>
             </div>
           </div>
-          <div className="flex-1 min-h-0 flex items-center">
-            {loading ? <div className="text-center text-gray-400">Loading chart...</div> : <SalesChart chartData={chartData} />}
-          </div>
-        </div>
 
-        <div className="col-span-2 bg-white rounded-2xl border border-gray-100 p-6 shadow-sm flex flex-col">
-          <div className="flex items-center justify-between mb-5 flex-shrink-0">
-            <div>
-              <h2 className="text-[15px] font-bold text-gray-900">Top Selling Products</h2>
-              <p className="text-[12px] text-gray-400 mt-0.5">This week</p>
-            </div>
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:underline cursor-pointer">
-              View all <ArrowUpRight size={12} />
-            </span>
-          </div>
-          <div className="flex-1 flex flex-col justify-between gap-3">
-            {topProducts.length === 0 ? (
-              <div className="text-center text-gray-400 py-4">No product data</div>
-            ) : (
-              topProducts.map((p, i) => (
-                <div key={i}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-[11px] font-bold text-gray-400 w-4 flex-shrink-0">#{i + 1}</span>
-                      <span className="text-[13px] font-medium text-gray-800 truncate">{p.name}</span>
-                    </div>
-                    <div className="flex items-center gap-3 flex-shrink-0 ml-2">
-                      <span className="text-[12px] text-gray-400">{p.units} sold</span>
-                      <span className="text-[13px] font-bold text-gray-900">${p.revenue}</span>
-                    </div>
-                  </div>
-                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full" style={{ width: `${p.pct}%` }} />
-                  </div>
+          {/* Chart + Products grid */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+
+            {/* Revenue Chart */}
+            <div className="rounded-xl border border-[#e4edd9] bg-white p-5">
+              <div className="mb-3 flex items-start justify-between">
+                <div>
+                  <h2 className="text-sm font-bold text-[#1a2e10]">Biểu đồ xu hướng doanh thu</h2>
                 </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Low Stock Alert + Pending Incidents */}
-      <div className="grid grid-cols-2 gap-4 items-stretch">
-
-        <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm flex flex-col">
-          <div className="flex items-center justify-between mb-5 flex-shrink-0">
-            <div>
-              <h2 className="text-[15px] font-bold text-gray-900">Low Stock Alert</h2>
-              <p className="text-[12px] text-gray-400 mt-0.5">Items needing restock</p>
-            </div>
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-orange-600 bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-lg uppercase tracking-wide">
-              <AlertTriangle size={11} />
-              Action Required
-            </span>
-          </div>
-          <div className="flex-1">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide pb-3">Product</th>
-                  <th className="text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wide pb-3">Shelf / Back</th>
-                  <th className="text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wide pb-3">Status</th>
-                  <th className="text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wide pb-3">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {lowStockItems.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="py-4 text-center text-gray-400">
-                      No low stock items
-                    </td>
-                  </tr>
+                <span className="flex items-center gap-1.5 text-[11px] text-[#7a8a6e]">
+                  <span className="inline-block h-2 w-2 rounded-full bg-[#3b8c2a]" />
+                  Doanh thu thực tế
+                </span>
+              </div>
+              <div className="h-56">
+                {loading ? (
+                  <div className="flex h-full items-center justify-center text-xs text-[#9aaa8e]">
+                    Đang tải...
+                  </div>
                 ) : (
-                  lowStockItems.map((item, i) => (
-                    <tr key={i} className="hover:bg-gray-50 transition-colors">
-                      <td className="py-3.5 text-[13px] font-medium text-gray-800">{item.product}</td>
-                      <td className="py-3.5 text-[13px] text-gray-500 text-center font-mono">
-                        {item.shelf} / {item.back}
-                      </td>
-                      <td className="py-3.5 text-center">
-                        <span
-                          className={`inline-flex items-center justify-center text-[11px] font-bold px-2.5 py-0.5 rounded-full min-w-[40px] ${
-                            item.status === 'Out'
-                              ? 'bg-red-50 text-red-600 border border-red-100'
-                              : 'bg-amber-50 text-amber-700 border border-amber-100'
-                          }`}
-                        >
-                          {item.status}
-                        </span>
-                      </td>
-                      <td className="py-3.5 text-right">
-                        <button className="text-[12px] font-semibold text-blue-600 hover:text-blue-800 transition-colors">
-                          Request Stock
-                        </button>
+                  <RevenueChart chartData={chartData} />
+                )}
+              </div>
+            </div>
+
+            {/* Top products */}
+            <div className="rounded-xl border border-[#e4edd9] bg-white p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-bold text-[#1a2e10]">Top 5 sản phẩm bán chạy nhất</h2>
+                </div>
+                <div className="flex items-center gap-1.5 rounded-lg border border-[#d4e0c8] px-2.5 py-1.5">
+                  <Search size={12} className="text-[#9aaa8e]" />
+                  <input
+                    type="text"
+                    placeholder="Tìm kiếm sản phẩm..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className="w-32 border-none bg-transparent text-xs text-[#4a6040] outline-none placeholder:text-[#b8c8aa]"
+                  />
+                </div>
+              </div>
+
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-[#eef2e9]">
+                    <th className="pb-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#9aaa8e]">
+                      Tên sản phẩm
+                    </th>
+                    <th className="pb-2.5 text-center text-[10px] font-semibold uppercase tracking-wider text-[#9aaa8e]">
+                      Số lượng đã bán
+                    </th>
+                    <th className="pb-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#9aaa8e]">
+                      Tổng doanh thu
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#f4f7f0]">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={3} className="py-6 text-center text-xs text-[#9aaa8e]">
+                        Đang tải...
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm flex flex-col">
-          <div className="flex items-center justify-between mb-5 flex-shrink-0">
-            <div>
-              <h2 className="text-[15px] font-bold text-gray-900">Pending Incident Reports</h2>
-              <p className="text-[12px] text-gray-400 mt-0.5">Awaiting resolution</p>
-            </div>
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:underline cursor-pointer">
-              View all <ArrowUpRight size={12} />
-            </span>
-          </div>
-          <div className="flex-1">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide pb-3">Reported By</th>
-                  <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide pb-3">Type</th>
-                  <th className="text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wide pb-3">Severity</th>
-                  <th className="text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wide pb-3">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {incidents.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="py-4 text-center text-gray-400">
-                      No incident reports
-                    </td>
-                  </tr>
-                ) : (
-                  incidents.map((inc, i) => (
-                    <tr key={i} className="hover:bg-gray-50 transition-colors">
-                      <td className="py-4 text-[13px] font-medium text-gray-800">{inc.reporter}</td>
-                      <td className="py-4 text-[13px] text-gray-600">{inc.type}</td>
-                      <td className="py-4 text-center">
-                        <span
-                          className={`inline-flex items-center justify-center text-[11px] font-bold px-2.5 py-0.5 rounded-full min-w-[48px] ${
-                            inc.severity === 'High'
-                              ? 'bg-red-50 text-red-600 border border-red-100'
-                              : inc.severity === 'Medium'
-                              ? 'bg-amber-50 text-amber-700 border border-amber-100'
-                              : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                          }`}
-                        >
-                          {inc.severity}
-                        </span>
+                  ) : filteredProducts.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="py-6 text-center text-xs text-[#9aaa8e]">
+                        Không có dữ liệu
                       </td>
-                      <td className="py-4 text-[13px] text-gray-400 text-right">{inc.date}</td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    filteredProducts.map((p, i) => (
+                      <tr key={i} className="transition hover:bg-[#fafcf8]">
+                        <td className="py-2.5 text-[13px] text-[#2d4a1a]">
+                          <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded bg-[#eef5e9] text-[11px] font-bold text-[#5a8a40]">
+                            {i + 1}
+                          </span>
+                          {p.name}
+                        </td>
+                        <td className="py-2.5 text-center">
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#eef2e9]">
+                              <div
+                                className="h-full rounded-full bg-[#3b8c2a]"
+                                style={{ width: `${p.pct}%` }}
+                              />
+                            </div>
+                            <span className="min-w-[36px] text-right text-xs font-semibold text-[#3b8c2a]">
+                              {p.units.toLocaleString('vi-VN')}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-2.5 text-right text-[13px] font-semibold text-[#1a2e10]">
+                          {p.revenue}₫
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
+
+          {/* Footer */}
+          <p className="mt-5 text-center text-[10px] text-[#b8c8aa]">
+            © 2025 Hệ thống quản lý bán lẻ. Bảng điều khiển quản trị viên.
+          </p>
         </div>
       </div>
-
-      {/* Footer */}
-      <p className="text-center text-[11px] text-gray-300 pb-2">
-        © 2025 RetailCore Systems Inc. All rights reserved. Main Street Supermarket Admin Portal.
-      </p>
     </div>
   )
 }
