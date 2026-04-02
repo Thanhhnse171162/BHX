@@ -8,6 +8,8 @@ const IAM_SERVICE_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://13.229.29.52:
 export async function GET(request: NextRequest) {
   const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV
 
+  console.log(`🔍 GET /api/users - isVercel: ${isVercel}, IAM_URL: ${IAM_SERVICE_URL}`)
+
   // Try local database first (only if not on Vercel)
   if (!isVercel) {
     try {
@@ -28,40 +30,58 @@ export async function GET(request: NextRequest) {
       `
 
       const users = await executeQuery(query)
+      console.log(`✅ Users fetched from local database: ${users.length} rows`)
       return NextResponse.json(users)
     } catch (error) {
-      console.error('Local database error:', error)
+      console.error('❌ Local database error:', error)
       // Fall through to IAM service
     }
   }
 
   // Fall back to IAM service (primary method on Vercel)
-  try {
-    const authHeader = request.headers.get('authorization') || ''
-    const iamEndpoint = `${IAM_SERVICE_URL}/api/users`
-    console.log(`📡 Fetching users from IAM service: ${iamEndpoint}`)
-    
-    const iamRes = await fetch(iamEndpoint, {
-      headers: {
-        Authorization: authHeader,
-      },
-    })
-    
-    if (iamRes.ok) {
-      const iamData = await iamRes.json()
-      console.log('✅ Users fetched from IAM service')
-      return NextResponse.json(Array.isArray(iamData) ? iamData : iamData.data || [])
-    } else {
-      console.error(`❌ IAM service returned ${iamRes.status}`)
+  const endpoints = [
+    `${IAM_SERVICE_URL}/api/users`,
+    `${IAM_SERVICE_URL}/api/users/list`,
+  ]
+
+  for (const endpoint of endpoints) {
+    try {
+      const authHeader = request.headers.get('authorization') || ''
+      console.log(`📡 Trying IAM endpoint: ${endpoint}`)
+      
+      const iamRes = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        cache: 'no-store',
+      })
+      
+      console.log(`IAM response status: ${iamRes.status} from ${endpoint}`)
+      
+      if (iamRes.ok) {
+        const iamData = await iamRes.json()
+        console.log(`✅ Users fetched from IAM service (${endpoint}): ${Array.isArray(iamData) ? iamData.length : '?'} items`)
+        return NextResponse.json(Array.isArray(iamData) ? iamData : iamData.data || [])
+      } else if (iamRes.status === 404) {
+        const responseText = await iamRes.text()
+        console.log(`⚠️ Endpoint not found (404): ${endpoint}. Trying next endpoint...`)
+        continue
+      } else {
+        console.error(`❌ IAM service returned ${iamRes.status} from ${endpoint}`)
+        const responseText = await iamRes.text()
+        console.error(`Response: ${responseText.substring(0, 300)}`)
+      }
+    } catch (iamError) {
+      console.error(`⚠️ Failed to fetch from ${endpoint}:`, iamError)
     }
-  } catch (iamError) {
-    console.error('IAM fallback error:', iamError)
   }
   
-  return NextResponse.json(
-    { error: 'Failed to fetch users' },
-    { status: 500 }
-  )
+  // If all attempts failed, return empty array with 200 status
+  console.log('⚠️ All IAM endpoints failed, returning empty array')
+  return NextResponse.json([], { status: 200 })
 }
 
 // POST /api/users - Create new user in local database
