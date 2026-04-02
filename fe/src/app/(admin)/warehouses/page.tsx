@@ -274,7 +274,7 @@ export default function WarehousesAdminPage() {
           name: formData.name,
           location: formData.location,
           capacity: formData.capacity,
-          status: formData.status === 'ACTIVE' ? 'Active' : 'Inactive', // .NET API expects "Active"/"Inactive"
+          status: formData.status, // Keep as ACTIVE or INACTIVE
         }
         
         // Only include parentId if it has a value
@@ -317,7 +317,7 @@ export default function WarehousesAdminPage() {
           name: formData.name,
           location: formData.location,
           capacity: formData.capacity,
-          status: formData.status === 'ACTIVE' ? 'Active' : 'Inactive',
+          status: formData.status, // Keep as ACTIVE or INACTIVE
           isDeleted: formData.isDeleted || false,
         }
         
@@ -636,8 +636,8 @@ export default function WarehousesAdminPage() {
                 })
               }
             >
-              <option value="ACTIVE">Active</option>
-              <option value="INACTIVE">Inactive</option>
+              <option value="ACTIVE">ACTIVE</option>
+              <option value="INACTIVE">INACTIVE</option>
             </select>
           </div>
 
