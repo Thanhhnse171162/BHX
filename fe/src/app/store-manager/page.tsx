@@ -131,6 +131,8 @@ export default function StoreManagerDashboard() {
   // Store selection
   const [stores, setStores] = useState<Store[]>([])
   const [selectedStoreId, setSelectedStoreId] = useState('')
+  const [showStoreMenu, setShowStoreMenu] = useState(false)
+  const selectedStore = stores.find(s => s.id === selectedStoreId)
 
   // Time filters
   const [activeRange, setActiveRange] = useState<TimeRange>('7days')
@@ -313,22 +315,51 @@ export default function StoreManagerDashboard() {
 
       {/* Filter bar */}
       <div className="mb-4 flex flex-wrap items-end gap-4 rounded-xl border border-[#e4edd9] bg-white px-5 py-4">
-        {/* Store select */}
-        <div className="flex flex-col gap-1">
+        {/* Store selection */}
+        <div className="flex flex-col gap-1 relative">
           <label className="text-[10px] font-semibold uppercase tracking-wider text-[#7a8a6e]">
             Cửa hàng
           </label>
-          <select 
-            value={selectedStoreId}
-            onChange={(e) => setSelectedStoreId(e.target.value)}
-            className="rounded-lg border border-[#d4e0c8] px-3 py-1.5 text-sm text-[#2d4a1a] outline-none focus:border-[#3b8c2a]"
-          >
-            {stores.map(store => (
-              <option key={store.id} value={store.id}>
-                {store.name}
-              </option>
-            ))}
-          </select>
+          {stores.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setShowStoreMenu(!showStoreMenu)}
+                className="min-w-[200px] rounded-lg border border-[#d4e0c8] bg-white px-4 py-2 text-sm font-semibold text-[#2d4a1a] outline-none hover:border-[#3b8c2a] focus:border-[#3b8c2a] transition flex items-center justify-between"
+              >
+                <span className="truncate">{selectedStore?.name || 'Chọn cửa hàng'}</span>
+                <svg className={`w-4 h-4 transition-transform ${showStoreMenu ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                </svg>
+              </button>
+              
+              {/* Dropdown menu */}
+              {showStoreMenu && stores.length > 1 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#d4e0c8] rounded-lg shadow-lg z-10 overflow-hidden">
+                  {stores.map(store => (
+                    <button
+                      key={store.id}
+                      onClick={() => {
+                        setSelectedStoreId(store.id)
+                        setShowStoreMenu(false)
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-sm font-medium transition ${
+                        selectedStoreId === store.id
+                          ? 'bg-[#f5fdf1] text-[#3b8c2a] border-l-4 border-[#3b8c2a]'
+                          : 'text-[#2d4a1a] hover:bg-[#f9fbf7]'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2.5">
+                        {selectedStoreId === store.id && (
+                          <span className="text-[#3b8c2a] font-bold">✓</span>
+                        )}
+                        {store.name}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Time tabs */}
