@@ -17,6 +17,7 @@ import { useAuthStore } from '@/store/auth.store'
 interface ChartPoint { day: string; value: number }
 interface Product { name: string; units: number; revenue: string; pct: number }
 interface Store { id: string; name: string }
+interface Staff { id: string; name: string; email?: string }
 
 type TimeRange = 'today' | 'yesterday' | '7days' | 'month' | 'custom'
 
@@ -151,6 +152,11 @@ export default function StoreManagerDashboard() {
   const [chartData, setChartData] = useState<ChartPoint[]>([])
   const [products, setProducts] = useState<Product[]>([])
 
+  // Staff selection
+  const [staffList, setStaffList] = useState<Staff[]>([])
+  const [selectedStaffId, setSelectedStaffId] = useState('')
+  const [showStaffMenu, setShowStaffMenu] = useState(false)
+
   // ── Initialize stores from API ─────────────────────────────────────────────
   useEffect(() => {
     const initStores = async () => {
@@ -177,6 +183,29 @@ export default function StoreManagerDashboard() {
     if (token) initStores()
   }, [token, user?.workplaceId])
 
+  // ── Fetch staff list when store changes ─────────────────────────────────────
+  useEffect(() => {
+    const fetchStaff = async () => {
+      try {
+        if (!selectedStoreId || !token) return
+        const headers: HeadersInit = { Authorization: `Bearer ${token}` }
+        const storeQuery = `?storeId=${encodeURIComponent(selectedStoreId)}`
+        const res = await fetch(`/api/users/by-store${storeQuery}`, { headers })
+        if (res.ok) {
+          const data = await res.json()
+          const employees = Array.isArray(data) ? data : (data.data || [])
+          setStaffList(employees)
+          setSelectedStaffId('') // Reset staff selection when store changes
+        }
+      } catch (err) {
+        console.error('Failed to load staff:', err)
+        setStaffList([])
+      }
+    }
+    
+    fetchStaff()
+  }, [selectedStoreId, token])
+
   // ── Fetch data ──────────────────────────────────────────────────────────────
   const fetchAll = async () => {
     try {
@@ -199,6 +228,9 @@ export default function StoreManagerDashboard() {
 
       const params = new URLSearchParams()
       params.set('storeId', selectedStoreId)
+      if (selectedStaffId) {
+        params.set('staffId', selectedStaffId)
+      }
       if (activeRange !== 'custom') {
         params.set('range', activeRange)
       } else {
@@ -293,7 +325,7 @@ export default function StoreManagerDashboard() {
     if (selectedStoreId && token) {
       fetchAll() 
     }
-  }, [token, activeRange, selectedStoreId, dateFrom, dateTo])
+  }, [token, activeRange, selectedStoreId, selectedStaffId, dateFrom, dateTo])
 
   const handleApply = () => {
     if (activeRange === 'custom' && (!dateFrom || !dateTo)) {
@@ -421,6 +453,69 @@ export default function StoreManagerDashboard() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+        </div>
+
+        {/* Staff selection */}
+        <div className="flex flex-col gap-1 relative">
+          <label className="text-[10px] font-semibold uppercase tracking-wider text-[#7a8a6e]">
+            Nhân viên
+          </label>
+          <button
+            onClick={() => setShowStaffMenu(!showStaffMenu)}
+            className="rounded-lg border border-[#d4e0c8] bg-white px-4 py-2 text-sm font-semibold text-[#2d4a1a] outline-none hover:border-[#3b8c2a] focus:border-[#3b8c2a] transition flex items-center justify-between"
+          >
+            <span className="truncate">
+              {selectedStaffId 
+                ? staffList.find(s => s.id === selectedStaffId)?.name || 'Chọn nhân viên'
+                : 'Tất cả nhân viên'}
+            </span>
+            <svg className={`w-4 h-4 transition-transform ${showStaffMenu ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+            </svg>
+          </button>
+          
+          {/* Staff Dropdown menu */}
+          {showStaffMenu && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#d4e0c8] rounded-lg shadow-lg z-10 overflow-hidden max-h-60 overflow-y-auto">
+              <button
+                onClick={() => {
+                  setSelectedStaffId('')
+                  setShowStaffMenu(false)
+                }}
+                className={`w-full text-left px-4 py-2.5 text-sm font-medium transition ${
+                  !selectedStaffId
+                    ? 'bg-[#f5fdf1] text-[#3b8c2a] border-l-4 border-[#3b8c2a]'
+                    : 'text-[#2d4a1a] hover:bg-[#f9fbf7]'
+                }`}
+              >
+                <span className="flex items-center gap-2.5">
+                  {!selectedStaffId && <span className="text-[#3b8c2a] font-bold">✓</span>}
+                  Tất cả nhân viên
+                </span>
+              </button>
+              {staffList.map(staff => (
+                <button
+                  key={staff.id}
+                  onClick={() => {
+                    setSelectedStaffId(staff.id)
+                    setShowStaffMenu(false)
+                  }}
+                  className={`w-full text-left px-4 py-2.5 text-sm font-medium transition ${
+                    selectedStaffId === staff.id
+                      ? 'bg-[#f5fdf1] text-[#3b8c2a] border-l-4 border-[#3b8c2a]'
+                      : 'text-[#2d4a1a] hover:bg-[#f9fbf7]'
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    {selectedStaffId === staff.id && (
+                      <span className="text-[#3b8c2a] font-bold">✓</span>
+                    )}
+                    {staff.name}
+                  </span>
+                </button>
+              ))}
             </div>
           )}
         </div>
