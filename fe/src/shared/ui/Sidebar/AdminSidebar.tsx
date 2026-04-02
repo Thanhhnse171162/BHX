@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 // Optimized: Import only what we actually use
-import { Menu, X, ChevronDown, ChevronRight } from 'lucide-react'
+import { Menu, X, ChevronDown, ChevronRight, LogOut } from 'lucide-react'
 import * as Icons from 'lucide-react'
 import type { NavGroup } from '@/shared/config/nav'
+import { useAuthStore } from '@/store/auth.store'
 
 const iconMap = {
   LayoutDashboard: Icons.LayoutDashboard,
@@ -43,7 +44,14 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({ navigation, isCollapsed, onToggleCollapse }: AdminSidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
+  const logout = useAuthStore((state) => state.logout)
   const [expandedGroups, setExpandedGroups] = useState<string[]>([])
+
+  const handleLogout = () => {
+    logout()
+    router.push('/login')
+  }
 
   const toggleGroup = (label: string) => {
     setExpandedGroups(prev =>
@@ -176,6 +184,19 @@ export function AdminSidebar({ navigation, isCollapsed, onToggleCollapse }: Admi
           </div>
         </div>
       )}
+
+      <div className="p-3 border-t border-slate-700/50">
+        <button
+          onClick={handleLogout}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-rose-200 hover:bg-rose-500/20 hover:text-rose-100 transition-colors ${
+            isCollapsed ? 'justify-center' : ''
+          }`}
+          title={isCollapsed ? 'Đăng xuất' : undefined}
+        >
+          <LogOut className="w-5 h-5" />
+          {!isCollapsed && <span>Đăng xuất</span>}
+        </button>
+      </div>
     </aside>
   )
 }

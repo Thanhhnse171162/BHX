@@ -4,7 +4,6 @@ import { useAuthStore } from '@/store/auth.store'
 import { useUIStore } from '@/store/ui.store'
 import { getAdminNavigation } from '@/shared/config/nav'
 import { RouteGuard } from '@/shared/auth/RouteGuard'
-import { LogoutButton } from '@/shared/ui/LogoutButton'
 import { AdminSidebar } from '@/shared/ui/Sidebar/AdminSidebar'
 
 function AdminShell({ children }: { children: React.ReactNode }) {
@@ -45,9 +44,6 @@ function AdminShell({ children }: { children: React.ReactNode }) {
                   <div className="text-xs text-slate-500">{user?.role}</div>
                 </div>
               </div>
-
-              {/* Professional Logout Button */}
-              <LogoutButton variant="default" />
             </div>
           </div>
         </header>

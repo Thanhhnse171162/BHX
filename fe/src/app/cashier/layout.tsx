@@ -191,6 +191,16 @@ export default function CashierLayout({ children }: CashierLayoutProps) {
           })}
         </nav>
 
+        <div className="border-t border-gray-100 p-3">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-[14px] font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors"
+          >
+            <LogOut size={16} />
+            Đăng xuất
+          </button>
+        </div>
+
       </aside>
 
       {/* Main content */}
@@ -205,13 +215,6 @@ export default function CashierLayout({ children }: CashierLayoutProps) {
             <div className="w-9 h-9 rounded-full bg-green-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0 font-sans">
               {userInitial}
             </div>
-            <button
-              onClick={handleLogout}
-              title="Đăng xuất"
-              className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-            >
-              <LogOut size={16} />
-            </button>
           </div>
         </header>
         <main className="flex-1">{children}</main>

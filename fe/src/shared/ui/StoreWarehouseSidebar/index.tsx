@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/shared/hooks/useAuth'
 import { 
   LayoutDashboard, 
   Warehouse,
@@ -9,7 +11,8 @@ import {
   BarChart3,
   Archive,
   Boxes,
-  ClipboardCheck
+  ClipboardCheck,
+  LogOut
 } from 'lucide-react'
 
 interface SidebarItem {
@@ -55,6 +58,13 @@ const sidebarItems: SidebarItem[] = [
 
 export function StoreWarehouseSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+  const { logout } = useAuth()
+
+  const handleLogout = () => {
+    logout()
+    router.push('/login')
+  }
 
   return (
     <aside className="relative flex h-screen w-[250px] flex-shrink-0 flex-col border-r border-slate-200 bg-white">
@@ -103,6 +113,16 @@ export function StoreWarehouseSidebar() {
           })}
         </ul>
       </nav>
+
+      <div className="border-t border-slate-100 p-3">
+        <button
+          onClick={handleLogout}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-100 px-3 py-2.5 text-[14px] font-medium text-red-600 transition-colors hover:bg-red-50"
+        >
+          <LogOut size={16} />
+          Đăng xuất
+        </button>
+      </div>
     </aside>
   )
 }

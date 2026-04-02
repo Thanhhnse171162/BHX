@@ -166,7 +166,7 @@ const STATUS_CONFIG: Record<Product['status'], { dot: string; badge: string; ico
 type StatusFilter = Product['status'] | null
 type CategoryFilter = string | null
 
-const PAGE_SIZE = 12
+const PAGE_SIZE = 10
 
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
 function ProductDetailPanel({ product, onClose }: { product: Product; onClose: () => void }) {
@@ -546,8 +546,28 @@ export default function CashierProductsPage() {
     return list
   }, [products, search, statusFilter, categoryFilter])
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const visiblePages = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1)
+    }
+
+    if (page <= 4) {
+      return [1, 2, 3, 4, 5, '...', totalPages]
+    }
+
+    if (page >= totalPages - 3) {
+      return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages]
+    }
+
+    return [1, '...', page - 1, page, page + 1, '...', totalPages]
+  }, [page, totalPages])
+
+  useEffect(() => {
+    setPage(prev => Math.min(prev, totalPages))
+  }, [totalPages])
 
   const handleSearch = (v: string) => {
     setSearch(v)
@@ -837,36 +857,42 @@ export default function CashierProductsPage() {
           </div>
 
           {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
-              <span className="text-sm text-gray-500">Trang {page} / {totalPages}</span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(pg => (
+          <div className="flex items-center justify-between mt-4">
+            <span className="text-sm text-gray-500">Trang {page} / {totalPages}</span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              {visiblePages.map((pg, idx) =>
+                pg === '...' ? (
+                  <span key={`ellipsis-${idx}`} className="w-8 h-8 inline-flex items-center justify-center text-sm text-gray-400">
+                    ...
+                  </span>
+                ) : (
                   <button
                     key={pg}
-                    onClick={() => setPage(pg)}
+                    onClick={() => {
+                      if (typeof pg === 'number') setPage(pg)
+                    }}
                     className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${pg === page ? 'bg-teal-700 text-white' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
                   >
                     {pg}
                   </button>
-                ))}
-                <button
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
+                ),
+              )}
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
-          )}
+          </div>
         </div>
       </div>
 
