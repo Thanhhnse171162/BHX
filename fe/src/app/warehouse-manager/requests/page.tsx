@@ -407,7 +407,7 @@ export default function WarehouseManagerRequestsPage() {
             priority: req.priority === 'URGENT' ? 'CAO' : req.priority === 'HIGH' ? 'TRUNG BÌNH' : 'THẤP',
             status: mapStatus(req.status),
             createdAt: createdAtDate,
-            actionLabel: req.status === 'APPROVED' ? 'Đã duyệt' : 'Duyệt',
+            actionLabel: mapActionLabel(req.status),
             type: 'store',
           }
         })
@@ -435,7 +435,7 @@ export default function WarehouseManagerRequestsPage() {
             priority: req.priority === 'URGENT' ? 'CAO' : req.priority === 'HIGH' ? 'TRUNG BÌNH' : 'THẤP',
             status: mapStatus(req.status),
             createdAt: createdAtDate,
-            actionLabel: req.status === 'APPROVED' ? 'Đã duyệt' : 'Duyệt',
+            actionLabel: mapActionLabel(req.status),
             type: 'warehouse',
           }
         })
@@ -620,6 +620,14 @@ export default function WarehouseManagerRequestsPage() {
     return 'Chờ duyệt'
   }
 
+  function mapActionLabel(status: string): string {
+    if (status === 'APPROVED') return 'Đã duyệt'
+    if (status === 'REJECTED') return 'Từ chối'
+    if (status === 'COMPLETED') return 'Đã giao'
+    if (status === 'PROCESSING') return 'Đang xử lý'
+    return 'Duyệt'
+  }
+
   const onChangeTab = (tab: RequestType) => {
     setActiveTab(tab)
     if (tab !== 'warehouse') {
@@ -692,7 +700,6 @@ export default function WarehouseManagerRequestsPage() {
 
     return { rows, paged, totalPages, page: safePage }
   }, [incomingTransfers, incomingSearch, incomingStatusFilter, incomingFromDate, incomingToDate, incomingPage])
-
   const getLocationName = useCallback((id?: string | null) => {
     const key = String(id ?? '').trim().toLowerCase()
     if (!key) return '—'
@@ -712,7 +719,6 @@ export default function WarehouseManagerRequestsPage() {
           type: 'error',
           message: err instanceof Error ? err.message : 'Không thể tải chi tiết đơn vận chuyển.',
         })
-      } finally {
         setIncomingDetailLoadingId(null)
       }
     },
@@ -2353,6 +2359,22 @@ function renderStatus(status: RequestStatus) {
 function actionButtonClass(label: string) {
   if (label === 'Duyệt') {
     return 'px-3 py-1.5 rounded-lg bg-[#f97316] text-white text-xs font-semibold hover:bg-[#ea580c] transition-colors'
+  }
+
+  if (label === 'Từ chối') {
+    return 'px-3 py-1.5 rounded-lg bg-red-50 text-red-700 text-xs font-semibold border border-red-200'
+  }
+
+  if (label === 'Đã duyệt') {
+    return 'px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200'
+  }
+
+  if (label === 'Đang xử lý') {
+    return 'px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-semibold border border-blue-200'
+  }
+
+  if (label === 'Đã giao') {
+    return 'px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200'
   }
 
   return 'px-3 py-1.5 rounded-lg bg-slate-100 text-slate-500 text-xs font-semibold'
