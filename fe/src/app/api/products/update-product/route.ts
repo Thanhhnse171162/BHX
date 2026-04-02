@@ -17,33 +17,69 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const body = await request.json()
+    const contentType = request.headers.get('content-type') || ''
+    let body: any
+    
     console.log('🔄 Forwarding PUT /api/products/update-product to:', CATALOG_SERVICE_URL)
-    console.log('📦 Update payload:', body)
+    console.log('📋 Content-Type:', contentType)
 
     const authHeader = request.headers.get('authorization')
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    }
+    const headers: HeadersInit = {}
     if (authHeader) {
       headers['Authorization'] = authHeader
     }
 
-    const response = await fetch(`${CATALOG_SERVICE_URL}/api/Product/Update-Product?id=${id}`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(body),
-    })
+    // Handle both JSON and FormData
+    if (contentType.includes('multipart/form-data')) {
+      // Forward FormData as-is (with file uploads)
+      const formData = await request.formData()
+      const backendFormData = new FormData()
+      
+      // Copy all fields from formData to backendFormData
+      for (const [key, value] of formData.entries()) {
+        backendFormData.append(key, value)
+      }
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      console.error('❌ Backend error:', response.status, errorData)
-      return NextResponse.json(errorData, { status: response.status })
+      console.log('📦 Update with files')
+      
+      const response = await fetch(`${CATALOG_SERVICE_URL}/api/Product/Update-Product?id=${id}`, {
+        method: 'PUT',
+        headers, // Don't set Content-Type for FormData, let fetch handle it
+        body: backendFormData,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('❌ Backend error:', response.status, errorData)
+        return NextResponse.json(errorData, { status: response.status })
+      }
+
+      const result = await response.json()
+      console.log('✅ Update success:', result)
+      return NextResponse.json(result, { status: 200 })
+    } else {
+      // JSON payload
+      body = await request.json()
+      headers['Content-Type'] = 'application/json'
+      
+      console.log('📦 Update payload:', body)
+
+      const response = await fetch(`${CATALOG_SERVICE_URL}/api/Product/Update-Product?id=${id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(body),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('❌ Backend error:', response.status, errorData)
+        return NextResponse.json(errorData, { status: response.status })
+      }
+
+      const result = await response.json()
+      console.log('✅ Update success:', result)
+      return NextResponse.json(result, { status: 200 })
     }
-
-    const result = await response.json()
-    console.log('✅ Update success:', result)
-    return NextResponse.json(result, { status: 200 })
   } catch (error: any) {
     console.error('❌ Update Product Error:', error.message)
     return NextResponse.json(

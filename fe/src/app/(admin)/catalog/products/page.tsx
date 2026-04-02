@@ -53,6 +53,7 @@ export default function ProductsPage() {
   const [price, setPrice] = useState<number>(0)
   const [unit, setUnit] = useState('kg')
   const [status, setStatus] = useState<ProductStatus>('ACTIVE')
+  const [supplierId, setSupplierId] = useState('')
   
   // Additional fields from Swagger
   const [barcode, setBarcode] = useState('')
@@ -62,13 +63,23 @@ export default function ProductsPage() {
   const [originalPrice, setOriginalPrice] = useState<number>(0)
   const [costPrice, setCostPrice] = useState<number>(0)
   const [weight, setWeight] = useState<number>(0)
+  const [volume, setVolume] = useState<number>(0)
+  const [quantityPerUnit, setQuantityPerUnit] = useState<number>(0)
+  const [minOrderQuantity, setMinOrderQuantity] = useState<number>(0)
+  const [maxOrderQuantity, setMaxOrderQuantity] = useState<number>(0)
+  const [expirationDate, setExpirationDate] = useState('')
+  const [shelfLifeDays, setShelfLifeDays] = useState<number>(0)
+  const [storageInstructions, setStorageInstructions] = useState('')
+  const [isPerishable, setIsPerishable] = useState(false)
   const [mainImage, setMainImage] = useState<File | null>(null)
   const [additionalImages, setAdditionalImages] = useState<File[]>([])
   const [slug, setSlug] = useState('')
   const [metaTitle, setMetaTitle] = useState('')
   const [metaDescription, setMetaDescription] = useState('')
   const [metaKeywords, setMetaKeywords] = useState('')
-  const [supplierId, setSupplierId] = useState('')
+  const [isFeatured, setIsFeatured] = useState(false)
+  const [isNew, setIsNew] = useState(false)
+  const [isOnSale, setIsOnSale] = useState(false)
 
   const getCategoryId = (category: CategoryFromAPI): string => {
     const candidates: Array<unknown> = [
@@ -251,6 +262,7 @@ export default function ProductsPage() {
     setPrice(0)
     setUnit('kg')
     setStatus('ACTIVE')
+    setSupplierId(suppliers[0]?.id || '')
     setBarcode('')
     setDescription('')
     setBrand('')
@@ -258,13 +270,23 @@ export default function ProductsPage() {
     setOriginalPrice(0)
     setCostPrice(0)
     setWeight(0)
+    setVolume(0)
+    setQuantityPerUnit(0)
+    setMinOrderQuantity(0)
+    setMaxOrderQuantity(0)
+    setExpirationDate('')
+    setShelfLifeDays(0)
+    setStorageInstructions('')
+    setIsPerishable(false)
     setMainImage(null)
     setAdditionalImages([])
     setSlug('')
     setMetaTitle('')
     setMetaDescription('')
     setMetaKeywords('')
-    setSupplierId(suppliers[0]?.id || '')
+    setIsFeatured(false)
+    setIsNew(false)
+    setIsOnSale(false)
     setIsModalOpen(true)
   }
 
@@ -302,10 +324,21 @@ export default function ProductsPage() {
       setOriginalPrice(fullProduct.originalPrice || 0)
       setCostPrice(fullProduct.costPrice || 0)
       setWeight(fullProduct.weight || 0)
+      setVolume((fullProduct as any).volume || 0)
+      setQuantityPerUnit((fullProduct as any).quantityPerUnit || 0)
+      setMinOrderQuantity((fullProduct as any).minOrderQuantity || 0)
+      setMaxOrderQuantity((fullProduct as any).maxOrderQuantity || 0)
+      setExpirationDate((fullProduct as any).expirationDate || '')
+      setShelfLifeDays((fullProduct as any).shelfLifeDays || 0)
+      setStorageInstructions((fullProduct as any).storageInstructions || '')
+      setIsPerishable((fullProduct as any).isPerishable || false)
       setSlug(fullProduct.slug || '')
       setMetaTitle(fullProduct.metaTitle || '')
       setMetaDescription(fullProduct.metaDescription || '')
       setMetaKeywords(fullProduct.metaKeywords || '')
+      setIsFeatured((fullProduct as any).isFeatured || false)
+      setIsNew((fullProduct as any).isNew || false)
+      setIsOnSale((fullProduct as any).isOnSale || false)
       
       // Clear image fields (these would need to be updated via file upload)
       setMainImage(null)
@@ -450,9 +483,18 @@ export default function ProductsPage() {
         appendIfDefined('OriginalPrice', originalPrice)
         appendIfDefined('CostPrice', costPrice)
         appendIfDefined('Weight', weight)
+        appendIfDefined('Volume', volume)
+        appendIfDefined('QuantityPerUnit', quantityPerUnit)
+        appendIfDefined('MinOrderQuantity', minOrderQuantity)
+        appendIfDefined('MaxOrderQuantity', maxOrderQuantity)
+        appendIfDefined('ExpirationDate', expirationDate)
+        appendIfDefined('ShelfLifeDays', shelfLifeDays)
+        appendIfDefined('StorageInstructions', storageInstructions)
+        appendIfDefined('IsPerishable', isPerishable)
         appendIfDefined('IsAvailable', status === 'ACTIVE')
-        appendIfDefined('IsFeatured', false)
-        appendIfDefined('IsNew', true)
+        appendIfDefined('IsFeatured', isFeatured)
+        appendIfDefined('IsNew', isNew)
+        appendIfDefined('IsOnSale', isOnSale)
         appendIfDefined('Slug', slug)
         appendIfDefined('MetaTitle', metaTitle)
         appendIfDefined('MetaDescription', metaDescription)
@@ -487,52 +529,123 @@ export default function ProductsPage() {
 
         alert('Tạo sản phẩm thành công!')
       } else if (mode === 'edit' && editingId) {
-        // Build update payload with all fields matching backend API
-        const updateData: any = {
-          barcode: barcode || null,
-          name,
-          description: description || null,
-          categoryId: category,
-          supplierId: suppliers.length > 0 ? suppliers[0].id : null, // Keep current supplier or first one
-          brand: brand || null,
-          origin: origin || null,
-          price,
-          originalPrice,
-          costPrice,
-          unit,
-          weight,
-          slug: slug || null,
-          metaTitle: metaTitle || null,
-          metaDescription: metaDescription || null,
-          metaKeywords: metaKeywords || null,
-          isAvailable: status === 'ACTIVE',
-          isFeatured: false,
-          isNew: false,
-          isOnSale: false,
-        }
+        // Check if we need to send FormData (when files are selected) or JSON
+        const hasFiles = mainImage !== null || additionalImages.length > 0
 
-        // Remove undefined/null values
-        Object.keys(updateData).forEach(key => {
-          if (updateData[key] === undefined || updateData[key] === null || updateData[key] === '') {
-            delete updateData[key]
+        if (hasFiles) {
+          // Send FormData with files
+          const formData = new FormData()
+
+          // Add all text fields
+          const appendIfDefined = (key: string, value: unknown) => {
+            if (value === undefined || value === null || value === '') return
+            formData.append(key, String(value))
           }
-        })
 
-        // Use correct backend endpoint: PUT /api/Product/Update-Product?id={id}
-        const token = useAuthStore.getState().token
-        const response = await fetch(`/api/products/update-product?id=${editingId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token && { Authorization: `Bearer ${token}` }),
-          },
-          body: JSON.stringify(updateData),
-        })
+          appendIfDefined('barcode', barcode)
+          appendIfDefined('name', name)
+          appendIfDefined('description', description)
+          appendIfDefined('categoryId', category)
+          appendIfDefined('supplierId', suppliers.length > 0 ? suppliers[0].id : '')
+          appendIfDefined('brand', brand)
+          appendIfDefined('origin', origin)
+          appendIfDefined('price', price)
+          appendIfDefined('originalPrice', originalPrice)
+          appendIfDefined('costPrice', costPrice)
+          appendIfDefined('unit', unit)
+          appendIfDefined('weight', weight)
+          appendIfDefined('volume', volume)
+          appendIfDefined('quantityPerUnit', quantityPerUnit)
+          appendIfDefined('minOrderQuantity', minOrderQuantity)
+          appendIfDefined('maxOrderQuantity', maxOrderQuantity)
+          appendIfDefined('expirationDate', expirationDate)
+          appendIfDefined('shelfLifeDays', shelfLifeDays)
+          appendIfDefined('storageInstructions', storageInstructions)
+          appendIfDefined('isPerishable', isPerishable)
+          appendIfDefined('slug', slug)
+          appendIfDefined('metaTitle', metaTitle)
+          appendIfDefined('metaDescription', metaDescription)
+          appendIfDefined('metaKeywords', metaKeywords)
+          appendIfDefined('isAvailable', status === 'ACTIVE')
+          appendIfDefined('isFeatured', isFeatured)
+          appendIfDefined('isNew', isNew)
+          appendIfDefined('isOnSale', isOnSale)
 
-        if (!response.ok) {
-          const errorPayload = await response.json().catch(() => null)
-          const errorMessage = parseApiErrorMessage(errorPayload) || `Update failed (${response.status})`
-          throw new Error(errorMessage)
+          // Add files
+          if (mainImage) {
+            formData.append('MainImage', mainImage)
+          }
+          additionalImages.forEach((file) => {
+            formData.append('AdditionalImages', file)
+          })
+
+          const token = useAuthStore.getState().token
+          const response = await fetch(`/api/products/update-product?id=${editingId}`, {
+            method: 'PUT',
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            body: formData,
+          })
+
+          if (!response.ok) {
+            const errorPayload = await response.json().catch(() => null)
+            const errorMessage = parseApiErrorMessage(errorPayload) || `Update failed (${response.status})`
+            throw new Error(errorMessage)
+          }
+        } else {
+          // Send JSON without files
+          const updateData: any = {
+            barcode: barcode || null,
+            name,
+            description: description || null,
+            categoryId: category,
+            supplierId: suppliers.length > 0 ? suppliers[0].id : null,
+            brand: brand || null,
+            origin: origin || null,
+            price,
+            originalPrice,
+            costPrice,
+            unit,
+            weight,
+            volume,
+            quantityPerUnit,
+            minOrderQuantity,
+            maxOrderQuantity,
+            expirationDate: expirationDate || null,
+            shelfLifeDays,
+            storageInstructions: storageInstructions || null,
+            isPerishable,
+            slug: slug || null,
+            metaTitle: metaTitle || null,
+            metaDescription: metaDescription || null,
+            metaKeywords: metaKeywords || null,
+            isAvailable: status === 'ACTIVE',
+            isFeatured,
+            isNew,
+            isOnSale,
+          }
+
+          // Remove undefined/null values
+          Object.keys(updateData).forEach(key => {
+            if (updateData[key] === undefined || updateData[key] === null || updateData[key] === '') {
+              delete updateData[key]
+            }
+          })
+
+          const token = useAuthStore.getState().token
+          const response = await fetch(`/api/products/update-product?id=${editingId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token && { Authorization: `Bearer ${token}` }),
+            },
+            body: JSON.stringify(updateData),
+          })
+
+          if (!response.ok) {
+            const errorPayload = await response.json().catch(() => null)
+            const errorMessage = parseApiErrorMessage(errorPayload) || `Update failed (${response.status})`
+            throw new Error(errorMessage)
+          }
         }
 
         alert('Cập nhật sản phẩm thành công!')
@@ -894,9 +1007,109 @@ export default function ProductsPage() {
             placeholder="0"
           />
           
+          <div className="grid grid-cols-3 gap-4">
+            <Input
+              label="Volume (L)"
+              type="number"
+              value={volume || ''}
+              onChange={(e) => setVolume(parseNumberInput(e.target.value))}
+              placeholder="0"
+            />
+            <Input
+              label="Quantity Per Unit"
+              type="number"
+              value={quantityPerUnit || ''}
+              onChange={(e) => setQuantityPerUnit(parseInt(e.target.value) || 0)}
+              placeholder="0"
+            />
+            <Input
+              label="Shelf Life (days)"
+              type="number"
+              value={shelfLifeDays || ''}
+              onChange={(e) => setShelfLifeDays(parseInt(e.target.value) || 0)}
+              placeholder="0"
+            />
+          </div>
+          
+          <div className="grid grid-cols-3 gap-4">
+            <Input
+              label="Min Order Qty"
+              type="number"
+              value={minOrderQuantity || ''}
+              onChange={(e) => setMinOrderQuantity(parseInt(e.target.value) || 0)}
+              placeholder="0"
+            />
+            <Input
+              label="Max Order Qty"
+              type="number"
+              value={maxOrderQuantity || ''}
+              onChange={(e) => setMaxOrderQuantity(parseInt(e.target.value) || 0)}
+              placeholder="0"
+            />
+            <Input
+              label="Expiration Date"
+              type="date"
+              value={expirationDate}
+              onChange={(e) => setExpirationDate(e.target.value)}
+              placeholder="2026-04-02"
+            />
+          </div>
+          
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-gray-700">
-              Main Image *
+              Storage Instructions
+            </label>
+            <textarea
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              value={storageInstructions}
+              onChange={(e) => setStorageInstructions(e.target.value)}
+              placeholder="Bảo quản trong tủ lạnh..."
+              rows={2}
+            />
+          </div>
+          
+          <div className="grid grid-cols-4 gap-2">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={isPerishable}
+                onChange={(e) => setIsPerishable(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <span className="text-sm font-medium">Perishable</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={isFeatured}
+                onChange={(e) => setIsFeatured(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <span className="text-sm font-medium">Featured</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={isNew}
+                onChange={(e) => setIsNew(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <span className="text-sm font-medium">New</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={isOnSale}
+                onChange={(e) => setIsOnSale(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <span className="text-sm font-medium">On Sale</span>
+            </label>
+          </div>
+          
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">
+              Main Image {mode === 'create' ? '*' : '(Optional - tải lên để cập nhật)'}
             </label>
             <input
               type="file"
@@ -909,7 +1122,11 @@ export default function ProductsPage() {
                 file:bg-primary-50 file:text-primary-700
                 hover:file:bg-primary-100"
             />
-            <p className="text-xs text-gray-500">Co the bo trong neu backend khong bat buoc anh chinh.</p>
+            <p className="text-xs text-gray-500">
+              {mode === 'create' 
+                ? 'Hình ảnh chính (bắt buộc). Nếu backend không bắt buộc, có thể bỏ trống.'
+                : 'Nếu muốn thay đổi ảnh chính, hãy tải lên ảnh mới. Nếu không tải, ảnh cũ sẽ được giữ.'}
+            </p>
           </div>
 
           <div className="flex flex-col gap-1">
@@ -929,8 +1146,13 @@ export default function ProductsPage() {
                 hover:file:bg-primary-100"
             />
             {additionalImages.length > 0 && (
-              <p className="text-xs text-gray-500">Da chon {additionalImages.length} anh phu</p>
+              <p className="text-xs text-gray-500">Đã chọn {additionalImages.length} ảnh phụ</p>
             )}
+            <p className="text-xs text-gray-500">
+              {mode === 'create' 
+                ? 'Chọn các ảnh phụ (tùy chọn)'
+                : 'Nếu muốn thêm ảnh phụ, hãy chọn ảnh mới. Nếu không chọn, ảnh cũ sẽ được giữ.'}
+            </p>
           </div>
           
           <Input
