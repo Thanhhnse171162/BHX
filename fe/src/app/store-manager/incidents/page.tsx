@@ -57,14 +57,7 @@ function mapApiPriority(quality?: number): Priority {
 }
 
 function resolveUserDisplayName(user: { full_name?: string; fullName?: string; name?: string; userName?: string; email?: string } | null): string {
-  if (!user) {
-    console.log('[resolveUserDisplayName] User is null/undefined')
-    return ''
-  }
-
-  const result = (user?.full_name || user?.fullName || user?.name || user?.userName || user?.email || '').trim()
-  console.log('[resolveUserDisplayName] User object:', { user, result })
-  return result
+  return (user?.full_name || user?.fullName || user?.name || user?.userName || user?.email || '').trim()
 }
 
 function normalizeUuid(value?: string): string {
@@ -101,9 +94,6 @@ function resolveReporterDisplayNameFromReport(report: DamageReportFromAPI): stri
     userName?: string
     fullName?: string
     full_name?: string
-    createdByUserName?: string
-    createdByFullName?: string
-    createdBy?: string
     reporter?: {
       full_name?: string
       fullName?: string
@@ -111,12 +101,6 @@ function resolveReporterDisplayNameFromReport(report: DamageReportFromAPI): stri
       userName?: string
     }
     reportedByUser?: {
-      full_name?: string
-      fullName?: string
-      name?: string
-      userName?: string
-    }
-    createdByUser?: {
       full_name?: string
       fullName?: string
       name?: string
@@ -130,8 +114,6 @@ function resolveReporterDisplayNameFromReport(report: DamageReportFromAPI): stri
     raw.reporterFullName ||
     raw.reportedByFullName ||
     raw.createdByName ||
-    raw.createdByUserName ||
-    raw.createdByFullName ||
     raw.userName ||
     raw.fullName ||
     raw.full_name ||
@@ -143,10 +125,6 @@ function resolveReporterDisplayNameFromReport(report: DamageReportFromAPI): stri
     raw.reportedByUser?.fullName ||
     raw.reportedByUser?.name ||
     raw.reportedByUser?.userName ||
-    raw.createdByUser?.full_name ||
-    raw.createdByUser?.fullName ||
-    raw.createdByUser?.name ||
-    raw.createdByUser?.userName ||
     ''
   ).trim()
 }
@@ -158,112 +136,74 @@ async function buildReporterNameMap(reports: DamageReportFromAPI[]): Promise<Map
 
   if (ids.length === 0) return new Map()
 
-  console.log('[buildReporterNameMap] Building map for user IDs:', ids)
-
   const idToName = new Map<string, string>()
 
-  // Strategy 1: Fetch all users at once (efficient)
   try {
-    console.log('[buildReporterNameMap] Fetching all users via /api/users/list...')
+    // Fetch all users at once instead of individual calls
     const [iamUsers, localUsers] = await Promise.all([
-      UserAPIService.getIamUsersList().catch((err) => {
-        console.warn('[buildReporterNameMap] IAM list failed:', err)
-        return []
-      }),
-      UserAPIService.getAll().catch((err) => {
-        console.warn('[buildReporterNameMap] Local list failed:', err)
-        return []
-      }),
+      UserAPIService.getIamUsersList().catch(() => []),
+      UserAPIService.getAll().catch(() => []),
     ])
 
-    const allUsers = [...iamUsers, ...localUsers]
-    console.log('[buildReporterNameMap] Fetched users:', { iamCount: iamUsers.length, localCount: localUsers.length })
-
-    // Build lookup map
-    allUsers.forEach((user) => {
+    const users = [...iamUsers, ...localUsers]
+    
+    // Build map from all fetched users
+    users.forEach((user) => {
       const name = resolveUserDisplayName(user)
-      if (!name) {
-        console.log('[buildReporterNameMap] User has no name:', user)
-        return
-      }
+      if (!name) return
 
-      // Try all possible ID fields
-      const userIds = [
-        user.id,
-        (user as any).userId,
-        (user as any).user_id,
-        (user as any).sub,
-        (user as any).uid,
-      ]
-        .map((v) => String(v || '').trim())
-        .filter(Boolean)
-
-      console.log('[buildReporterNameMap] Mapping user:', { name, userIds })
-
-      userIds.forEach((uid) => {
-        idToName.set(normalizeUuid(uid), name)
+      // Map all possible ID variants to the name
+      getUserIdCandidates(user).forEach((id) => {
+        const normalized = normalizeUuid(id)
+        if (normalized && !idToName.has(normalized)) {
+          idToName.set(normalized, name)
+        }
       })
     })
+  } catch (error) {
+    console.warn('Error fetching users list:', error)
+  }
 
-    const found = ids.filter((id) => idToName.has(id))
-    const missing = ids.filter((id) => !idToName.has(id))
-    console.log('[buildReporterNameMap] After batch lookup:', { found: found.length, missing: missing.length, missing })
-
-    // If all IDs found, return early
-    if (missing.length === 0) {
-      const result = new Map(ids.map((id) => [id, idToName.get(id) || ''] as const).filter(([, name]) => name))
-      console.log('[buildReporterNameMap] All users found in batch fetch')
-      return result
-    }
-
-    // Strategy 2: Individual lookups for remaining users
-    console.log('[buildReporterNameMap] Attempting individual lookups for:', missing)
+  // For any unresolved IDs, do individual lookups
+  const unresolvedIds = ids.filter((id) => !idToName.has(id))
+  
+  if (unresolvedIds.length > 0) {
     const resolved = await Promise.all(
-      missing.map(async (id) => {
+      unresolvedIds.map(async (id) => {
         try {
           const localUser = await UserAPIService.getById(id)
-          const localName = resolveUserDisplayName(localUser)
-          if (localName) {
-            console.log('[buildReporterNameMap] Local lookup SUCCESS:', { id, localName })
-            return [id, localName] as const
+          if (localUser) {
+            const localName = resolveUserDisplayName(localUser)
+            if (localName) return [id, localName] as const
           }
-        } catch (err) {
-          console.warn('[buildReporterNameMap] Local lookup FAILED:', { id, error: err })
+        } catch (error) {
+          console.warn(`Local lookup failed for ${id}:`, error)
         }
 
         try {
           const iamUser = await UserAPIService.getIamDetailsById(id)
-          const iamName = resolveUserDisplayName(iamUser)
-          if (iamName) {
-            console.log('[buildReporterNameMap] IAM lookup SUCCESS:', { id, iamName })
-            return [id, iamName] as const
+          if (iamUser) {
+            const iamName = resolveUserDisplayName(iamUser)
+            if (iamName) return [id, iamName] as const
           }
-        } catch (err) {
-          console.warn('[buildReporterNameMap] IAM lookup FAILED:', { id, error: err })
+        } catch (error) {
+          console.warn(`IAM lookup failed for ${id}:`, error)
         }
 
-        console.warn('[buildReporterNameMap] All lookups FAILED for:', id)
-        return null
+        // If all lookups fail, keep the UUID
+        return [id, id] as const
       })
     )
 
-    resolved.forEach((entry) => {
-      if (entry) {
-        const [id, name] = entry
+    // Add resolved names to map
+    resolved.forEach(([id, name]) => {
+      if (id && !idToName.has(id)) {
         idToName.set(id, name)
       }
     })
-
-    const finalMap = new Map(
-      ids.map((id) => [id, idToName.get(id) || ''] as const).filter(([, name]) => name)
-    )
-    console.log('[buildReporterNameMap] Final map size:', finalMap.size)
-    return finalMap
-  } catch (err) {
-    console.error('[buildReporterNameMap] Critical error:', err)
-    return new Map()
   }
-}
+
+  return idToName
 }
 
 function mapDamageReportToIncident(
@@ -280,20 +220,26 @@ function mapDamageReportToIncident(
 
   const reportedBy = (report.reportedBy || '').trim()
   
-  // Priority 1: Try to extract name directly from report object (backend might populate it)
+  // Priority 1: Try to extract name directly from report object (backend-populated field)
   let reporter = resolveReporterDisplayNameFromReport(report).trim()
   
   // Priority 2: Try to get name from lookup map (from IAM/user API)
   if (!reporter && reportedBy) {
-    const mappedName = reporterNameMap.get(normalizeUuid(reportedBy))
+    const normalizedId = normalizeUuid(reportedBy)
+    const mappedName = reporterNameMap.get(normalizedId)
     if (mappedName && !looksLikeUuid(mappedName)) {
-      reporter = mappedName
+      reporter = mappedName.trim()
     }
   }
   
-  // Last resort: show "Không xác định" (Unknown) instead of UUID
+  // Priority 3: Use reportedByName field if available
+  if (!reporter && (report as any).reportedByName) {
+    reporter = ((report as any).reportedByName || '').trim()
+  }
+  
+  // Last resort: show the user ID if we have one, otherwise "—"
   if (!reporter) {
-    reporter = 'Không xác định'
+    reporter = reportedBy || '—'
   }
 
   return {

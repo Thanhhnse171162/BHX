@@ -77,12 +77,14 @@ export interface DamageReportFromAPI {
   productId?: string
   damageType?: string
   reportedBy?: string
+  reportedByName?: string
   reportedDate?: string
   quality?: number
   description?: string
   photos?: string[]
   status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | string
   approvedBy?: string | null
+  approvedByName?: string | null
   approvedDate?: string | null
   createdAt?: string
 }
