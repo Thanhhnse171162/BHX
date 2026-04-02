@@ -316,6 +316,9 @@ export default function ProductsPage() {
       setUnit(fullProduct.unit || '')
       setStatus(fullProduct.isActive ? 'ACTIVE' : 'INACTIVE')
       
+      // Map supplier ID
+      setSupplierId((fullProduct as any).supplierId || (fullProduct as any).SupplierId || '')
+      
       // Map additional fields
       setBarcode(fullProduct.barcode || '')
       setDescription(fullProduct.description || '')
@@ -546,7 +549,7 @@ export default function ProductsPage() {
           appendIfDefined('name', name)
           appendIfDefined('description', description)
           appendIfDefined('categoryId', category)
-          appendIfDefined('supplierId', suppliers.length > 0 ? suppliers[0].id : '')
+          appendIfDefined('supplierId', supplierId)
           appendIfDefined('brand', brand)
           appendIfDefined('origin', origin)
           appendIfDefined('price', price)
@@ -598,7 +601,7 @@ export default function ProductsPage() {
             name,
             description: description || null,
             categoryId: category,
-            supplierId: suppliers.length > 0 ? suppliers[0].id : null,
+            supplierId: supplierId || null,
             brand: brand || null,
             origin: origin || null,
             price,
@@ -911,28 +914,26 @@ export default function ProductsPage() {
               })}
             </select>
           </div>
-          {mode === 'create' && (
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-700">
-                Nhà cung cấp *
-              </label>
-              <select
-                className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                value={supplierId}
-                onChange={(e) => setSupplierId(e.target.value)}
-                required
-              >
-                <option value="" disabled>
-                  {suppliers.length > 0 ? 'Chọn nhà cung cấp' : 'Không có nhà cung cấp'}
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">
+              Nhà cung cấp {mode === 'create' ? '*' : '(Tùy chọn)'}
+            </label>
+            <select
+              className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              value={supplierId}
+              onChange={(e) => setSupplierId(e.target.value)}
+              required={mode === 'create'}
+            >
+              <option value="" disabled>
+                {suppliers.length > 0 ? 'Chọn nhà cung cấp' : 'Không có nhà cung cấp'}
+              </option>
+              {suppliers.map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>
+                  {supplier.name}
                 </option>
-                {suppliers.map((supplier) => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+              ))}
+            </select>
+          </div>
           <Input
             label="Giá"
             type="number"
