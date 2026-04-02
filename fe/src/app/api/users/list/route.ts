@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       headers.Authorization = `Bearer ${cookieToken}`
     }
 
-    const response = await fetch(`${IAM_SERVICE_URL}/api/users/list`, {
+    const response = await fetch(`${IAM_SERVICE_URL}/api/users`, {
       method: 'GET',
       headers,
       cache: 'no-store',

@@ -100,7 +100,7 @@ export class UserAPIService {
 
       // Prefer Next.js proxy to avoid browser CORS issues when calling IAM directly.
       try {
-        const proxyRes = await fetch('/api/users/list', {
+        const proxyRes = await fetch('/api/users', {
           method: 'GET',
           headers,
         })
@@ -116,7 +116,7 @@ export class UserAPIService {
 
       // Call backend directly with full URL
       const iamBaseUrl = process.env.NEXT_PUBLIC_IAM_URL || 'http://13.229.29.52:5000'
-      const url = `${iamBaseUrl}/api/users/list`
+      const url = `${iamBaseUrl}/api/users`
 
       const res = await fetch(url, {
         method: 'GET',

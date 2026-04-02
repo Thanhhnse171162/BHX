@@ -136,7 +136,6 @@ export default function UsersPage() {
       // Try local database first (will show newly created users)
       // If it fails, fallback to IAM service
       let response = await fetch('/api/users', { headers })
-      if (!response.ok) response = await fetch('/api/users/list', { headers })
 
       console.log('📋 loadUsers response:', response.status, response.statusText, response.url)
 

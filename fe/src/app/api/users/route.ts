@@ -38,9 +38,10 @@ export async function GET(request: NextRequest) {
   // Fall back to IAM service (primary method on Vercel)
   try {
     const authHeader = request.headers.get('authorization') || ''
-    console.log(`📡 Fetching users from IAM service: ${IAM_SERVICE_URL}/api/users/list`)
+    const iamEndpoint = `${IAM_SERVICE_URL}/api/users`
+    console.log(`📡 Fetching users from IAM service: ${iamEndpoint}`)
     
-    const iamRes = await fetch(`${IAM_SERVICE_URL}/api/users/list`, {
+    const iamRes = await fetch(iamEndpoint, {
       headers: {
         Authorization: authHeader,
       },
