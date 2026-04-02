@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
 
 export function StoreWarehouseHeader() {
-  const { user, logout } = useAuth()
+  const { logout } = useAuth()
   const router = useRouter()
 
   const handleLogout = () => {
