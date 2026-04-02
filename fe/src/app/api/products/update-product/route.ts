@@ -17,6 +17,7 @@ async function parseResponseBody(response: Response) {
 
 /**
  * PUT /api/products/update-product?id={id} - Cập nhật product
+ * Converts FormData to JSON and forwards to backend
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -30,30 +31,40 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const contentType = request.headers.get('content-type') || ''
-    
     console.log('🔄 Forwarding PUT /api/products/update-product to:', CATALOG_SERVICE_URL)
-    console.log('📋 Content-Type:', contentType)
+
+    // Parse FormData and convert to JSON object (skip files)
+    const formData = await request.formData()
+    const jsonPayload: Record<string, unknown> = {}
+
+    for (const [key, value] of formData.entries()) {
+      // Skip file fields, only include text fields
+      if (!(value instanceof File)) {
+        // Convert boolean string values back to actual booleans
+        if (value === 'true') {
+          jsonPayload[key] = true
+        } else if (value === 'false') {
+          jsonPayload[key] = false
+        } else {
+          jsonPayload[key] = value
+        }
+      }
+    }
+
+    console.log('📋 Converted FormData to JSON:', JSON.stringify(jsonPayload, null, 2))
 
     const authHeader = request.headers.get('authorization')
-    const headers: HeadersInit = {}
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    }
     if (authHeader) {
       headers['Authorization'] = authHeader
     }
-    if (contentType) {
-      headers['Content-Type'] = contentType
-    }
 
-    // Forward raw body to preserve multipart boundary and exact payload format.
-    const rawBody = await request.arrayBuffer()
-    const backendBody: BodyInit | undefined = rawBody.byteLength > 0 ? rawBody : undefined
-
-    console.log('📦 Forwarding update payload to backend')
-    
     const response = await fetch(`${CATALOG_SERVICE_URL}/api/Product/Update-Product?id=${id}`, {
       method: 'PUT',
       headers,
-      body: backendBody,
+      body: JSON.stringify(jsonPayload),
     })
 
     const result = await parseResponseBody(response)
@@ -80,3 +91,4 @@ export async function PUT(request: NextRequest) {
     )
   }
 }
+
