@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const CATALOG_SERVICE_URL = process.env.NEXT_PUBLIC_CATALOG_URL || 'http://13.229.29.52:5001'
 
+async function parseResponseBody(response: Response) {
+  const raw = await response.text()
+  if (!raw || !raw.trim()) {
+    return null
+  }
+
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return raw
+  }
+}
+
 /**
  * PUT /api/products/update-product?id={id} - Cập nhật product
  */
@@ -43,15 +56,18 @@ export async function PUT(request: NextRequest) {
       body: backendBody,
     })
 
+    const result = await parseResponseBody(response)
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      console.error('❌ Backend error:', response.status, errorData)
-      return NextResponse.json(errorData, { status: response.status })
+      console.error('❌ Backend error:', response.status, result)
+      return NextResponse.json(
+        result ?? { success: false, error: `Backend returned ${response.status}` },
+        { status: response.status }
+      )
     }
 
-    const result = await response.json()
     console.log('✅ Update success:', result)
-    return NextResponse.json(result, { status: 200 })
+    return NextResponse.json(result ?? { success: true }, { status: response.status })
   } catch (error: any) {
     console.error('❌ Update Product Error:', error.message)
     return NextResponse.json(

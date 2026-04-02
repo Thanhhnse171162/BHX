@@ -34,6 +34,16 @@ interface ProductRow {
   [key: string]: unknown
 }
 
+type ProductWithFlexibleKeys = ProductFromAPI & {
+  supplierId?: unknown
+  SupplierId?: unknown
+  supplierID?: unknown
+  SupplierID?: unknown
+  supplier_id?: unknown
+  supplier?: { id?: unknown } | unknown
+  Supplier?: { id?: unknown } | unknown
+}
+
 export default function ProductsPage() {
   const [products, setProducts] = useState<ProductRow[]>([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -275,6 +285,35 @@ export default function ProductsPage() {
     return isNaN(num) ? 0 : num
   }
 
+  const resolveSupplierId = (product: ProductWithFlexibleKeys): string => {
+    const supplierObj =
+      product.supplier && typeof product.supplier === 'object'
+        ? (product.supplier as { id?: unknown })
+        : null
+    const supplierObjPascal =
+      product.Supplier && typeof product.Supplier === 'object'
+        ? (product.Supplier as { id?: unknown })
+        : null
+
+    const candidates: Array<unknown> = [
+      product.supplierId,
+      product.SupplierId,
+      product.supplierID,
+      product.SupplierID,
+      product.supplier_id,
+      supplierObj?.id,
+      supplierObjPascal?.id,
+    ]
+
+    for (const candidate of candidates) {
+      if (candidate === undefined || candidate === null) continue
+      const normalized = String(candidate).trim()
+      if (normalized) return normalized
+    }
+
+    return ''
+  }
+
   const handleEdit = async (row: ProductRow) => {
     setMode('edit')
     setEditingId(row.id)
@@ -294,8 +333,9 @@ export default function ProductsPage() {
       setUnit(fullProduct.unit || '')
       setStatus(fullProduct.isAvailable ? 'ACTIVE' : 'INACTIVE')
       
-      // Map supplier ID
-      setSupplierId((fullProduct as any).supplierId || (fullProduct as any).SupplierId || '')
+      // Map supplier ID with flexible key support from inconsistent backend payloads
+      const resolvedSupplierId = resolveSupplierId(fullProduct as ProductWithFlexibleKeys)
+      setSupplierId(resolvedSupplierId || suppliers[0]?.id || '')
       
       // Map additional fields
       setBarcode(fullProduct.barcode || '')
