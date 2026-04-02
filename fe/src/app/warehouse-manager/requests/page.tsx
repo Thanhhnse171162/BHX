@@ -74,6 +74,34 @@ function normalizeId(value?: string | null): string {
   return String(value ?? '').trim().toLowerCase()
 }
 
+function normalizeDisplayName(user?: {
+  full_name?: string
+  fullName?: string
+  name?: string
+  email?: string
+} | null): string {
+  return String(user?.full_name || user?.fullName || user?.name || user?.email || '').trim()
+}
+
+function looksLikeUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || '').trim())
+}
+
+function getRequesterDisplayName(
+  requestedBy: string,
+  userMap: Record<string, string>,
+): string {
+  const normalizedRequestedBy = normalizeId(requestedBy)
+  const mappedName = userMap[normalizedRequestedBy]
+  if (mappedName) return mappedName
+
+  const rawRequestedBy = String(requestedBy || '').trim()
+  if (!rawRequestedBy) return '—'
+  if (!looksLikeUuid(rawRequestedBy)) return rawRequestedBy
+
+  return rawRequestedBy
+}
+
 function toValidRequestedQuantity(value: string): number {
   const parsed = Number(value)
   if (!Number.isFinite(parsed) || parsed < 1) return 1
@@ -304,16 +332,13 @@ export default function WarehouseManagerRequestsPage() {
         
         // Map tất cả users để hiển thị tên của requestedBy (sử dụng normalized id làm key)
         for (const u of allUsers) {
-          const userName = u.full_name || u.fullName || u.name || u.email || u.id
+          const userName = normalizeDisplayName(u) || u.id
           const normalizedUserId = normalizeId(u.id)
           userMap[normalizedUserId] = userName
           console.log(`  ✓ Mapped: ${normalizedUserId} -> ${userName}`)
         }
-        console.log(`✅ userMap build complete with ${Object.keys(userMap).length} entries`)
-        setUserMap(userMap)
       } catch (error) {
         console.error('❌ Failed to fetch users:', error)
-        setUserMap({})
       }
 
       // Tab "Yêu cầu từ Cửa hàng" - GET /api/restock-requests/by-parent-warehouse/{parentWarehouseId}
@@ -336,12 +361,41 @@ export default function WarehouseManagerRequestsPage() {
         warehouseRequests = []
       }
 
+      const unresolvedRequesterIds = Array.from(
+        new Set(
+          [...storeRequests, ...warehouseRequests]
+            .map((req) => normalizeId(req.requestedBy))
+            .filter((id) => id && !userMap[id]),
+        ),
+      )
+
+      if (unresolvedRequesterIds.length > 0) {
+        const resolvedUsers = await Promise.all(
+          unresolvedRequesterIds.map(async (id) => {
+            try {
+              const user = await UserAPIService.getById(id)
+              const userName = normalizeDisplayName(user)
+              return userName ? ([id, userName] as const) : null
+            } catch {
+              return null
+            }
+          }),
+        )
+
+        resolvedUsers.forEach((entry) => {
+          if (!entry) return
+          userMap[entry[0]] = entry[1]
+        })
+      }
+
+      console.log(`✅ userMap build complete with ${Object.keys(userMap).length} entries`)
+      setUserMap(userMap)
+
       const storeItems: RequestItem[] = storeRequests
         .filter((req) => String(req.fromWarehouseId ?? '').trim().toLowerCase() === String(warehouseId ?? '').trim().toLowerCase())
         .map((req) => {
           const productNames = req.items?.map((item) => item.productName || productMap[item.productId] || '--').join(', ') || '--'
-          const normalizedRequestedById = normalizeId(req.requestedBy)
-          const userName = userMap[normalizedRequestedById] || req.requestedBy || '--'
+          const userName = getRequesterDisplayName(req.requestedBy, userMap)
           const createdAtDate = req.requestedDate ? new Date(req.requestedDate).toLocaleDateString('vi-VN') : '--/--/----'
 
           return {
@@ -369,8 +423,7 @@ export default function WarehouseManagerRequestsPage() {
         })
         .map((req) => {
           const productNames = req.items?.map((item) => item.productName || productMap[item.productId] || '--').join(', ') || '--'
-          const normalizedRequestedById = normalizeId(req.requestedBy)
-          const userName = userMap[normalizedRequestedById] || req.requestedBy || '--'
+          const userName = getRequesterDisplayName(req.requestedBy, userMap)
           const createdAtDate = req.requestedDate ? new Date(req.requestedDate).toLocaleDateString('vi-VN') : '--/--/----'
 
           return {
@@ -2048,12 +2101,9 @@ export default function WarehouseManagerRequestsPage() {
               <div>
                 <p className="text-xs text-gray-500 uppercase font-semibold">Nguồn / Người yêu cầu</p>
                 <p className="text-sm font-medium text-gray-700">
-                  {selectedFullRequest ? (() => {
-                    const normalizedId = normalizeId(selectedFullRequest.requestedBy)
-                    const displayName = userMap[normalizedId] || selectedFullRequest.requestedBy
-                    console.log(`🔍 Detail Modal - requestedBy: ${selectedFullRequest.requestedBy}, normalized: ${normalizedId}, found in map: ${!!userMap[normalizedId]}, display: ${displayName}, userMapSize: ${Object.keys(userMap).length}`)
-                    return displayName || '—'
-                  })() : selectedRequest.source}
+                  {selectedFullRequest
+                    ? getRequesterDisplayName(selectedFullRequest.requestedBy, userMap)
+                    : selectedRequest.source}
                 </p>
               </div>
 
