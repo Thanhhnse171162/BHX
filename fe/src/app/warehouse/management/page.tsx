@@ -311,7 +311,7 @@ export default function WarehouseManagementPage() {
             />
 
             {/* Pagination Controls */}
-            {Math.ceil(warehouses.length / itemsPerPage) > 1 && (
+            {warehouses.length > 0 && (
               <div className="mt-6 flex items-center justify-between bg-white rounded-lg shadow p-4">
                 <div className="text-sm text-gray-600">
                   Hiển thị <span className="font-semibold">{(currentPage - 1) * itemsPerPage + 1}</span> đến&nbsp;
