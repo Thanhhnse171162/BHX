@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import axios from 'axios'
 
+// This route must be dynamic because it accesses request.headers
+export const dynamic = 'force-dynamic'
+
 const SALES_SERVICE_URL = process.env.SALES_URL || process.env.NEXT_PUBLIC_SALES_URL || 'http://13.229.29.52:5006'
 
 interface SaleFromApi {

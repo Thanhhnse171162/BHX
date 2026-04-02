@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import axios from 'axios'
 
+export const dynamic = 'force-dynamic'
+
 // Proxy to backend: GET /api/Inventory/location/{locationType}/{locationId}
 const INVENTORY_SERVICE_URL = process.env.INVENTORY_URL || process.env.NEXT_PUBLIC_INVENTORY_URL || 'http://13.229.29.52:5003'
 
