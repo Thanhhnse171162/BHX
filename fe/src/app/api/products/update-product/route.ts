@@ -2,8 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const CATALOG_SERVICE_URL = process.env.NEXT_PUBLIC_CATALOG_URL || 'http://13.229.29.52:5001'
 
+async function parseResponseBody(response: Response) {
+  const raw = await response.text()
+  if (!raw || !raw.trim()) {
+    return null
+  }
+
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return raw
+  }
+}
+
 /**
  * PUT /api/products/update-product?id={id} - Cập nhật product
+ * Converts FormData to JSON and forwards to backend
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -17,43 +31,54 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const contentType = request.headers.get('content-type') || ''
-    
     console.log('🔄 Forwarding PUT /api/products/update-product to:', CATALOG_SERVICE_URL)
-    console.log('📋 Content-Type:', contentType)
+
+    // Parse FormData and convert to JSON object (skip files)
+    const formData = await request.formData()
+    const jsonPayload: Record<string, unknown> = {}
+
+    for (const [key, value] of formData.entries()) {
+      // Skip file fields, only include text fields
+      if (!(value instanceof File)) {
+        // Convert boolean string values back to actual booleans
+        if (value === 'true') {
+          jsonPayload[key] = true
+        } else if (value === 'false') {
+          jsonPayload[key] = false
+        } else {
+          jsonPayload[key] = value
+        }
+      }
+    }
+
+    console.log('📋 Converted FormData to JSON:', JSON.stringify(jsonPayload, null, 2))
 
     const authHeader = request.headers.get('authorization')
-    const headers: HeadersInit = {}
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    }
     if (authHeader) {
       headers['Authorization'] = authHeader
     }
 
-    // Always handle as FormData (backend only accepts FormData)
-    const formData = await request.formData()
-    const backendFormData = new FormData()
-    
-    // Copy all fields from formData to backendFormData
-    for (const [key, value] of formData.entries()) {
-      backendFormData.append(key, value)
-    }
-
-    console.log('📦 Sending FormData to backend')
-    
     const response = await fetch(`${CATALOG_SERVICE_URL}/api/Product/Update-Product?id=${id}`, {
       method: 'PUT',
-      headers, // Don't set Content-Type for FormData, let fetch handle it
-      body: backendFormData,
+      headers,
+      body: JSON.stringify(jsonPayload),
     })
 
+    const result = await parseResponseBody(response)
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      console.error('❌ Backend error:', response.status, errorData)
-      return NextResponse.json(errorData, { status: response.status })
+      console.error('❌ Backend error:', response.status, result)
+      return NextResponse.json(
+        result ?? { success: false, error: `Backend returned ${response.status}` },
+        { status: response.status }
+      )
     }
 
-    const result = await response.json()
     console.log('✅ Update success:', result)
-    return NextResponse.json(result, { status: 200 })
+    return NextResponse.json(result ?? { success: true }, { status: response.status })
   } catch (error: any) {
     console.error('❌ Update Product Error:', error.message)
     return NextResponse.json(
@@ -66,3 +91,4 @@ export async function PUT(request: NextRequest) {
     )
   }
 }
+

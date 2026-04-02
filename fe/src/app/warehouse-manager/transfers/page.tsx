@@ -16,6 +16,7 @@ import { TransferAPIService, type TransferFromAPI } from '@/services/transfer-ap
 import { RestockAPIService, type RestockRequestFromAPI } from '@/services/restock-api.service'
 import { ProductBatchAPIService, type ProductBatchFromAPI } from '@/services/product-batch-api.service'
 import { ProductAPIService } from '@/services/product-api.service'
+import { UserAPIService } from '@/services/user-api.service'
 
 type TransferStatus = 'PENDING' | 'IN_TRANSIT' | 'DELIVERED' | 'COMPLETED'
 
@@ -40,6 +41,25 @@ function formatDateVI(value?: string | null): string {
 function getStatusMeta(status: string | null | undefined) {
   const s = String(status ?? '').trim().toUpperCase() as TransferStatus
   return STATUS_META[s] ?? { label: status ?? '—', cls: 'bg-gray-50 text-gray-600 border-gray-200', dot: 'bg-gray-400' }
+}
+
+function resolveShippedByDisplay(
+  shippedBy: string | null | undefined,
+  userNameById: Record<string, string>,
+): string {
+  const raw = String(shippedBy ?? '').trim()
+  if (!raw) return '—'
+  return userNameById[normalizeId(raw)] ?? raw
+}
+
+function normalizeUserDisplayName(user: {
+  full_name?: string
+  fullName?: string
+  name?: string
+  email?: string
+  id?: string
+} | null | undefined): string {
+  return String(user?.full_name ?? user?.fullName ?? user?.name ?? user?.email ?? user?.id ?? '').trim()
 }
 
 function sumExpectedQty(t: TransferFromAPI) {
@@ -162,11 +182,13 @@ function TransferDetailModal({
   transferId,
   onClose,
   locationsById,
+  userNameById,
 }: {
   open: boolean
   transferId: string | null
   onClose: () => void
   locationsById: Record<string, string>
+  userNameById: Record<string, string>
 }) {
   const [loading, setLoading] = useState(false)
   const [transfer, setTransfer] = useState<TransferFromAPI | null>(null)
@@ -296,7 +318,7 @@ function TransferDetailModal({
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Người giao</p>
-                  <p className="mt-1 font-medium text-gray-900">{transfer.shippedBy ?? '—'}</p>
+                  <p className="mt-1 font-medium text-gray-900">{resolveShippedByDisplay(transfer.shippedBy, userNameById)}</p>
                 </div>
                 <div className="min-w-[240px]">
                   <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Ghi chú</p>
@@ -816,6 +838,7 @@ export default function WarehouseManagerTransfersPage() {
 
   const [locationsById, setLocationsById] = useState<Record<string, string>>({})
   const [storeOptions, setStoreOptions] = useState<{ id: string; name: string }[]>([])
+  const [userNameById, setUserNameById] = useState<Record<string, string>>({})
 
   const [transfers, setTransfers] = useState<TransferFromAPI[]>([])
 
@@ -896,6 +919,39 @@ export default function WarehouseManagerTransfersPage() {
     }
   }, [token, normalizedCurrentWarehouseId, storeOptions])
 
+  const loadUsers = useCallback(async () => {
+    const users = await UserAPIService.getAll()
+    const next: Record<string, string> = {}
+    for (const u of users ?? []) {
+      const id = normalizeId(u?.id)
+      const name = normalizeUserDisplayName(u)
+      if (id && name) {
+        next[id] = name
+      }
+    }
+    setUserNameById(next)
+  }, [])
+
+  const hydrateMissingUserNames = useCallback(async (ids: string[]) => {
+    const resolved = await Promise.all(
+      ids.map(async (id) => {
+        const user = await UserAPIService.getById(id)
+        const name = normalizeUserDisplayName(user)
+        return name ? [normalizeId(id), name] as const : null
+      })
+    )
+
+    setUserNameById((prev) => {
+      const next = { ...prev }
+      for (const entry of resolved) {
+        if (!entry) continue
+        const [id, name] = entry
+        if (!next[id]) next[id] = name
+      }
+      return next
+    })
+  }, [])
+
   useEffect(() => {
     void (async () => {
       if (!currentWarehouseId) {
@@ -913,6 +969,23 @@ export default function WarehouseManagerTransfersPage() {
     // Re-load transfers after we know store options
     void loadTransfers()
   }, [currentWarehouseId, loadTransfers])
+
+  useEffect(() => {
+    void loadUsers()
+  }, [loadUsers])
+
+  useEffect(() => {
+    const missingUserIds = Array.from(
+      new Set(
+        transfers
+          .map((t) => String(t.shippedBy ?? '').trim())
+          .filter((id) => id && !userNameById[normalizeId(id)])
+      )
+    )
+
+    if (missingUserIds.length === 0) return
+    void hydrateMissingUserNames(missingUserIds)
+  }, [hydrateMissingUserNames, transfers, userNameById])
 
   const derived = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -1108,7 +1181,7 @@ export default function WarehouseManagerTransfersPage() {
                           {ui.label}
                         </span>
                       </td>
-                      <td className="px-5 py-4 text-gray-700">{t.shippedBy ?? '—'}</td>
+                      <td className="px-5 py-4 text-gray-700">{resolveShippedByDisplay(t.shippedBy, userNameById)}</td>
                       <td className="px-5 py-4 text-gray-600">
                         <div className="break-all">{t.notes ?? '—'}</div>
                         <div className="text-[11px] text-gray-400 mt-1">
@@ -1158,6 +1231,7 @@ export default function WarehouseManagerTransfersPage() {
           setDetailId(null)
         }}
         locationsById={locationsById}
+        userNameById={userNameById}
       />
 
       <CreateTransferModal

@@ -56,8 +56,8 @@ function mapApiPriority(quality?: number): Priority {
   return 'low'
 }
 
-function resolveUserDisplayName(user: { full_name?: string; fullName?: string; name?: string } | null): string {
-  return (user?.full_name || user?.fullName || user?.name || '').trim()
+function resolveUserDisplayName(user: { full_name?: string; fullName?: string; name?: string; userName?: string; email?: string } | null): string {
+  return (user?.full_name || user?.fullName || user?.name || user?.userName || user?.email || '').trim()
 }
 
 function normalizeUuid(value?: string): string {
@@ -126,7 +126,9 @@ function resolveReporterDisplayNameFromReport(report: DamageReportFromAPI): stri
 }
 
 async function buildReporterNameMap(reports: DamageReportFromAPI[]): Promise<Map<string, string>> {
-  const ids = Array.from(new Set(reports.map((row) => (row.reportedBy || '').trim()).filter(Boolean)))
+  const ids = Array.from(
+    new Set(reports.map((row) => normalizeUuid(row.reportedBy)).filter(Boolean))
+  )
 
   if (ids.length === 0) return new Map()
 
@@ -149,7 +151,7 @@ async function buildReporterNameMap(reports: DamageReportFromAPI[]): Promise<Map
     })
 
     const resolved = ids.map((id) => {
-      const name = idToName.get(normalizeUuid(id)) || id
+      const name = idToName.get(id) || id
       return [id, name] as const
     })
     return new Map(resolved)
@@ -197,7 +199,7 @@ function mapDamageReportToIncident(
   const reportedBy = (report.reportedBy || '').trim()
   
   // Try to get name from map first (from API lookup)
-  let reporter = reportedBy ? reporterNameMap.get(reportedBy) : null
+  let reporter = reportedBy ? reporterNameMap.get(normalizeUuid(reportedBy)) : null
   
   // Fallback: try to extract name directly from report object
   if (!reporter) {
