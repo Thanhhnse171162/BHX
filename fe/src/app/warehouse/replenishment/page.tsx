@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Plus, Search, SlidersHorizontal, Eye,
+  Plus, Search, Eye,
   ChevronLeft, ChevronRight, X, ChevronDown,
   Package, ArrowRight, Trash2
 } from 'lucide-react'

@@ -1587,10 +1587,12 @@ export default function WarehouseRequestsPage() {
                       ) : selectedTransfer.items.map((item: any, idx: number) => {
                         const product = products.find(p => p.id === item.productId)
                         const productName = item.productName || product?.name || item.productId || '—'
+                        const batch = batches.find(b => b.id === item.batchId)
+                        const batchName = item.batchNumber || batch?.batchNumber || '—'
                         return (
                           <tr key={item.id} className={idx !== selectedTransfer.items.length - 1 ? 'border-b border-gray-100' : ''}>
                             <td className="px-4 py-3 font-medium text-gray-800">{productName}</td>
-                            <td className="px-4 py-3 text-gray-500 text-xs font-mono">{item.batchNumber || item.batchId || '—'}</td>
+                            <td className="px-4 py-3 text-gray-500 text-xs font-mono">{batchName}</td>
                             <td className="px-4 py-3 font-semibold text-blue-600">{item.requestedQuantity ?? '—'}</td>
                             <td className="px-4 py-3 text-gray-600">{item.shippedQuantity ?? '—'}</td>
                             <td className="px-4 py-3 font-semibold text-teal-600">{item.receivedQuantity ?? '—'}</td>
