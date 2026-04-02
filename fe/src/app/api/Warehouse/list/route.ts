@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(req: NextRequest) {
   try {
     const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://13.229.29.52:5000'
