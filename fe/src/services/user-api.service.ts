@@ -1,6 +1,23 @@
 import axios, { AxiosInstance } from 'axios'
 import { useAuthStore } from '@/store/auth.store'
 
+const AUTH_WAIT_INTERVAL_MS = 100
+const AUTH_WAIT_MAX_ATTEMPTS = 30
+
+async function waitForAuthHydration(): Promise<string> {
+  if (typeof window === 'undefined') {
+    return ''
+  }
+
+  let attempts = 0
+  while (!useAuthStore.getState().hydrated && attempts < AUTH_WAIT_MAX_ATTEMPTS) {
+    await new Promise((resolve) => setTimeout(resolve, AUTH_WAIT_INTERVAL_MS))
+    attempts++
+  }
+
+  return useAuthStore.getState().token || ''
+}
+
 // Call Next.js API route (local DB-backed users)
 const localApiClient: AxiosInstance = axios.create({
   baseURL: '/api',
@@ -36,6 +53,13 @@ export interface UserInfoFromAPI {
 export class UserAPIService {
   static async getAll(): Promise<UserInfoFromAPI[]> {
     try {
+      const token = await waitForAuthHydration()
+
+      if (!token) {
+        console.warn('⚠️ No auth token available after hydration; skipping user fetch')
+        return []
+      }
+
       console.log('📍 UserAPIService.getAll() - Trying local /api/users')
       const res = await localApiClient.get('/users')
       const payload = res.data
@@ -67,6 +91,12 @@ export class UserAPIService {
 
   static async getById(id: string): Promise<UserInfoFromAPI | null> {
     if (!id) return null
+
+    const token = await waitForAuthHydration()
+    if (!token) {
+      console.warn(`⚠️ No auth token available after hydration; skipping user fetch for ${id}`)
+      return null
+    }
     
     // Try local API route first
     try {
@@ -98,7 +128,7 @@ export class UserAPIService {
       if (token) headers.Authorization = `Bearer ${token}`
     }
 
-    const res = await fetch(`/iam/api/users/details/${encodeURIComponent(id)}`, {
+    const res = await fetch(`/api/users/${encodeURIComponent(id)}`, {
       method: 'GET',
       headers,
     })
@@ -112,90 +142,45 @@ export class UserAPIService {
 
   static async getIamUsersList(): Promise<UserInfoFromAPI[]> {
     try {
-      // Get token from auth store (may be empty on first load)
-      let token = ''
-      let authState = null
-      
-      if (typeof window !== 'undefined') {
-        try {
-          authState = useAuthStore.getState()
-          token = authState?.token || ''
-          console.log(`🔐 Auth state:`, {
-            hasUser: !!authState?.user,
-            hasToken: !!token,
-            tokenLength: token?.length || 0,
-            tokenPreview: token ? token.substring(0, 25) + '...' : 'none',
-            isAuthenticated: authState?.isAuthenticated,
-            hydrated: authState?.hydrated,
-          })
-        } catch (e) {
-          console.warn('⚠️ Failed to get auth store:', e)
-        }
-      } else {
-        console.warn('⚠️ Not in browser environment (SSR)')
+      const token = await waitForAuthHydration()
+
+      if (!token) {
+        console.warn('⚠️ No auth token available after hydration; skipping IAM users list fetch')
+        return []
       }
 
-      // Try multiple IAM endpoints
-      const iamBaseUrl = process.env.NEXT_PUBLIC_IAM_URL || 'http://13.229.29.52:5000'
-      const endpoints = [
-        `${iamBaseUrl}/api/users`,
-        `${iamBaseUrl}/api/users/list`,
-      ]
-
-      for (const endpoint of endpoints) {
-        try {
-          console.log(`📍 Trying IAM endpoint: ${endpoint}`)
-          
-          // Build headers with auth if available
-          const headers: HeadersInit = {
-            'Content-Type': 'application/json',
-          }
-          
-          if (token) {
-            headers.Authorization = `Bearer ${token}`
-            console.log(`   ✓ Sending Bearer token`)
-          } else {
-            console.warn(`   ⚠️ No token available, request may fail`)
-          }
-          
-          const res = await fetch(endpoint, {
-            method: 'GET',
-            headers,
-            credentials: 'include', // Send cookies if any
-          })
-
-          console.log(`   Response status: ${res.status}`)
-          
-          if (res.ok) {
-            const payload = await res.json().catch(() => null)
-            let users: UserInfoFromAPI[] = []
-            
-            if (Array.isArray(payload)) {
-              users = payload
-            } else if (payload?.data && Array.isArray(payload.data)) {
-              users = payload.data
-            }
-            
-            console.log(`✅ IAM endpoint ${endpoint} returned ${users.length} users`)
-            return users
-          } else if (res.status === 401) {
-            const statusText = await res.text().catch(() => '')
-            console.warn(`⚠️ 401 Unauthorized from ${endpoint}`)
-            console.warn(`   Token provided: ${token ? 'yes' : 'no'}`)
-            if (statusText) console.warn(`   Error: ${statusText.substring(0, 100)}`)
-            // Don't continue on 401 - token is missing/invalid
-          } else {
-            const statusText = await res.text().catch(() => '')
-            console.log(`⚠️ IAM endpoint ${endpoint} returned status ${res.status}`)
-            if (statusText) console.log(`   Error: ${statusText.substring(0, 100)}`)
-          }
-        } catch (error) {
-          console.log(`⚠️ Failed to fetch from ${endpoint}:`, error)
-          continue
-        }
+      console.log('📍 Trying IAM proxy endpoint: /api/users/list')
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
       }
 
-      console.log('❌ All IAM endpoints failed')
+      const res = await fetch('/api/users/list', {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+      })
+
+      console.log(`   Response status: ${res.status}`)
+
+      if (res.ok) {
+        const payload = await res.json().catch(() => null)
+        let users: UserInfoFromAPI[] = []
+
+        if (Array.isArray(payload)) {
+          users = payload
+        } else if (payload?.data && Array.isArray(payload.data)) {
+          users = payload.data
+        }
+
+        console.log(`✅ IAM proxy endpoint returned ${users.length} users`)
+        return users
+      }
+
+      const statusText = await res.text().catch(() => '')
+      console.warn(`⚠️ IAM proxy endpoint returned status ${res.status}`)
+      if (statusText) console.warn(`   Error: ${statusText.substring(0, 100)}`)
+
       return []
     } catch (error) {
       console.error('❌ getIamUsersList error:', error)

@@ -2,21 +2,26 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const IAM_SERVICE_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://13.229.29.52:5000'
 
+function getIamAuthorization(request: NextRequest) {
+  const authHeader = request.headers.get('authorization') || ''
+  const cookieToken = request.cookies.get('auth_token')?.value
+  return authHeader || (cookieToken ? `Bearer ${cookieToken}` : '')
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization')
-    const cookieToken = request.cookies.get('auth_token')?.value
+    const authorization = getIamAuthorization(request)
+
+    if (!authorization) {
+      return NextResponse.json([], { status: 200 })
+    }
 
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       Accept: '*/*',
     }
 
-    if (authHeader) {
-      headers.Authorization = authHeader
-    } else if (cookieToken) {
-      headers.Authorization = `Bearer ${cookieToken}`
-    }
+    headers.Authorization = authorization
 
     const response = await fetch(`${IAM_SERVICE_URL}/api/users`, {
       method: 'GET',

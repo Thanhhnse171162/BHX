@@ -44,15 +44,23 @@ export async function GET(request: NextRequest) {
     `${IAM_SERVICE_URL}/api/users/list`,
   ]
 
+    const authHeader = request.headers.get('authorization') || ''
+    const cookieToken = request.cookies.get('auth_token')?.value
+    const authorization = authHeader || (cookieToken ? `Bearer ${cookieToken}` : '')
+
+    if (!authorization) {
+      console.warn('⚠️ No auth token available for IAM fallback, returning empty user list')
+      return NextResponse.json([], { status: 200 })
+    }
+
   for (const endpoint of endpoints) {
     try {
-      const authHeader = request.headers.get('authorization') || ''
       console.log(`📡 Trying IAM endpoint: ${endpoint}`)
       
       const iamRes = await fetch(endpoint, {
         method: 'GET',
         headers: {
-          'Authorization': authHeader,
+            'Authorization': authorization,
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
