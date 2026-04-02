@@ -584,19 +584,6 @@ export default function WarehousesAdminPage() {
             placeholder="Nhập địa điểm..."
           />
 
-          {mode === 'edit' && (
-            <Input
-              label="Dung Lượng"
-              type="number"
-              required
-              value={formData.capacity}
-              onChange={(e) =>
-                setFormData({ ...formData, capacity: parseInt(e.target.value) || 0 })
-              }
-              placeholder="Nhập dung lượng..."
-            />
-          )}
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Kho Phụ Thuộc
