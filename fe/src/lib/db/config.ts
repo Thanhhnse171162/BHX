@@ -11,17 +11,25 @@ function getHostFromUrl(value?: string): string | undefined {
 }
 
 function createDbConfig(): sql.config {
+  // Vercel environment check
+  const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV
+  
+  if (isVercel) {
+    throw new Error(
+      '❌ Direct database connections are not supported on Vercel. ' +
+      'API routes must call backend services instead:\n' +
+      '  - IAM Service: ' + (process.env.NEXT_PUBLIC_IAM_URL || 'http://13.229.29.52:5000') + '\n' +
+      '  - Catalog Service: ' + (process.env.NEXT_PUBLIC_CATALOG_URL || 'http://13.229.29.52:5001') + '\n' +
+      '  - Inventory Service: ' + (process.env.NEXT_PUBLIC_INVENTORY_URL || 'http://13.229.29.52:5003') + '\n\n' +
+      'Update your API route to use fetch() to call these services instead of executeQuery().'
+    )
+  }
+
   const inferredServer =
     process.env.DB_SERVER ||
     getHostFromUrl(process.env.IAM_URL) ||
     getHostFromUrl(process.env.NEXT_PUBLIC_IAM_URL) ||
     getHostFromUrl(process.env.NEXT_PUBLIC_API_BASE_URL)
-
-
-  
-  if (process.env.NODE_ENV === 'production' && !inferredServer) {
-    console.warn('⚠️ Warning: DB_SERVER not configured, falling back to localhost. Set DB_SERVER env var for production.')
-  }
 
   return {
     user: process.env.DB_USER || 'sa',

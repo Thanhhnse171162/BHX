@@ -4,9 +4,14 @@ import bcrypt from 'bcryptjs'
 
 const IAM_SERVICE_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://13.229.29.52:5000'
 
-// GET /api/users - List all users from local database
+// GET /api/users - List all users from IAM service (or local database if available)
 export async function GET(request: NextRequest) {
   try {
+    // On Vercel, skip local database and go directly to IAM service
+    if (process.env.VERCEL === '1' || process.env.VERCEL_ENV) {
+      throw new Error('Using IAM service on Vercel')
+    }
+
     const query = `
       SELECT 
         u.id,
@@ -29,7 +34,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Get users error:', error)
     
-    // Fall back to IAM service
+    // Fall back to IAM service (primary method on Vercel)
     try {
       const authHeader = request.headers.get('authorization') || ''
       const iamRes = await fetch(`${IAM_SERVICE_URL}/api/users/list`, {
