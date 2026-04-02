@@ -39,6 +39,23 @@ const normalizeStatus = (status: unknown): string => {
   return 'INACTIVE'
 }
 
+// Translate error messages from English to Vietnamese
+const translateErrorMessage = (message: string): string => {
+  const translations: Record<string, string> = {
+    'Cannot delete warehouse because some inventory records still have quantity > 0': 'Không thể xóa kho vì một số bản ghi tồn kho vẫn có hàng',
+    'Failed to delete warehouse': 'Không thể xóa kho',
+    'Unauthorized': 'Không có quyền truy cập',
+  }
+  
+  for (const [en, vi] of Object.entries(translations)) {
+    if (message && message.includes(en)) {
+      return message.replace(en, vi)
+    }
+  }
+  
+  return message
+}
+
 export default function WarehousesAdminPage() {
   const { token } = useAuthStore()
   const [filteredWarehouses, setFilteredWarehouses] = useState<AdminWarehouse[]>([])
@@ -63,6 +80,7 @@ export default function WarehousesAdminPage() {
     capacity: 0,
     status: 'ACTIVE',
     parentId: undefined,
+    isDeleted: false,
   })
 
   // Available warehouses for parent selection
@@ -169,6 +187,7 @@ export default function WarehousesAdminPage() {
       capacity: 0,
       status: 'ACTIVE',
       parentId: undefined,
+      isDeleted: false,
     })
     fetchAllWarehousesForParent()
     setIsModalOpen(true)
@@ -182,6 +201,7 @@ export default function WarehousesAdminPage() {
       capacity: 0,
       status: 'ACTIVE',
       parentId: undefined,
+      isDeleted: false,
     })
     setEditingId(null)
   }
@@ -195,6 +215,7 @@ export default function WarehousesAdminPage() {
       capacity: warehouse.capacity,
       status: warehouse.status,
       parentId: warehouse.parentId,
+      isDeleted: warehouse.isDeleted,
     })
     fetchAllWarehousesForParent()
     setIsModalOpen(true)
@@ -222,10 +243,10 @@ export default function WarehousesAdminPage() {
         showToast('Warehouse deleted successfully', 'success')
         fetchWarehouses()
       } else {
-        let errorMessage = 'Failed to delete warehouse'
+        let errorMessage = 'Không thể xóa kho'
         try {
           const data = await response.json()
-          errorMessage = data.message || errorMessage
+          errorMessage = translateErrorMessage(data.message || errorMessage)
         } catch (_e) {
           const text = await response.text()
           console.log('Response text:', text)
@@ -234,7 +255,7 @@ export default function WarehousesAdminPage() {
       }
     } catch (error) {
       console.error('Error deleting warehouse:', error)
-      showToast('Failed to delete warehouse', 'error')
+      showToast('Không thể xóa kho', 'error')
     }
   }
 
@@ -291,7 +312,10 @@ export default function WarehousesAdminPage() {
         const payload = {
           name: formData.name,
           location: formData.location,
+          capacity: formData.capacity,
+          status: formData.status === 'ACTIVE' ? 'Active' : 'Inactive',
           parentId: formData.parentId || null,
+          isDeleted: formData.isDeleted || false,
         }
 
         const headers: HeadersInit = { 'Content-Type': 'application/json' }
@@ -561,7 +585,6 @@ export default function WarehousesAdminPage() {
               setFormData({ ...formData, capacity: parseInt(e.target.value) || 0 })
             }
             placeholder="Nhập dung lượng..."
-            style={{ display: mode === 'create' ? 'block' : 'none' }}
           />
 
           <div>
@@ -589,7 +612,7 @@ export default function WarehousesAdminPage() {
             </select>
           </div>
 
-          <div style={{ display: mode === 'create' ? 'block' : 'none' }}>
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Trạng Thái
             </label>
@@ -606,6 +629,21 @@ export default function WarehousesAdminPage() {
               <option value="ACTIVE">Active</option>
               <option value="INACTIVE">Inactive</option>
             </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="isDeleted"
+              checked={formData.isDeleted || false}
+              onChange={(e) =>
+                setFormData({ ...formData, isDeleted: e.target.checked })
+              }
+              className="w-4 h-4 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            />
+            <label htmlFor="isDeleted" className="text-sm font-medium text-gray-700 cursor-pointer">
+              Đánh dấu là đã xóa
+            </label>
           </div>
 
           <div className="flex justify-end gap-3 pt-4">

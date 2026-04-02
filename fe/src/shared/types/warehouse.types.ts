@@ -1007,6 +1007,7 @@ export interface AdminWarehouseFormData {
   capacity: number;
   status: 'ACTIVE' | 'INACTIVE';
   parentId?: string;
+  isDeleted?: boolean;
 }
 
 export interface AdminWarehouseApiResponse {
