@@ -8,7 +8,7 @@ const INVENTORY_SERVICE_URL =
   process.env.NEXT_PUBLIC_INVENTORY_API_URL ||
   'http://13.229.29.52:5003'
 
-export async function PUT(
+export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
 ) {
@@ -36,14 +36,14 @@ export async function PUT(
       name,
       location,
       capacity,
-      status: status || 'Active',
+      status: status || 'ACTIVE',
       parentId: parentId || null,
     }
 
     console.log('🔵 Updating warehouse:', { url, id, payload })
 
     const response = await fetch(url, {
-      method: 'PUT',
+      method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
         Authorization: authHeader,

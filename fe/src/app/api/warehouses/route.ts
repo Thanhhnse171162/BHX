@@ -112,7 +112,7 @@ export async function POST(request: Request) {
       name,
       location,
       capacity,
-      status: status || 'Active', // .NET API expects "Active"/"Inactive"
+      status: status || 'ACTIVE', // Backend expects "ACTIVE"/"INACTIVE" (uppercase)
       parentId: parentId || null,
       // DO NOT include createdBy - backend auto-sets from JWT token
     }
