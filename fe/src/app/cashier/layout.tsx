@@ -147,7 +147,7 @@ export default function CashierLayout({ children }: CashierLayoutProps) {
                 Bách Hóa Xanh
               </p>
               <p className="text-[13px] text-green-600 font-medium font-sans mt-0.5">
-                Store Staff Portal
+                Nhân viên cửa hàng
               </p>
             </div>
           </div>
