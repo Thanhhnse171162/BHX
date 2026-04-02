@@ -660,6 +660,24 @@ export default function ProductsPage() {
                 },
                 { key: 'unit', label: 'Đơn vị' },
                 {
+                  key: 'status',
+                  label: 'Trạng thái',
+                  render: (value) => {
+                    const status = value as ProductStatus
+                    return (
+                      <span
+                        className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          status === 'ACTIVE'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}
+                      >
+                        {status === 'ACTIVE' ? 'Hoạt động' : 'Không hoạt động'}
+                      </span>
+                    )
+                  },
+                },
+                {
                   key: 'totalQuantity',
                   label: 'Tổng tồn',
                   render: (value) => (
@@ -727,6 +745,7 @@ export default function ProductsPage() {
                   label: 'Thao tác',
                   render: (_value, item) => {
                     const row = item as unknown as ProductRow
+                    const isInactive = row.status === 'INACTIVE'
                     return (
                       <div className="flex gap-2">
                         <Button
@@ -739,16 +758,18 @@ export default function ProductsPage() {
                         >
                           Sửa
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDelete(row.id)
-                          }}
-                        >
-                          Xóa
-                        </Button>
+                        {!isInactive && (
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDelete(row.id)
+                            }}
+                          >
+                            Xóa
+                          </Button>
+                        )}
                       </div>
                     )
                   },

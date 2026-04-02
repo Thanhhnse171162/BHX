@@ -273,7 +273,10 @@ export default function WarehouseManagerRequestsPage() {
         for (const p of products) {
           productMap[p.id] = p.name
         }
-      } catch {}
+        setProductMap(productMap)
+      } catch {
+        setProductMap({})
+      }
 
       const userMap: Record<string, string> = {}
 
@@ -2031,7 +2034,9 @@ export default function WarehouseManagerRequestsPage() {
 
               <div>
                 <p className="text-xs text-gray-500 uppercase font-semibold">Nguồn / Người yêu cầu</p>
-                <p className="text-sm font-medium text-gray-700">{selectedRequest.source}</p>
+                <p className="text-sm font-medium text-gray-700">
+                  {selectedFullRequest ? userMap[selectedFullRequest.requestedBy] || selectedFullRequest.requestedBy || '—' : selectedRequest.source}
+                </p>
               </div>
 
               {selectedFullRequest && selectedFullRequest.items && selectedFullRequest.items.length > 0 && (
@@ -2041,7 +2046,7 @@ export default function WarehouseManagerRequestsPage() {
                     {selectedFullRequest.items.map((item) => (
                       <div key={item.id} className="flex justify-between items-start text-sm">
                         <div className="flex-1">
-                          <p className="font-medium text-gray-900">{item.productName}</p>
+                          <p className="font-medium text-gray-900">{item.productName || productMap[item.productId] || '—'}</p>
                           <p className="text-xs text-gray-500 mt-0.5">{item.reason || '-'}</p>
                         </div>
                         <div className="text-right ml-2">
