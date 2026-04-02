@@ -274,14 +274,13 @@ export default function CashierDashboard() {
                       <th className="text-center px-4 py-3 text-sm font-semibold text-gray-500 uppercase tracking-wide border-b border-r border-gray-200">Mã HD</th>
                       <th className="text-center px-4 py-3 text-sm font-semibold text-gray-500 uppercase tracking-wide border-b border-r border-gray-200">Thời gian</th>
                       <th className="text-center px-4 py-3 text-sm font-semibold text-gray-500 uppercase tracking-wide border-b border-r border-gray-200">Khách hàng</th>
-                      <th className="text-center px-4 py-3 text-sm font-semibold text-gray-500 uppercase tracking-wide border-b border-r border-gray-200">Số SP</th>
                       <th className="text-center px-4 py-3 text-sm font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">Trạng thái</th>
                     </tr>
                   </thead>
                   <tbody>
                     {loadingInvoices ? (
                       <tr>
-                        <td colSpan={5} className="text-center py-10">
+                        <td colSpan={4} className="text-center py-10">
                           <div className="flex items-center justify-center gap-2 text-gray-500">
                             <Loader2 className="w-4 h-4 animate-spin" />
                             <span className="text-sm">Đang tải dữ liệu...</span>
@@ -290,7 +289,7 @@ export default function CashierDashboard() {
                       </tr>
                     ) : paged.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="text-center py-10 text-base text-gray-400">{invoices.length === 0 ? 'Chưa có giao dịch hôm nay' : 'Không tìm thấy giao dịch phù hợp'}</td>
+                        <td colSpan={4} className="text-center py-10 text-base text-gray-400">{invoices.length === 0 ? 'Chưa có giao dịch hôm nay' : 'Không tìm thấy giao dịch phù hợp'}</td>
                       </tr>
                     ) : paged.map((tx, idx) => {
                       const cfg = statusConfig[tx.status] ?? { dot: 'bg-gray-400', badge: 'bg-gray-100 text-gray-700' }
@@ -304,9 +303,6 @@ export default function CashierDashboard() {
                           </td>
                           <td className="px-4 py-3.5 border-r border-gray-200 text-center">
                             <span className="text-base text-gray-800 font-medium">{tx.customerName}</span>
-                          </td>
-                          <td className="px-4 py-3.5 border-r border-gray-200 text-center">
-                            <span className="text-base text-gray-700">{tx.itemCount}</span>
                           </td>
                           <td className="px-4 py-3.5 text-center">
                             <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${cfg.badge}`}>
