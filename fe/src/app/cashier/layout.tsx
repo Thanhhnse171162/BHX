@@ -47,7 +47,7 @@ const navItems = [
     href: '/cashier/incidents',
     label: 'Báo cáo sự cố',
     icon: AlertTriangle,
-    badge: 'incident',
+    badge: null,
   },
 ]
 

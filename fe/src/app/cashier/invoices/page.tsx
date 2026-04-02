@@ -656,7 +656,7 @@ export default function InvoicesPage() {
             </div>
           </div>
           <div className="bg-white rounded-2xl px-5 py-4 shadow-sm border border-gray-100">
-            <p className="text-xs font-medium text-gray-400 mb-1">Doanh thu ca</p>
+            <p className="text-xs font-medium text-gray-400 mb-1">Doanh thu</p>
             <div className="flex items-end justify-between">
               <span className="text-2xl font-extrabold text-gray-900">
                 {new Intl.NumberFormat('vi-VN', { notation: 'compact', maximumFractionDigits: 1 }).format(revenue)}

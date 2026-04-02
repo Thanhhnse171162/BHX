@@ -39,6 +39,29 @@ interface SimpleSaleResponse {
   paymentId?: string
 }
 
+interface InvoicePrintItem {
+  productName: string
+  sku: string
+  quantity: number
+  unitPrice: number
+  lineTotal: number
+}
+
+interface InvoicePrintData {
+  saleId: string
+  saleNumber: string
+  saleDate: string
+  storeId: string
+  cashierId: string
+  paymentStatus: string
+  paymentMethod: string
+  items: InvoicePrintItem[]
+  subtotal: number
+  discount: number
+  tax: number
+  total: number
+}
+
 const DEFAULT_POS_STORE_ID = 'B0000001-0001-0001-0001-000000000001'
 const DEFAULT_POS_CASHIER_ID = '33333333-3333-3333-3333-333333333331'
 const DEFAULT_IMAGE = '/default-product.png'
@@ -151,6 +174,149 @@ const PAYMENT_METHODS = [
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n)
+
+const escapeHtml = (text: string): string =>
+  text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+
+const openInvoicePrintView = (invoice: InvoicePrintData, storeName: string, cashierName: string) => {
+  if (typeof window === 'undefined') return
+
+  const paid = String(invoice.paymentStatus || '').toUpperCase() === 'PAID'
+  const saleDate = new Date(invoice.saleDate)
+  const dateText = Number.isNaN(saleDate.getTime()) ? invoice.saleDate : saleDate.toLocaleDateString('vi-VN')
+  const timeText = Number.isNaN(saleDate.getTime()) ? '' : saleDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+
+  const rows = invoice.items.map((p) => `
+    <tr>
+      <td>
+        <div class="product-name">${escapeHtml(p.productName)}</div>
+        <div class="sku">SKU: ${escapeHtml(p.sku)}</div>
+      </td>
+      <td class="center">${p.quantity}</td>
+      <td class="right">${fmt(p.unitPrice)}</td>
+      <td class="right">${fmt(p.lineTotal)}</td>
+    </tr>
+  `).join('')
+
+  const qrValue = encodeURIComponent(invoice.saleNumber)
+  const qrUrl = `https://quickchart.io/qr?text=${qrValue}&size=170`
+
+  const html = `<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hoa don ${escapeHtml(invoice.saleNumber)}</title>
+  <style>
+    :root { --green:#006a4e; --green2:#0a7d57; --gray:#f3f4f6; --text:#1f2937; --muted:#6b7280; --yellow:#f7be00; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#efefef; color:var(--text); }
+    .topbar { background:var(--green); color:#ffd44d; font-weight:900; font-style:italic; padding:10px 14px; font-size:20px; letter-spacing:.3px; }
+    .sheet-wrap { padding:18px; display:flex; justify-content:center; }
+    .sheet { width:420px; background:#fff; border-radius:6px; overflow:hidden; box-shadow:0 8px 22px rgba(0,0,0,.12); }
+    .header { padding:18px 18px 10px; border-bottom:1px solid #ececec; }
+    .title-row { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+    .brand { color:var(--green2); font-weight:900; font-size:34px; line-height:1; letter-spacing:.2px; }
+    .meta-small { color:var(--muted); font-size:11px; margin-top:5px; }
+    .badge { background:#dff7ea; color:#1f9d63; border:1px solid #bce9d1; border-radius:999px; font-size:11px; padding:3px 8px; font-weight:700; display:inline-block; }
+    .code { font-size:20px; font-weight:700; margin-top:8px; }
+    .grid2 { margin-top:12px; display:grid; grid-template-columns:1fr 1fr; gap:8px 20px; font-size:11px; color:var(--muted); }
+    .grid2 b { color:#111827; font-weight:700; }
+    .content { padding:14px 18px 0; }
+    .section-title { font-size:13px; font-weight:800; margin-bottom:8px; color:#374151; }
+    .table { width:100%; border-collapse:collapse; font-size:12px; }
+    .table th { text-align:left; background:#f7f7f7; color:#6b7280; font-weight:700; font-size:10px; padding:8px; border:1px solid #ebebeb; text-transform:uppercase; }
+    .table td { padding:9px 8px; border:1px solid #efefef; vertical-align:top; }
+    .table .center { text-align:center; }
+    .table .right { text-align:right; }
+    .product-name { font-weight:700; color:#1f2937; }
+    .sku { font-size:10px; color:#9ca3af; margin-top:2px; }
+    .totals { margin-top:0; background:var(--yellow); padding:14px 18px; }
+    .totals .line { display:flex; justify-content:space-between; color:#3b3b3b; font-size:14px; margin:4px 0; }
+    .totals .sum { display:flex; justify-content:space-between; margin-top:8px; font-size:30px; font-weight:900; color:#1e1e1e; }
+    .qr-wrap { text-align:center; padding:20px 16px 12px; }
+    .qr-box { display:inline-flex; border:1px solid #ddd; padding:8px; background:#fff; }
+    .qr-box img { width:120px; height:120px; display:block; }
+    .footer-note { font-size:11px; color:#6b7280; margin-top:8px; }
+    @media print {
+      body { background:#fff; }
+      .topbar { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .sheet { box-shadow:none; width:100%; }
+      .totals { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .sheet-wrap { padding:0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">BACH HOA XANH</div>
+  <div class="sheet-wrap">
+    <div class="sheet">
+      <div class="header">
+        <div class="title-row">
+          <div>
+            <div class="brand">BACH HOA XANH</div>
+            <div class="meta-small">CUA HANG<br>${escapeHtml(storeName)}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="badge">${paid ? 'DA THANH TOAN' : 'CHUA THANH TOAN'}</div>
+            <div class="meta-small" style="margin-top:8px">SO HOA DON</div>
+            <div class="code">${escapeHtml(invoice.saleNumber)}</div>
+          </div>
+        </div>
+        <div class="grid2">
+          <div><span>THOI GIAN GIAO DICH</span><br><b>${escapeHtml(`${dateText} ${timeText}`.trim())}</b></div>
+          <div><span>SALE ID</span><br><b>${escapeHtml(invoice.saleId)}</b></div>
+          <div><span>NHAN VIEN (CASHIER)</span><br><b>${escapeHtml(cashierName)}</b></div>
+          <div><span>PHUONG THUC THANH TOAN</span><br><b>${escapeHtml(String(invoice.paymentMethod || '').toUpperCase())}</b></div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="section-title">Chi tiet gio hang</div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>SAN PHAM / SKU</th>
+              <th class="center">SL</th>
+              <th class="right">DON GIA</th>
+              <th class="right">THANH TIEN</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      </div>
+      <div class="totals">
+        <div class="line"><span>Tam tinh:</span><b>${fmt(invoice.subtotal || 0)}</b></div>
+        <div class="line"><span>Giam gia:</span><b>${fmt(invoice.discount || 0)}</b></div>
+        <div class="line"><span>Thue (VAT):</span><b>${fmt(invoice.tax || 0)}</b></div>
+        <div class="sum"><span>TONG THANH TOAN</span><span>${fmt(invoice.total || 0)}</span></div>
+      </div>
+      <div class="qr-wrap">
+        <div class="qr-box"><img src="${qrUrl}" alt="QR" /></div>
+        <div class="footer-note">Cam on quy khach da mua sam tai Bach Hoa Xanh.</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`
+
+  const printWindow = window.open('', '_blank', 'width=520,height=900')
+  if (!printWindow) return
+  printWindow.document.open()
+  printWindow.document.write(html)
+  printWindow.document.close()
+  printWindow.focus()
+  window.setTimeout(() => {
+    printWindow.print()
+  }, 350)
+}
 
 // ✅ ProductImage — tự fallback, tránh onError loop
 function ProductImage({
@@ -347,6 +513,68 @@ export default function POSPage() {
       DEFAULT_POS_STORE_ID,
     ]
     return (candidates.find(v => isGuid(v)) as string) || ''
+  }
+
+  const buildPrintData = (): InvoicePrintData | null => {
+    if (paymentResult) {
+      // Print from completed sale
+      return {
+        saleId: paymentResult.saleId,
+        saleNumber: paymentResult.saleNumber,
+        saleDate: paymentResult.saleDate,
+        storeId: getStoreId(),
+        cashierId: getCashierId(),
+        paymentStatus: paymentResult.paymentStatus || '',
+        paymentMethod: paymentResult.paymentMethod || 'CASH',
+        items: cart.map(item => ({
+          productName: item.name,
+          sku: item.sku,
+          quantity: item.qty,
+          unitPrice: item.price,
+          lineTotal: item.price * item.qty,
+        })),
+        subtotal: paymentResult.subtotal,
+        discount: 0,
+        tax: 0,
+        total: paymentResult.totalAmount,
+      }
+    }
+
+    if (cart.length === 0) return null
+
+    // Print from current cart
+    const subTotal = cart.reduce((s, x) => s + x.price * x.qty, 0)
+    return {
+      saleId: '',
+      saleNumber: orderNumber.current,
+      saleDate: new Date().toISOString(),
+      storeId: getStoreId(),
+      cashierId: getCashierId(),
+      paymentStatus: 'PENDING',
+      paymentMethod: payMethod === 'momo' ? 'MOMO' : 'CASH',
+      items: cart.map(item => ({
+        productName: item.name,
+        sku: item.sku,
+        quantity: item.qty,
+        unitPrice: item.price,
+        lineTotal: item.price * item.qty,
+      })),
+      subtotal: subTotal,
+      discount: 0,
+      tax: 0,
+      total: subTotal,
+    }
+  }
+
+  const handlePrintInvoice = () => {
+    const printData = buildPrintData()
+    if (!printData) return
+    
+    const storeId = getStoreId()
+    const storeName = storeId || 'Cửa hàng'
+    const cashierName = user?.name || 'Thu ngân'
+    
+    openInvoicePrintView(printData, storeName, cashierName)
   }
 
   const handleCheckout = async () => {
@@ -675,7 +903,11 @@ export default function POSPage() {
 
           {/* Print */}
           <div>
-            <button className="w-full flex items-center justify-center gap-1.5 px-3 py-2 border border-gray-200 bg-white rounded-xl text-xs text-gray-500 hover:border-green-400 hover:text-green-600 transition-colors">
+            <button
+              disabled={cart.length === 0 && !paymentResult}
+              onClick={handlePrintInvoice}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 border border-gray-200 bg-white rounded-xl text-xs text-gray-500 hover:border-green-400 hover:text-green-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:text-gray-500 transition-colors"
+            >
               <Receipt className="w-3.5 h-3.5" />
               In hóa đơn
             </button>

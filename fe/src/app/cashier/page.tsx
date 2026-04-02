@@ -45,7 +45,6 @@ export default function CashierDashboard() {
   const [invoiceCount, setInvoiceCount] = useState(0)
   const [productCount, setProductCount] = useState(0)
   const [revenue, setRevenue] = useState(0)
-  const [revenuePercent, setRevenuePercent] = useState(0)
   const [loadingStats, setLoadingStats] = useState(true)
   
   // Invoice list states
@@ -104,7 +103,6 @@ export default function CashierDashboard() {
         if (revenueRes.status === 'fulfilled' && revenueRes.value.ok) {
           const data = await revenueRes.value.json()
           setRevenue(data.total || 0)
-          setRevenuePercent(data.percentChange || 0)
         }
       } catch (error) {
         console.error('Failed to fetch stats:', error)
@@ -203,28 +201,20 @@ export default function CashierDashboard() {
             </div>
           </div>
 
-          {/* Doanh thu ca */}
+          {/* Doanh thu*/}
           <div className="bg-white rounded-xl border border-gray-200 px-6 py-6 flex items-center gap-4">
             <div className="w-11 h-11 rounded-xl bg-purple-100 flex items-center justify-center flex-shrink-0">
               <TrendingUp className="w-5 h-5 text-purple-500" />
             </div>
             <div>
-              <p className="text-sm text-gray-500 mb-1">Doanh thu ca</p>
-              <div className="flex items-end gap-2">
-                <p className="text-3xl font-bold text-gray-900 leading-tight">
-                  {loadingStats ? (
-                    <span className="text-lg text-gray-400">—</span>
-                  ) : (
-                    new Intl.NumberFormat('vi-VN', { notation: 'compact', maximumFractionDigits: 1 }).format(revenue)
-                  )}
-                </p>
-                {!loadingStats && (
-                  <span className={`text-sm font-semibold flex items-center gap-0.5 pb-1 ${revenuePercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    <TrendingUp className="w-3.5 h-3.5" />
-                    {revenuePercent >= 0 ? '+' : ''}{revenuePercent}%
-                  </span>
+              <p className="text-sm text-gray-500 mb-1">Doanh thu</p>
+              <p className="text-3xl font-bold text-gray-900 leading-tight">
+                {loadingStats ? (
+                  <span className="text-lg text-gray-400">—</span>
+                ) : (
+                  new Intl.NumberFormat('vi-VN', { notation: 'compact', maximumFractionDigits: 1 }).format(revenue)
                 )}
-              </div>
+              </p>
             </div>
           </div>
         </div>
