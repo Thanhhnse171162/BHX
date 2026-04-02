@@ -26,7 +26,7 @@ interface InvoiceListItem {
   status: string
 }
 
-const PAGE_SIZE = 9
+const PAGE_SIZE = 5
 
 const statusConfig: Record<string, { dot: string; badge: string }> = {
   'Thành công': { dot: 'bg-green-500',  badge: 'bg-green-100 text-green-700' },

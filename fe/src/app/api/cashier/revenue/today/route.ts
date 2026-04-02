@@ -104,7 +104,11 @@ export async function GET(request: NextRequest) {
               const status = mapOrderStatus(sale.status || null, sale.paymentStatus || null)
               return status === 'Thành công'
             })
-            .reduce((sum: number, sale: SaleFromApi) => sum + (sale.totalAmount || sale.subtotal || 0), 0)
+            .reduce((sum: number, sale: SaleFromApi) => {
+              // Try multiple possible field names for amount
+              const amount = sale.totalAmount || sale.subtotal || (sale as any)?.total || (sale as any)?.amount || 0
+              return sum + Number(amount)
+            }, 0)
 
           found = true
           break

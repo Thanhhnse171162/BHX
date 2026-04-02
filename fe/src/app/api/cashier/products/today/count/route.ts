@@ -88,7 +88,13 @@ export async function GET(request: NextRequest) {
           count = sales
             .filter((sale: SaleFromApi) => isToday(sale.saleDate))
             .reduce((total: number, sale: SaleFromApi) => {
-              const itemCount = (sale.items || []).reduce((sum, item) => sum + (item.quantity || 0), 0)
+              // Try multiple possible field names for items/products
+              const itemsArray = sale.items || (sale as any)?.lineItems || (sale as any)?.products || []
+              const itemCount = itemsArray.reduce((sum: number, item: any) => {
+                // Handle various possible quantity field names
+                const qty = item.quantity || item.qty || item.amount || item.quantity_ordered || 1
+                return sum + Number(qty)
+              }, 0)
               return total + itemCount
             }, 0)
 

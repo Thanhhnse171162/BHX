@@ -111,13 +111,24 @@ export async function GET(request: NextRequest) {
           const data = response.data
           const sales = Array.isArray(data) ? data : data?.data || []
 
+          if (sales.length > 0) {
+            console.log('Sample sale data:', JSON.stringify(sales[0], null, 2))
+          }
+
           // Filter today's invoices and format
           invoices = sales
             .filter((sale: SaleFromApi) => isToday(sale.saleDate))
             .sort((a: SaleFromApi, b: SaleFromApi) => new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime())
             .map((sale: SaleFromApi) => {
               const d = new Date(sale.saleDate)
-              const itemCount = (sale.items || []).reduce((sum, item) => sum + (item.quantity || 0), 0)
+              
+              // Try multiple possible field names for items/products
+              const itemsArray = sale.items || (sale as any)?.lineItems || (sale as any)?.products || []
+              const itemCount = itemsArray.reduce((sum: number, item: any) => {
+                // Handle various possible quantity field names
+                const qty = item.quantity || item.qty || item.amount || item.quantity_ordered || 1
+                return sum + Number(qty)
+              }, 0)
               const customerName = sale.customerId ? `KH ${sale.customerId.slice(0, 8)}` : 'Khách vãng lai'
 
               return {
