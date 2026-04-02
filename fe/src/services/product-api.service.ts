@@ -32,11 +32,17 @@ export interface ProductFromAPI {
   categoryName: string
   brandId: string | null
   brand: string | null
+  origin?: string
   price: number
   unit: string
   originalPrice: number
+  costPrice?: number
   weight: number
   volume: number | null
+  slug?: string
+  metaTitle?: string
+  metaDescription?: string
+  metaKeywords?: string
   isFeatured: boolean
   isActive: boolean
   createdAt: string
