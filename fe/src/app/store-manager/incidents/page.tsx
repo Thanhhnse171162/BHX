@@ -374,6 +374,9 @@ function IncidentDetailModal({
 export default function IncidentsPage() {
   const { user } = useAuthStore()
   const [incidents, setIncidents] = useState<Incident[]>([])
+  const [rawReports, setRawReports] = useState<DamageReportFromAPI[]>([])
+  const [products, setProducts] = useState<ProductFromAPI[]>([])
+  const [reporterNames, setReporterNames] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [search, setSearch] = useState('')
@@ -388,6 +391,11 @@ export default function IncidentsPage() {
   const locationId = user?.workplaceId?.trim() || ''
   const locationType = user?.workplaceType === 'WAREHOUSE' ? 'WAREHOUSE' : 'STORE'
 
+  const rebuildIncidents = useCallback((reps: DamageReportFromAPI[], prods: ProductFromAPI[], names: Record<string, string>) => {
+    const reporterNameMap = new Map(Object.entries(names))
+    setIncidents(reps.map((row) => mapDamageReportToIncident(row, prods, reporterNameMap)))
+  }, [])
+
   const loadReports = useCallback(async () => {
     if (!locationId) {
       setIncidents([])
@@ -400,23 +408,77 @@ export default function IncidentsPage() {
     setLoadError('')
 
     try {
-      const [products, reports] = await Promise.all([
+      const [prods, reports] = await Promise.all([
         ProductAPIService.getAllProducts(),
         DamageReportAPIService.getDamageReports({ locationId, locationType }),
       ])
+      setProducts(prods)
+      setRawReports(reports)
       const reporterNameMap = await buildReporterNameMap(reports)
-      setIncidents(reports.map((row) => mapDamageReportToIncident(row, products, reporterNameMap)))
+      setReporterNames(Object.fromEntries(reporterNameMap))
+      const nameMap = Object.entries(reporterNameMap).reduce(
+        (acc, [k, v]) => ({ ...acc, [k]: v }),
+        {} as Record<string, string>
+      )
+      rebuildIncidents(reports, prods, nameMap)
     } catch {
       setIncidents([])
       setLoadError('Không thể tải danh sách báo cáo sự cố từ hệ thống.')
     } finally {
       setIsLoading(false)
     }
-  }, [locationId, locationType])
+  }, [locationId, locationType, rebuildIncidents])
 
   useEffect(() => {
     loadReports()
   }, [loadReports])
+
+  useEffect(() => {
+    const missingUserIds = Array.from(
+      new Set(
+        rawReports
+          .map((r) => String(r.reportedBy ?? '').trim())
+          .filter((id) => id && !reporterNames[normalizeUuid(id)] && looksLikeUuid(id))
+      )
+    )
+
+    if (missingUserIds.length === 0 || Object.keys(reporterNames).length === 0) return
+
+    void (async () => {
+      const resolved = await Promise.all(
+        missingUserIds.map(async (id) => {
+          try {
+            const localUser = await UserAPIService.getById(id)
+            const localName = resolveUserDisplayName(localUser)
+            if (localName) return [normalizeUuid(id), localName] as const
+          } catch {
+            // Ignore local lookup errors
+          }
+
+          try {
+            const iamUser = await UserAPIService.getIamDetailsById(id)
+            const iamName = resolveUserDisplayName(iamUser)
+            if (iamName) return [normalizeUuid(id), iamName] as const
+          } catch {
+            // Ignore IAM lookup errors
+          }
+
+          return null
+        })
+      )
+
+      const newNames = { ...reporterNames }
+      for (const entry of resolved) {
+        if (entry) {
+          const [id, name] = entry
+          newNames[id] = name
+        }
+      }
+
+      setReporterNames(newNames)
+      rebuildIncidents(rawReports, products, newNames)
+    })()
+  }, [rawReports, reporterNames, products, rebuildIncidents])
 
   useEffect(() => {
     setPage(1)
