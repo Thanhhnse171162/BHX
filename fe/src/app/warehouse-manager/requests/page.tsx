@@ -224,6 +224,8 @@ export default function WarehouseManagerRequestsPage() {
   // Detail modal state
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [selectedRequest, setSelectedRequest] = useState<RequestItem | null>(null)
+  const [allFullRequests, setAllFullRequests] = useState<RestockRequestFromAPI[]>([])
+  const [selectedFullRequest, setSelectedFullRequest] = useState<RestockRequestFromAPI | null>(null)
 
   // Inventory Check Detail Modal
   const [isInventoryCheckDetailOpen, setIsInventoryCheckDetailOpen] = useState(false)
@@ -358,6 +360,7 @@ export default function WarehouseManagerRequestsPage() {
         })
 
       setRequests([...storeItems, ...warehouseItems])
+      setAllFullRequests([...storeRequests, ...warehouseRequests])
       setPage(1)
     } catch {
       setRequests([])
@@ -1077,6 +1080,8 @@ export default function WarehouseManagerRequestsPage() {
                           <button 
                             onClick={() => {
                               setSelectedRequest(row)
+                              const fullReq = allFullRequests.find(r => r.id === row.uniqueId || `wh-${r.id}` === row.uniqueId)
+                              setSelectedFullRequest(fullReq || null)
                               setIsDetailOpen(true)
                             }}
                             className="text-gray-400 hover:text-gray-600"
@@ -2029,10 +2034,25 @@ export default function WarehouseManagerRequestsPage() {
                 <p className="text-sm font-medium text-gray-700">{selectedRequest.source}</p>
               </div>
 
-              <div>
-                <p className="text-xs text-gray-500 uppercase font-semibold">Sản phẩm</p>
-                <p className="text-sm font-medium text-gray-700">{selectedRequest.productSummary}</p>
-              </div>
+              {selectedFullRequest && selectedFullRequest.items && selectedFullRequest.items.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold mb-3">Chi tiết sản phẩm</p>
+                  <div className="space-y-2 border border-gray-200 rounded-lg p-3 bg-gray-50">
+                    {selectedFullRequest.items.map((item) => (
+                      <div key={item.id} className="flex justify-between items-start text-sm">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">{item.productName}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{item.reason || '-'}</p>
+                        </div>
+                        <div className="text-right ml-2">
+                          <p className="font-semibold text-gray-900">{item.requestedQuantity} {item.unit}</p>
+                          <p className="text-xs text-gray-500">Yêu cầu</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <p className="text-xs text-gray-500 uppercase font-semibold">Loại yêu cầu</p>
