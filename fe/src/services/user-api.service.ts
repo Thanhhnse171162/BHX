@@ -112,21 +112,27 @@ export class UserAPIService {
 
   static async getIamUsersList(): Promise<UserInfoFromAPI[]> {
     try {
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      }
-      
+      // Get token from auth store (may be empty on first load)
       let token = ''
+      let authState = null
+      
       if (typeof window !== 'undefined') {
-        token = useAuthStore.getState().token || ''
-        if (token) {
-          headers.Authorization = `Bearer ${token}`
-          console.log(`✓ Auth token found (${token.substring(0, 20)}...)`)
-        } else {
-          console.warn('⚠️ No auth token available from AuthStore')
+        try {
+          authState = useAuthStore.getState()
+          token = authState?.token || ''
+          console.log(`🔐 Auth state:`, {
+            hasUser: !!authState?.user,
+            hasToken: !!token,
+            tokenLength: token?.length || 0,
+            tokenPreview: token ? token.substring(0, 25) + '...' : 'none',
+            isAuthenticated: authState?.isAuthenticated,
+            hydrated: authState?.hydrated,
+          })
+        } catch (e) {
+          console.warn('⚠️ Failed to get auth store:', e)
         }
       } else {
-        console.warn('⚠️ Not in browser environment (no window object)')
+        console.warn('⚠️ Not in browser environment (SSR)')
       }
 
       // Try multiple IAM endpoints
@@ -139,11 +145,23 @@ export class UserAPIService {
       for (const endpoint of endpoints) {
         try {
           console.log(`📍 Trying IAM endpoint: ${endpoint}`)
-          console.log(`   Headers:`, { ...headers, Authorization: headers.Authorization ? 'Bearer [***]' : 'none' })
+          
+          // Build headers with auth if available
+          const headers: HeadersInit = {
+            'Content-Type': 'application/json',
+          }
+          
+          if (token) {
+            headers.Authorization = `Bearer ${token}`
+            console.log(`   ✓ Sending Bearer token`)
+          } else {
+            console.warn(`   ⚠️ No token available, request may fail`)
+          }
           
           const res = await fetch(endpoint, {
             method: 'GET',
             headers,
+            credentials: 'include', // Send cookies if any
           })
 
           console.log(`   Response status: ${res.status}`)
@@ -160,6 +178,12 @@ export class UserAPIService {
             
             console.log(`✅ IAM endpoint ${endpoint} returned ${users.length} users`)
             return users
+          } else if (res.status === 401) {
+            const statusText = await res.text().catch(() => '')
+            console.warn(`⚠️ 401 Unauthorized from ${endpoint}`)
+            console.warn(`   Token provided: ${token ? 'yes' : 'no'}`)
+            if (statusText) console.warn(`   Error: ${statusText.substring(0, 100)}`)
+            // Don't continue on 401 - token is missing/invalid
           } else {
             const statusText = await res.text().catch(() => '')
             console.log(`⚠️ IAM endpoint ${endpoint} returned status ${res.status}`)

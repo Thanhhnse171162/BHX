@@ -262,6 +262,23 @@ export default function WarehouseManagerRequestsPage() {
   const loadRequests = useCallback(async () => {
     try {
       setRequestsLoading(true)
+      
+      // Wait for auth to be hydrated - essential for getting token on Vercel
+      console.log('⏳ Checking auth hydration...')
+      let authState = useAuthStore.getState()
+      if (!authState.hydrated) {
+        console.log('⏳ Waiting for auth hydration...')
+        let waitCount = 0
+        while (!useAuthStore.getState().hydrated && waitCount < 30) {
+          await new Promise(resolve => setTimeout(resolve, 100))
+          waitCount++
+        }
+        authState = useAuthStore.getState()
+        console.log(`✓ Auth hydrated after ${waitCount * 100}ms, token=${!!authState.token}`)
+      } else {
+        console.log(`✓ Auth already hydrated, token=${!!authState.token}`)
+      }
+      
       const warehouseId = user?.warehouseId ?? user?.storeId ?? user?.workplaceId ?? ''
       if (!warehouseId) {
         setRequests([])
