@@ -275,16 +275,47 @@ export default function ProductsPage() {
     return isNaN(num) ? 0 : num
   }
 
-  const handleEdit = (row: ProductRow) => {
+  const handleEdit = async (row: ProductRow) => {
     setMode('edit')
     setEditingId(row.id)
-    setSku(row.sku)
-    setName(row.name)
-    const matchedCategory = availableCategories.find((c) => c.name === row.category)
-    setCategory(matchedCategory ? matchedCategory.resolvedId : '')
-    setPrice(row.price)
-    setUnit(row.unit)
-    setStatus(row.status)
+    
+    // Load full product details from API
+    try {
+      const fullProduct = await ProductAPIService.getProductById(row.id)
+      
+      // Map all fields from API response
+      setSku(fullProduct.sku || '')
+      setName(fullProduct.name || '')
+      
+      const matchedCategory = availableCategories.find((c) => c.name === row.category)
+      setCategory(matchedCategory ? matchedCategory.resolvedId : '')
+      
+      setPrice(fullProduct.price || 0)
+      setUnit(fullProduct.unit || '')
+      setStatus(fullProduct.isActive ? 'ACTIVE' : 'INACTIVE')
+      
+      // Map additional fields
+      setBarcode(fullProduct.barcode || '')
+      setDescription(fullProduct.description || '')
+      setBrand(fullProduct.brand || '')
+      setOrigin((fullProduct as any).origin || '')
+      setOriginalPrice(fullProduct.originalPrice || 0)
+      setCostPrice((fullProduct as any).costPrice || 0)
+      setWeight(fullProduct.weight || 0)
+      setSlug((fullProduct as any).slug || '')
+      setMetaTitle((fullProduct as any).metaTitle || '')
+      setMetaDescription((fullProduct as any).metaDescription || '')
+      setMetaKeywords((fullProduct as any).metaKeywords || '')
+      
+      // Clear image fields (these would need to be updated via file upload)
+      setMainImage(null)
+      setAdditionalImages([])
+    } catch (err) {
+      console.error('Error loading product details:', err)
+      alert('Không thể tải thông tin sản phẩm. Vui lòng thử lại.')
+      return
+    }
+    
     setIsModalOpen(true)
   }
 
@@ -456,13 +487,64 @@ export default function ProductsPage() {
 
         alert('Tạo sản phẩm thành công!')
       } else if (mode === 'edit' && editingId) {
-        await ProductAPIService.updateProduct(editingId, {
+        // Build update payload with all fields
+        const updateData: any = {
           sku,
           name,
+          categoryId: category,
           price,
           unit,
+          barcode,
+          description,
+          brand,
+          origin,
+          originalPrice,
+          costPrice,
+          weight,
           isActive: status === 'ACTIVE',
-        })
+          slug,
+          metaTitle,
+          metaDescription,
+          metaKeywords,
+        }
+
+        // Handle file uploads if new images are selected
+        if (mainImage || additionalImages.length > 0) {
+          const formData = new FormData()
+
+          // Add all text fields
+          Object.entries(updateData).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+              formData.append(key, String(value))
+            }
+          })
+
+          // Add images
+          if (mainImage) {
+            formData.append('MainImage', mainImage)
+          }
+          additionalImages.forEach((file) => {
+            formData.append('AdditionalImages', file)
+          })
+
+          // Use fetch for FormData (axios doesn't handle multipart well)
+          const token = useAuthStore.getState().token
+          const response = await fetch(`/api/products/${editingId}`, {
+            method: 'PUT',
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            body: formData,
+          })
+
+          if (!response.ok) {
+            const errorPayload = await response.json().catch(() => null)
+            const errorMessage = parseApiErrorMessage(errorPayload) || `Update failed (${response.status})`
+            throw new Error(errorMessage)
+          }
+        } else {
+          // No file uploads, use axios service
+          await ProductAPIService.updateProduct(editingId, updateData)
+        }
+
         alert('Cập nhật sản phẩm thành công!')
       }
 
