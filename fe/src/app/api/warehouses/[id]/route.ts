@@ -14,7 +14,7 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json()
-    const { name, location, capacity, status, parentId } = body
+    const { name, location, capacity, status, parentId, isDeleted } = body
     const { id } = params
 
     if (!name || !location || !capacity) {
@@ -38,6 +38,7 @@ export async function PATCH(
       capacity,
       status: status || 'ACTIVE',
       parentId: parentId || null,
+      isDeleted: isDeleted || false,
     }
 
     console.log('🔵 Updating warehouse:', { url, id, payload })
