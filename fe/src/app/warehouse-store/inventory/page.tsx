@@ -467,7 +467,7 @@ export default function InventoryListPage() {
             )}
 
             {/* Pagination */}
-            {totalPages > 1 && (
+            {filteredInventory.length > 0 && (
               <div className="px-6 py-4 border-t border-gray-200">
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-gray-600">
