@@ -1,21 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/store/auth.store'
-
 export default function DashboardPage() {
-  const router = useRouter()
-  const { token } = useAuthStore()
-
-  useEffect(() => {
-    // Redirect to login if not authenticated
-    if (!token) {
-      router.push('/login')
-      return
-    }
-  }, [token, router])
-
   return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="text-center">
