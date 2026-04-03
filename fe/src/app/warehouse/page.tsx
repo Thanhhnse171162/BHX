@@ -191,18 +191,23 @@ export default function WarehouseDashboard() {
           return a.availableQuantity - b.availableQuantity
         })
         .slice(0, 5)
-        .map((item) => ({
-          id: item.id,
-          name: item.product?.name || item.name || item.productName || 'Sản phẩm',
-          sku: item.product?.sku || item.sku || 'N/A',
-          quantity: item.availableQuantity,
-          status:
-            item.availableQuantity === 0
-              ? 'out-of-stock'
-              : item.isLowStock
-              ? 'low-stock'
-              : 'in-stock',
-        }))
+        .map((item) => {
+          let statusValue: 'in-stock' | 'low-stock' | 'out-of-stock'
+          if (item.availableQuantity === 0) {
+            statusValue = 'out-of-stock'
+          } else if (item.isLowStock) {
+            statusValue = 'low-stock'
+          } else {
+            statusValue = 'in-stock'
+          }
+          return {
+            id: item.id,
+            name: item.product?.name || item.name || item.productName || 'Sản phẩm',
+            sku: item.product?.sku || item.sku || 'N/A',
+            quantity: item.availableQuantity,
+            status: statusValue,
+          }
+        })
       setHighlights(highlightsData)
 
       const recentRequests = requestList
