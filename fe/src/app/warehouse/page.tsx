@@ -220,15 +220,15 @@ export default function WarehouseDashboard() {
           source: item,
         }))
         .sort((a, b) => {
-          const timeA = new Date(a.batch?.receivedAt || 0).getTime()
-          const timeB = new Date(b.batch?.receivedAt || 0).getTime()
+          const timeA = a.batch?.receivedAt ? new Date(a.batch.receivedAt).getTime() : 0
+          const timeB = b.batch?.receivedAt ? new Date(b.batch.receivedAt).getTime() : 0
           return timeB - timeA
         })
         .slice(0, 5)
         .map(({ product, batch, source }) => ({
           id: source.id,
-          name: source.product?.name || source.name || source.productName || product?.name || `SP-${source.productId.slice(0, 8)}`,
-          sku: source.product?.sku || source.sku || product?.sku || `SKU-${source.productId.slice(0, 8).toUpperCase()}`,
+          name: source.product?.name || source.name || source.productName || product?.name || 'Sản phẩm',
+          sku: source.product?.sku || source.sku || product?.sku || 'N/A',
           quantity: source.availableQuantity,
           lot: String(batch?.batchNumber || '').trim() || 'CHUA_CO_LO',
           status:
@@ -259,7 +259,8 @@ export default function WarehouseDashboard() {
           // Hiển thị tất cả sản phẩm trong request
           const itemsDisplay = items.map((item) => {
             const itemQty = item.requestedQuantity || 0
-            const productName = item.productName || productById.get(normalizeId(item.productId))?.name || `SP-${item.productId.slice(0, 8)}`
+            const productId = String(item.productId ?? '').trim()
+            const productName = item.productName || (productId ? productById.get(normalizeId(productId))?.name : null) || (productId ? `SP-${productId.slice(0, 8)}` : 'Sản phẩm')
             return `${productName} (${itemQty})`
           }).join(', ')
           
