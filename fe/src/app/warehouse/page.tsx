@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   Package, 
@@ -12,47 +12,311 @@ import {
   FileText
 } from 'lucide-react'
 import { Button } from '@/shared/ui/Button'
-import { inventoryData } from '@/data/inventory-data'
+import { useAuthStore } from '@/store/auth.store'
+import { InventoryAPIService, InventoryItem } from '@/services/inventory-api.service'
+import { RestockAPIService, RestockRequestFromAPI } from '@/services/restock-api.service'
+import { WarehouseAPIService, WarehouseFromAPI } from '@/services/warehouse-api.service'
+import { StockMovementAPIService, StockMovementFromAPI } from '@/services/stock-movement-api.service'
+import { UserAPIService, UserInfoFromAPI } from '@/services/user-api.service'
+
+type WeeklyDataPoint = {
+  day: string
+  incoming: number
+  outgoing: number
+}
+
+type WarehouseDistributionItem = {
+  id: string
+  name: string
+  quantity: number
+  percentage: number
+}
+
+type InventoryHighlightRow = {
+  id: string
+  name: string
+  sku: string
+  quantity: number
+  status: 'in-stock' | 'low-stock' | 'out-of-stock'
+}
+
+type IncomingRequestRow = {
+  id: string
+  requestNumber: string
+  sourceName: string
+  productSummary: string
+  statusLabel: string
+}
+
+type DashboardStats = {
+  totalProducts: number
+  lowStock: number
+  pendingRequests: number
+  linkedWarehouses: number
+  activeStores: number
+}
+
+const WEEKDAY_LABELS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'] as const
+
+function normalizeId(value?: string | number | null): string {
+  return String(value ?? '').trim().toLowerCase()
+}
+
+function getStatusKey(value?: string | null): string {
+  return String(value ?? '').trim().toUpperCase()
+}
+
+function isPendingRequest(status?: string | null): boolean {
+  const key = getStatusKey(status)
+  return key === 'PENDING' || key === 'PROCESSING'
+}
+
+function isInboundMovement(type?: string | null): boolean {
+  const key = getStatusKey(type)
+  return key.includes('IN') || key.includes('IMPORT') || key.includes('NHAP') || key.includes('RECEIVE')
+}
+
+function isOutboundMovement(type?: string | null): boolean {
+  const key = getStatusKey(type)
+  return key.includes('OUT') || key.includes('EXPORT') || key.includes('XUAT') || key.includes('SHIP')
+}
+
+function toRequestStatusLabel(status?: string | null): string {
+  const key = getStatusKey(status)
+  if (key === 'PENDING') return 'CHỜ XỬ LÝ'
+  if (key === 'PROCESSING') return 'ĐANG XỬ LÝ'
+  if (key === 'APPROVED') return 'ĐÃ DUYỆT'
+  if (key === 'COMPLETED') return 'HOÀN TẤT'
+  if (key === 'REJECTED') return 'TỪ CHỐI'
+  return key || 'KHÔNG XÁC ĐỊNH'
+}
+
+function getWorkplaceType(user: ReturnType<typeof useAuthStore.getState>['user']): 'WAREHOUSE' | 'STORE' | null {
+  const value = String(user?.workplaceType ?? '').toUpperCase()
+  if (value === 'WAREHOUSE' || value === 'STORE') return value
+  return null
+}
 
 export default function WarehouseDashboard() {
   const router = useRouter()
+  const { user, hydrated } = useAuthStore()
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [stats, setStats] = useState<DashboardStats>({
+    totalProducts: 0,
+    lowStock: 0,
+    pendingRequests: 0,
+    linkedWarehouses: 0,
+    activeStores: 0,
+  })
+  const [weeklyData, setWeeklyData] = useState<WeeklyDataPoint[]>([])
+  const [distribution, setDistribution] = useState<WarehouseDistributionItem[]>([])
+  const [highlights, setHighlights] = useState<InventoryHighlightRow[]>([])
+  const [incomingRequests, setIncomingRequests] = useState<IncomingRequestRow[]>([])
 
-  // Calculate real-time statistics
-  const stats = useMemo(() => {
-    const total = inventoryData.length
-    const inStock = inventoryData.filter(item => item.status === 'in-stock').length
-    const lowStock = inventoryData.filter(item => item.status === 'low-stock').length
-    const outOfStock = inventoryData.filter(item => item.status === 'out-of-stock').length
-    const totalQuantity = inventoryData.reduce((sum, item) => sum + item.quantity, 0)
-    
-    // Mock data for pending requests
-    const pendingRequests = 12
-    const linkedWarehouses = 3
-    const activeStores = 6
-    
-    return {
-      totalProducts: total,
-      inStock,
-      lowStock,
-      outOfStock,
-      totalQuantity,
-      pendingRequests,
-      linkedWarehouses,
-      activeStores
+  const loadDashboardData = useCallback(async () => {
+    if (!hydrated) return
+
+    const workplaceType = getWorkplaceType(user)
+    const workplaceId = String(user?.workplaceId ?? '').trim()
+
+    if (!workplaceType || !workplaceId) {
+      setError('Tài khoản chưa có thông tin kho/cửa hàng (workplace). Vui lòng đăng xuất và đăng nhập lại.')
+      setIsLoading(false)
+      return
     }
-  }, [])
 
-  // Mock data for charts
-  const weeklyData = [
-    { day: 'T2', incoming: 320, outgoing: 280 },
-    { day: 'T3', incoming: 450, outgoing: 380 },
-    { day: 'T4', incoming: 280, outgoing: 420 },
-    { day: 'T5', incoming: 520, outgoing: 490 },
-    { day: 'T6', incoming: 380, outgoing: 540 },
-    { day: 'T7', incoming: 280, outgoing: 620 }
-  ]
+    setIsLoading(true)
+    setError(null)
 
-  const maxValue = Math.max(...weeklyData.flatMap(d => [d.incoming, d.outgoing]))
+    try {
+      const [inventory, requestData, movementData, warehouseData, userData] = await Promise.all([
+        InventoryAPIService.getInventoryByLocation(workplaceType, workplaceId),
+        workplaceType === 'WAREHOUSE'
+          ? RestockAPIService.getByParentWarehouse(workplaceId).catch(() => RestockAPIService.getByWarehouse(workplaceId))
+          : RestockAPIService.getByWarehouse(workplaceId),
+        StockMovementAPIService.getByLocation(workplaceId).catch(() => [] as StockMovementFromAPI[]),
+        WarehouseAPIService.getAll().catch(() => [] as WarehouseFromAPI[]),
+        UserAPIService.getAll().catch(() => [] as UserInfoFromAPI[]),
+      ])
+
+      const inventoryList = Array.isArray(inventory) ? inventory : []
+      const requestList = Array.isArray(requestData) ? requestData : []
+      const movementList = Array.isArray(movementData) ? movementData : []
+      const warehouseList = Array.isArray(warehouseData) ? warehouseData : []
+
+      const normalizedCurrentId = normalizeId(workplaceId)
+      const warehouseById = new Map<string, WarehouseFromAPI>()
+      warehouseList.forEach((wh) => {
+        const id = normalizeId(wh.id)
+        if (id) warehouseById.set(id, wh)
+      })
+
+      const childWarehouses = warehouseList.filter((wh) => {
+        const parentId = normalizeId(wh.parentId ?? wh.parent_id)
+        return parentId === normalizedCurrentId
+      })
+
+      const activeStoreIds = new Set<string>()
+      userData.forEach((account) => {
+        const accountStatus = getStatusKey(account.status)
+        const workplaceTypeKey = getStatusKey(account.workplaceType ?? account.workplace_type ?? account.workplace?.type)
+        const workplaceIdKey = normalizeId(account.workplaceId ?? account.workplace_id ?? account.workplace?.id)
+
+        if (!workplaceIdKey || workplaceTypeKey !== 'STORE') return
+        if (accountStatus && accountStatus !== 'ACTIVE') return
+        activeStoreIds.add(workplaceIdKey)
+      })
+
+      const lowStock = inventoryList.filter((item) => item.availableQuantity > 0 && item.isLowStock).length
+      const pendingRequests = requestList.filter((req) => isPendingRequest(req.status)).length
+
+      setStats({
+        totalProducts: inventoryList.length,
+        lowStock,
+        pendingRequests,
+        linkedWarehouses: childWarehouses.length,
+        activeStores: activeStoreIds.size,
+      })
+
+      const highlightsData = [...inventoryList]
+        .sort((a, b) => {
+          const score = (item: InventoryItem) => {
+            if (item.availableQuantity === 0) return 3
+            if (item.isLowStock) return 2
+            return 1
+          }
+          const scoreDiff = score(b) - score(a)
+          if (scoreDiff !== 0) return scoreDiff
+          return a.availableQuantity - b.availableQuantity
+        })
+        .slice(0, 5)
+        .map((item) => ({
+          id: item.id,
+          name: item.product?.name || item.name || item.productName || 'Sản phẩm',
+          sku: item.product?.sku || item.sku || 'N/A',
+          quantity: item.availableQuantity,
+          status:
+            item.availableQuantity === 0
+              ? 'out-of-stock'
+              : item.isLowStock
+              ? 'low-stock'
+              : 'in-stock',
+        }))
+      setHighlights(highlightsData)
+
+      const recentRequests = requestList
+        .filter((req) => isPendingRequest(req.status))
+        .sort((a, b) => {
+          const left = new Date(a.requestedDate || 0).getTime()
+          const right = new Date(b.requestedDate || 0).getTime()
+          return right - left
+        })
+        .slice(0, 3)
+        .map((req: RestockRequestFromAPI) => {
+          const sourceWarehouseId = normalizeId(req.fromWarehouseId)
+          const sourceWarehouse = warehouseById.get(sourceWarehouseId)
+          const sourceName = sourceWarehouse?.name || (req.fromWarehouseId ? `Kho ${String(req.fromWarehouseId).slice(0, 8)}` : 'N/A')
+
+          const firstItem = req.items?.[0]
+          const totalQty = (req.items || []).reduce((sum, item) => sum + Number(item.requestedQuantity || 0), 0)
+          const productSummary = firstItem
+            ? `${firstItem.productName} (${totalQty})`
+            : `Tổng SL (${totalQty})`
+
+          return {
+            id: req.id,
+            requestNumber: req.requestNumber || req.id,
+            sourceName,
+            productSummary,
+            statusLabel: toRequestStatusLabel(req.status),
+          }
+        })
+      setIncomingRequests(recentRequests)
+
+      const distributionTargets: WarehouseFromAPI[] = []
+      const currentWarehouse = warehouseById.get(normalizedCurrentId)
+      if (currentWarehouse) distributionTargets.push(currentWarehouse)
+      distributionTargets.push(...childWarehouses)
+
+      if (distributionTargets.length > 0) {
+        const quantityByWarehouse = await Promise.all(
+          distributionTargets.map(async (wh) => {
+            const whInventory = await InventoryAPIService.getInventoryByWarehouse(wh.id).catch(() => [] as InventoryItem[])
+            const totalQty = whInventory.reduce((sum, item) => sum + Number(item.availableQuantity || item.quantity || 0), 0)
+            return { id: wh.id, name: wh.name || 'Kho', quantity: totalQty }
+          })
+        )
+
+        const maxQty = Math.max(...quantityByWarehouse.map((item) => item.quantity), 1)
+        const distributionData = quantityByWarehouse
+          .filter((item) => item.quantity > 0)
+          .slice(0, 5)
+          .map((item) => ({
+            ...item,
+            percentage: Math.round((item.quantity / maxQty) * 100),
+          }))
+
+        setDistribution(distributionData)
+      } else {
+        const fallbackQty = inventoryList.reduce((sum, item) => sum + Number(item.availableQuantity || item.quantity || 0), 0)
+        setDistribution([
+          {
+            id: workplaceId,
+            name: 'Kho hiện tại',
+            quantity: fallbackQty,
+            percentage: 100,
+          },
+        ])
+      }
+
+      const dailyMap = new Map<string, WeeklyDataPoint>()
+      const today = new Date()
+
+      for (let offset = 5; offset >= 0; offset -= 1) {
+        const date = new Date(today)
+        date.setDate(today.getDate() - offset)
+        const key = date.toISOString().slice(0, 10)
+        dailyMap.set(key, {
+          day: WEEKDAY_LABELS[date.getDay()],
+          incoming: 0,
+          outgoing: 0,
+        })
+      }
+
+      movementList.forEach((movement) => {
+        const movementDate = new Date(movement.movementDate || movement.createdAt || Date.now())
+        const key = movementDate.toISOString().slice(0, 10)
+        const daily = dailyMap.get(key)
+        if (!daily) return
+
+        const qty = (movement.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0)
+        if (isInboundMovement(movement.movementType)) {
+          daily.incoming += qty
+          return
+        }
+        if (isOutboundMovement(movement.movementType)) {
+          daily.outgoing += qty
+        }
+      })
+
+      setWeeklyData(Array.from(dailyMap.values()))
+    } catch (err) {
+      console.error('Error loading warehouse dashboard:', err)
+      setError('Không thể tải dữ liệu dashboard. Vui lòng thử lại.')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [hydrated, user])
+
+  useEffect(() => {
+    void loadDashboardData()
+  }, [loadDashboardData])
+
+  const maxValue = useMemo(
+    () => Math.max(...weeklyData.flatMap((d) => [d.incoming, d.outgoing]), 1),
+    [weeklyData]
+  )
 
   return (
     <div className="space-y-6 p-6 bg-gray-50">
@@ -62,6 +326,12 @@ export default function WarehouseDashboard() {
         <p className="text-gray-600 mt-1">Giám sát chuỗi cung ứng thời gian thực cho Kho trung tâm & Các trung tâm phân phối liên kết.</p>
       </div>
 
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       {/* Main Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {/* Total Products */}
@@ -70,10 +340,10 @@ export default function WarehouseDashboard() {
             <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
               <Package className="text-green-600" size={20} />
             </div>
-            <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded">+2.5%</span>
+            <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded">Realtime</span>
           </div>
           <p className="text-xs text-gray-600 font-medium uppercase mb-1">TỔNG SẢN PHẨM</p>
-          <p className="text-3xl font-bold text-gray-900">{stats.totalProducts.toLocaleString()}</p>
+          <p className="text-3xl font-bold text-gray-900">{isLoading ? '...' : stats.totalProducts.toLocaleString()}</p>
         </div>
 
         {/* Low Stock Items */}
@@ -84,22 +354,25 @@ export default function WarehouseDashboard() {
             <div className="w-10 h-10 bg-red-50 rounded-full flex items-center justify-center">
               <AlertTriangle className="text-red-600" size={20} />
             </div>
-            <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded">-10%</span>
+            <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded">Realtime</span>
           </div>
           <p className="text-xs text-gray-600 font-medium uppercase mb-1">SẢN PHẨM TỒN KHO THẤP</p>
-          <p className="text-3xl font-bold text-gray-900">{stats.lowStock}</p>
+          <p className="text-3xl font-bold text-gray-900">{isLoading ? '...' : stats.lowStock}</p>
         </div>
 
         {/* Pending Requests */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 cursor-pointer hover:shadow-md transition-shadow">
+        <div
+          className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => router.push('/warehouse/requests')}
+        >
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center">
               <FileText className="text-orange-600" size={20} />
             </div>
-            <span className="text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded">+5%</span>
+            <span className="text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded">Realtime</span>
           </div>
           <p className="text-xs text-gray-600 font-medium uppercase mb-1">YÊU CẦU CHỜ XỬ LÝ</p>
-          <p className="text-3xl font-bold text-gray-900">{stats.pendingRequests}</p>
+          <p className="text-3xl font-bold text-gray-900">{isLoading ? '...' : stats.pendingRequests}</p>
         </div>
 
         {/* Linked Warehouses */}
@@ -108,10 +381,10 @@ export default function WarehouseDashboard() {
             <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
               <Warehouse className="text-blue-600" size={20} />
             </div>
-            <span className="text-xs font-semibold text-gray-500 bg-gray-50 px-2 py-1 rounded">0%</span>
+            <span className="text-xs font-semibold text-gray-500 bg-gray-50 px-2 py-1 rounded">Live</span>
           </div>
           <p className="text-xs text-gray-600 font-medium uppercase mb-1">KHO LIÊN KẾT</p>
-          <p className="text-3xl font-bold text-gray-900">{stats.linkedWarehouses}</p>
+          <p className="text-3xl font-bold text-gray-900">{isLoading ? '...' : stats.linkedWarehouses}</p>
         </div>
 
         {/* Active Stores */}
@@ -120,10 +393,10 @@ export default function WarehouseDashboard() {
             <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
               <Store className="text-purple-600" size={20} />
             </div>
-            <span className="text-xs font-semibold text-gray-500 bg-gray-50 px-2 py-1 rounded">0%</span>
+            <span className="text-xs font-semibold text-gray-500 bg-gray-50 px-2 py-1 rounded">Live</span>
           </div>
           <p className="text-xs text-gray-600 font-medium uppercase mb-1">CỬA HÀNG HOẠT ĐỘNG</p>
-          <p className="text-3xl font-bold text-gray-900">{stats.activeStores}</p>
+          <p className="text-3xl font-bold text-gray-900">{isLoading ? '...' : stats.activeStores}</p>
         </div>
       </div>
 
@@ -147,15 +420,13 @@ export default function WarehouseDashboard() {
           
           {/* Bar Chart */}
           <div className="flex items-end justify-between h-64 gap-4">
-            {weeklyData.map((data, index) => (
-              <div key={index} className="flex-1 flex flex-col items-center gap-2">
+            {weeklyData.length > 0 ? weeklyData.map((data, index) => (
+              <div key={`${data.day}-${index}`} className="flex-1 flex flex-col items-center gap-2">
                 <div className="w-full flex flex-col items-center gap-1 flex-1 justify-end">
-                  {/* Outgoing (lighter) */}
                   <div 
                     className="w-full bg-green-200 rounded-t transition-all hover:bg-green-300"
                     style={{ height: `${(data.outgoing / maxValue) * 100}%` }}
                   ></div>
-                  {/* Incoming (darker) */}
                   <div 
                     className="w-full bg-green-600 rounded-t transition-all hover:bg-green-700"
                     style={{ height: `${(data.incoming / maxValue) * 100}%` }}
@@ -163,7 +434,11 @@ export default function WarehouseDashboard() {
                 </div>
                 <span className="text-xs text-gray-600 font-medium uppercase">{data.day}</span>
               </div>
-            ))}
+            )) : (
+              <div className="w-full h-full flex items-center justify-center text-sm text-gray-500">
+                Chưa có dữ liệu thông lượng 6 ngày gần nhất
+              </div>
+            )}
           </div>
         </div>
 
@@ -174,38 +449,23 @@ export default function WarehouseDashboard() {
           </div>
           
           <div className="space-y-4">
-            {/* Warehouse 1 */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700">KHO 1 (THỰC PHẨM)</span>
-                <span className="text-sm font-bold text-gray-900">85% CÔNG SUẤT</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className="bg-green-600 h-2 rounded-full" style={{ width: '85%' }}></div>
-              </div>
-            </div>
+            {distribution.length > 0 ? distribution.map((item) => {
+              const barColor = item.percentage >= 70 ? 'bg-green-600' : item.percentage >= 40 ? 'bg-orange-500' : 'bg-red-500'
 
-            {/* Warehouse 2 */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700">KHO 2 (ĐỒ UỐNG)</span>
-                <span className="text-sm font-bold text-gray-900">42% CÔNG SUẤT</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className="bg-orange-500 h-2 rounded-full" style={{ width: '42%' }}></div>
-              </div>
-            </div>
-
-            {/* Warehouse 3 */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700">KHO 3 (ĐỒ GIA DỤNG)</span>
-                <span className="text-sm font-bold text-gray-900">68% CÔNG SUẤT</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className="bg-green-600 h-2 rounded-full" style={{ width: '68%' }}></div>
-              </div>
-            </div>
+              return (
+                <div key={item.id}>
+                  <div className="flex items-center justify-between mb-2 gap-4">
+                    <span className="text-sm font-medium text-gray-700 truncate">{item.name.toUpperCase()}</span>
+                    <span className="text-sm font-bold text-gray-900 whitespace-nowrap">{item.percentage}% MỨC TỒN</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className={`${barColor} h-2 rounded-full`} style={{ width: `${item.percentage}%` }}></div>
+                  </div>
+                </div>
+              )
+            }) : (
+              <div className="text-sm text-gray-500">Chưa có dữ liệu phân bổ kho.</div>
+            )}
           </div>
 
           <Button 
@@ -229,6 +489,7 @@ export default function WarehouseDashboard() {
               variant="outline" 
               size="sm"
               className="text-green-600 hover:text-green-700"
+              onClick={() => router.push('/warehouse/inventory')}
             >
               Xem tất cả
             </Button>
@@ -247,8 +508,8 @@ export default function WarehouseDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {inventoryData.slice(0, 3).map((item, index) => (
-                  <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                {highlights.slice(0, 3).map((item) => (
+                  <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-3 px-2">
                       <div className="flex items-center gap-2">
                         <Package size={16} className="text-gray-400" />
@@ -257,7 +518,7 @@ export default function WarehouseDashboard() {
                     </td>
                     <td className="py-3 px-2 text-sm text-gray-600">{item.sku}</td>
                     <td className="py-3 px-2 text-sm font-semibold text-gray-900">{item.quantity}</td>
-                    <td className="py-3 px-2 text-sm text-gray-600">B24-OCT</td>
+                    <td className="py-3 px-2 text-sm text-gray-600">--</td>
                     <td className="py-3 px-2">
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                         item.status === 'in-stock' ? 'bg-green-100 text-green-700' :
@@ -270,6 +531,13 @@ export default function WarehouseDashboard() {
                     </td>
                   </tr>
                 ))}
+                {!isLoading && highlights.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-sm text-gray-500">
+                      Chưa có dữ liệu tồn kho.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -283,46 +551,54 @@ export default function WarehouseDashboard() {
               variant="outline" 
               size="sm"
               className="text-green-600 hover:text-green-700"
+              onClick={() => router.push('/warehouse/requests')}
             >
               Xem lại tất cả
             </Button>
           </div>
           
           <div className="space-y-3">
-            {/* Request 1 */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
-              <div className="flex items-start gap-3 flex-1">
-                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Warehouse className="text-blue-600" size={16} />
+            {incomingRequests.map((request) => (
+              <div key={request.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+                <div className="flex items-start gap-3 flex-1">
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Warehouse className="text-blue-600" size={16} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-xs font-medium text-gray-500">ID</p>
+                      <p className="text-sm font-semibold text-gray-900">#{request.requestNumber}</p>
+                    </div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-xs font-medium text-gray-500">NGUỒN</p>
+                      <p className="text-sm text-gray-900">{request.sourceName}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-medium text-gray-500">SẢN PHẨM</p>
+                      <p className="text-sm text-gray-900">{request.productSummary}</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="text-xs font-medium text-gray-500">ID</p>
-                    <p className="text-sm font-semibold text-gray-900">#RQ-8821</p>
-                  </div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="text-xs font-medium text-gray-500">NGUỒN</p>
-                    <p className="text-sm text-gray-900">Kho 2</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-xs font-medium text-gray-500">SẢN PHẨM</p>
-                    <p className="text-sm text-gray-900">Coca Cola (200)</p>
-                  </div>
+                <div className="flex items-center gap-2 ml-3">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                    {request.statusLabel}
+                  </span>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    className="p-2"
+                    onClick={loadDashboardData}
+                  >
+                    <RefreshCw size={16} className="text-gray-600" />
+                  </Button>
                 </div>
               </div>
-              <div className="flex items-center gap-2 ml-3">
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
-                  CHỜ XỬ LÝ
-                </span>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  className="p-2"
-                >
-                  <RefreshCw size={16} className="text-gray-600" />
-                </Button>
+            ))}
+            {!isLoading && incomingRequests.length === 0 && (
+              <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
+                Hiện không có yêu cầu chờ xử lý.
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
