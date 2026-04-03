@@ -35,14 +35,6 @@ interface Product {
 }
 
 // Dữ liệu thực tế sẽ được fetch từ API
-const ALL_STORES: Store[] = []
-const PRODUCTS: Product[] = []
-
-const DATA_BY_TAB: Record<TabKey, number[]> = {
-  ngay:    [],
-  hom_qua: [],
-  tuan:    [],
-}
 const DAY_LABELS = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN']
 
 const PRIMARY     = '#1a6b3a'
@@ -127,7 +119,7 @@ function BarChart({ data }: { data: number[] }) {
 
 // ─── Store Dropdown ───────────────────────────────────────────────────────────
 
-function StoreDropdown({ selected, onChange }: { selected: Store | null; onChange: (s: Store | null) => void }) {
+function StoreDropdown({ selected, onChange, stores }: { selected: Store | null; onChange: (s: Store | null) => void; stores: Store[] }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -163,7 +155,7 @@ function StoreDropdown({ selected, onChange }: { selected: Store | null; onChang
             <span className="w-5 h-5 rounded-full bg-[#e8f5ed] flex items-center justify-center text-[10px] text-[#1a6b3a] font-bold flex-shrink-0">✓</span>
             Tất cả cửa hàng
           </button>
-          {ALL_STORES.map(s => (
+          {stores.map(s => (
             <button
               key={s.rank}
               onClick={() => { onChange(s); setOpen(false) }}
@@ -335,8 +327,66 @@ export default function DashboardPage() {
   const [orderCount,      setOrderCount]      = useState<number | null>(null)
   const [totalRevenue,    setTotalRevenue]    = useState<number | null>(null)
   const [totalStock,      setTotalStock]      = useState<number | null>(null)
+  const [topStores,       setTopStores]       = useState<Store[]>([])
+  const [topProducts,     setTopProducts]     = useState<Product[]>([])
+  const [chartData,       setChartData]       = useState<Record<TabKey, number[]>>({
+    ngay:    [],
+    hom_qua: [],
+    tuan:    [],
+  })
 
   const storeName = selectedStore ? selectedStore.name : 'Tất cả cửa hàng'
+
+  // Fetch orders count and revenue when store is selected
+  useEffect(() => {
+    async function loadOrderData() {
+      try {
+        // Fetch invoices based on selected store
+        let url = '/api/cashier/invoices/list'
+        
+        const response = await fetch(url)
+        if (response.ok) {
+          const data = await response.json()
+          const invoices = Array.isArray(data) ? data : data?.data || []
+          
+          let filteredInvoices = invoices
+          
+          // If a store is selected, filter invoices by store
+          if (selectedStore) {
+            filteredInvoices = invoices.filter((inv: any) => {
+              // Check multiple possible fields for store/warehouse identifier
+              const storeInfo = [
+                inv.storeName || '',
+                inv.store || '',
+                inv.warehouse || '',
+                inv.location || '',
+                inv.branch || '',
+                inv.warehouseName || '',
+              ].join(' ').toLowerCase()
+              
+              return storeInfo.includes(selectedStore.name.toLowerCase())
+            })
+          }
+          
+          // Set order count
+          setOrderCount(filteredInvoices.length)
+          
+          // Calculate total revenue from invoices
+          const totalRev = filteredInvoices.reduce((sum: number, inv: any) => {
+            const amount = inv.totalAmount || inv.total || inv.subtotal || 0
+            return sum + (typeof amount === 'string' ? parseFloat(amount) : amount)
+          }, 0)
+          setTotalRevenue(totalRev > 0 ? totalRev : null)
+        }
+      } catch (error) {
+        console.error('Failed to load order data:', error)
+        setOrderCount(null)
+        setTotalRevenue(null)
+      }
+    }
+
+    loadOrderData()
+  }, [selectedStore])
 
   // Fetch orders count and revenue when store is selected
   useEffect(() => {
@@ -453,15 +503,77 @@ export default function DashboardPage() {
           }))
           .sort((a, b) => a.name.localeCompare(b.name))
         
-        // Update the global ALL_STORES
-        ALL_STORES.length = 0
-        ALL_STORES.push(...transformedStores)
+        setTopStores(transformedStores)
       } catch (error) {
         console.error('Failed to load stores:', error)
+        setTopStores([])
       }
     }
 
     loadStores()
+  }, [])
+
+  // Fetch revenue trend data for chart
+  useEffect(() => {
+    async function loadRevenueTrend() {
+      try {
+        const response = await fetch('/api/reports/revenue-trend?period=LAST_7_DAYS&groupBy=DAY')
+        if (response.ok) {
+          const data = await response.json()
+          const trendData = Array.isArray(data) ? data : data?.data || []
+          
+          // Extract revenue values for chart
+          const revenueValues = trendData.map((item: any) => {
+            const rev = item.revenue || 0
+            return typeof rev === 'string' ? parseFloat(rev) : rev
+          })
+          
+          // Update chart data
+          setChartData({
+            tuan:    revenueValues,
+            ngay:    revenueValues.length > 0 ? [revenueValues[revenueValues.length - 1]] : [],
+            hom_qua: revenueValues.length > 1 ? [revenueValues[revenueValues.length - 2]] : [],
+          })
+        }
+      } catch (error) {
+        console.error('Failed to load revenue trend:', error)
+      }
+    }
+
+    loadRevenueTrend()
+  }, [])
+
+  // Fetch top products data
+  useEffect(() => {
+    async function loadTopProducts() {
+      try {
+        const response = await fetch('/api/reports/top-products?topN=5')
+        if (response.ok) {
+          const data = await response.json()
+          const topProductsData = Array.isArray(data) ? data : data?.data || []
+          
+          // Transform API data to Product interface
+          const transformedProducts: Product[] = topProductsData.map((item: any) => ({
+            icon: '📦', // Default icon, can be customized per category
+            name: item.productName || item.name || 'Unknown',
+            cat: item.category || 'Uncategorized',
+            rev: `${(item.revenue || 0).toLocaleString('vi-VN')}đ`,
+            qty: String(item.quantitySold || 0),
+            detail: {
+              growth: item.growth || '+0%',
+              stores: item.stores || [],
+            }
+          }))
+          
+          setTopProducts(transformedProducts)
+        }
+      } catch (error) {
+        console.error('Failed to load top products:', error)
+        setTopProducts([])
+      }
+    }
+
+    loadTopProducts()
   }, [])
 
   return (
@@ -477,9 +589,9 @@ export default function DashboardPage() {
             from={dateFrom} to={dateTo}
             onChange={(f, t) => { setDateFrom(f); setDateTo(t) }}
           />
-          <StoreDropdown selected={selectedStore} onChange={setSelectedStore} />
+          <StoreDropdown selected={selectedStore} onChange={setSelectedStore} stores={topStores} />
           <button
-            onClick={() => exportToExcel(storeName, `${dateFrom} – ${dateTo}`, ALL_STORES, PRODUCTS)}
+            onClick={() => exportToExcel(storeName, `${dateFrom} – ${dateTo}`, topStores, topProducts)}
             className="flex items-center gap-1.5 bg-[#1a6b3a] hover:bg-[#155c30] text-white rounded-lg px-4 py-1.5 text-xs font-medium transition-colors"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -527,13 +639,13 @@ export default function DashboardPage() {
               ))}
             </div>
           </div>
-          <BarChart data={DATA_BY_TAB[activeTab]} />
+          <BarChart data={chartData[activeTab]} />
         </div>
 
         {/* Top 7 stores list */}
         <div className="bg-white border border-gray-100 rounded-xl p-5">
           <div className="text-sm font-medium text-gray-900 mb-3">Top cửa hàng</div>
-          {ALL_STORES.map(s => (
+          {topStores.map(s => (
             <div key={s.rank} className="flex items-center gap-2.5 py-2 border-b border-gray-50 last:border-0">
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-medium flex-shrink-0 ${s.rank === 1 ? 'bg-[#1a6b3a] text-white' : 'bg-[#e8f5ed] text-[#1a6b3a]'}`}>
                 {s.rank}
@@ -568,7 +680,7 @@ export default function DashboardPage() {
             </tr>
           </thead>
           <tbody>
-            {PRODUCTS.slice(0, 5).map((p, i) => (
+            {topProducts.slice(0, 5).map((p, i) => (
               <tr key={i} className="border-b border-gray-50 last:border-0">
                 <td className="py-3">
                   <div className="flex items-center gap-2.5">
