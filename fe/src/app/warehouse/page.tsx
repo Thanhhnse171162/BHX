@@ -6,9 +6,6 @@ import {
   Package, 
   AlertTriangle, 
   Warehouse,
-  ArrowRight,
-  RefreshCw,
-  Store,
   FileText
 } from 'lucide-react'
 import { Button } from '@/shared/ui/Button'
@@ -56,7 +53,6 @@ type DashboardStats = {
   lowStock: number
   pendingRequests: number
   linkedWarehouses: number
-  activeStores: number
 }
 
 const WEEKDAY_LABELS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'] as const
@@ -133,7 +129,6 @@ export default function WarehouseDashboard() {
     lowStock: 0,
     pendingRequests: 0,
     linkedWarehouses: 0,
-    activeStores: 0,
   })
   const [weeklyData, setWeeklyData] = useState<WeeklyDataPoint[]>([])
   const [distribution, setDistribution] = useState<WarehouseDistributionItem[]>([])
@@ -224,7 +219,6 @@ export default function WarehouseDashboard() {
         lowStock,
         pendingRequests,
         linkedWarehouses: childWarehouses.length,
-        activeStores: activeStoreIds.size,
       })
 
       const highlightsData: InventoryHighlightRow[] = [...inventoryList]
@@ -274,8 +268,17 @@ export default function WarehouseDashboard() {
 
           const firstItem = req.items?.[0]
           const totalQty = (req.items || []).reduce((sum, item) => sum + Number(item.requestedQuantity || 0), 0)
+          const firstProductName = (() => {
+            const fromItem = String(firstItem?.productName ?? '').trim()
+            if (fromItem) return fromItem
+
+            const fromMap = firstItem?.productId
+              ? productById.get(normalizeId(firstItem.productId))?.name
+              : ''
+            return String(fromMap ?? '').trim() || 'Sản phẩm chưa đồng bộ'
+          })()
           const productSummary = firstItem
-            ? `${firstItem.productName} (${totalQty})`
+            ? `${firstProductName} (${totalQty})`
             : `Tổng SL (${totalQty})`
 
           return {
@@ -499,17 +502,6 @@ export default function WarehouseDashboard() {
           <p className="text-3xl font-bold text-gray-900">{isLoading ? '...' : stats.linkedWarehouses}</p>
         </div>
 
-        {/* Active Stores */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
-              <Store className="text-purple-600" size={20} />
-            </div>
-            <span className="text-xs font-semibold text-gray-500 bg-gray-50 px-2 py-1 rounded">Live</span>
-          </div>
-          <p className="text-xs text-gray-600 font-medium uppercase mb-1">CỬA HÀNG HOẠT ĐỘNG</p>
-          <p className="text-3xl font-bold text-gray-900">{isLoading ? '...' : stats.activeStores}</p>
-        </div>
       </div>
 
       {/* Main Content Grid */}
@@ -606,14 +598,6 @@ export default function WarehouseDashboard() {
             )}
           </div>
 
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="w-full mt-6"
-            onClick={() => router.push('/warehouse/inventory/overview')}
-          >
-            Xem bản đồ mạng lưới <ArrowRight size={16} className="ml-1" />
-          </Button>
         </div>
       </div>
 
@@ -721,14 +705,6 @@ export default function WarehouseDashboard() {
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
                     {request.statusLabel}
                   </span>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    className="p-2"
-                    onClick={loadDashboardData}
-                  >
-                    <RefreshCw size={16} className="text-gray-600" />
-                  </Button>
                 </div>
               </div>
             ))}
