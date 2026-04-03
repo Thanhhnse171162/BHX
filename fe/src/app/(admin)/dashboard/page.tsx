@@ -69,6 +69,17 @@ function exportToExcel(storeName: string, dateRange: string, stores: Store[], pr
 // ─── Bar Chart (no Y-axis column) ────────────────────────────────────────────
 
 function BarChart({ data }: { data: number[] }) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="w-full h-[250px] flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100">
+        <div className="text-center">
+          <div className="text-sm text-gray-400">Không có dữ liệu</div>
+          <div className="text-xs text-gray-300 mt-1">Dữ liệu sẽ hiển thị khi có giao dịch</div>
+        </div>
+      </div>
+    )
+  }
+
   const max    = Math.max(...data)
   const chartH = 200
   const barW   = 36
@@ -76,7 +87,7 @@ function BarChart({ data }: { data: number[] }) {
   const padL   = 6
   const padB   = 30
   const padT   = 24
-  const totalW = padL + data.length * (barW + gap) - gap + 8
+  const totalW = Math.max(padL + data.length * (barW + gap) - gap + 8, 100)
 
   return (
     <svg width="100%" viewBox={`0 0 ${totalW} ${chartH + padB + padT}`} style={{ overflow: 'visible' }}>
