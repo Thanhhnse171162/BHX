@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/shared/ui/Button'
 import { useAuthStore } from '@/store/auth.store'
-import { InventoryAPIService, InventoryItem } from '@/services/inventory-api.service'
+import { InventoryAPIService } from '@/services/inventory-api.service'
 import { RestockAPIService, RestockRequestFromAPI } from '@/services/restock-api.service'
 import { WarehouseAPIService, WarehouseFromAPI } from '@/services/warehouse-api.service'
 import { StockMovementAPIService, StockMovementFromAPI } from '@/services/stock-movement-api.service'
