@@ -54,6 +54,7 @@ const translateErrorMessage = (message: string): string => {
 
 export default function WarehousesAdminPage() {
   const { token } = useAuthStore()
+  const [allWarehouses, setAllWarehouses] = useState<AdminWarehouse[]>([])
   const [filteredWarehouses, setFilteredWarehouses] = useState<AdminWarehouse[]>([])
   const [loading, setLoading] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -61,6 +62,11 @@ export default function WarehousesAdminPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
+  
+  // Search and filter states
+  const [searchName, setSearchName] = useState('')
+  const [searchAddress, setSearchAddress] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
   
   // Toast state
   const [toast, setToast] = useState<{
@@ -138,6 +144,7 @@ export default function WarehousesAdminPage() {
       if (data.success) {
         // Normalize status values from API
         const normalizedData = Array.isArray(data.data) ? normalizeWarehouseData(data.data) : []
+        setAllWarehouses(normalizedData)
         setFilteredWarehouses(normalizedData)
       } else {
         showToast('Failed to fetch warehouses', 'error')
@@ -153,6 +160,19 @@ export default function WarehousesAdminPage() {
   useEffect(() => {
     void fetchWarehouses()
   }, [fetchWarehouses])
+
+  // Apply client-side filters
+  useEffect(() => {
+    const filtered = allWarehouses.filter(warehouse => {
+      const matchesName = warehouse.name.toLowerCase().includes(searchName.toLowerCase())
+      const matchesAddress = warehouse.location.toLowerCase().includes(searchAddress.toLowerCase())
+      const matchesStatus = statusFilter === '' || warehouse.status === statusFilter
+      return matchesName && matchesAddress && matchesStatus
+    })
+    
+    setFilteredWarehouses(filtered)
+    setCurrentPage(1)
+  }, [searchName, searchAddress, statusFilter, allWarehouses])
 
   // Fetch all warehouses for parent selection dropdown
   const fetchAllWarehousesForParent = async () => {
@@ -478,6 +498,58 @@ export default function WarehousesAdminPage() {
             </Button>
           }
         />
+
+        {/* Search and Filter Section */}
+        {!loading && allWarehouses.length > 0 && (
+          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:gap-3">
+            <div className="flex flex-col gap-1 flex-1">
+              <label className="text-sm font-medium text-gray-700">Tìm kiếm theo tên kho</label>
+              <input
+                type="text"
+                placeholder="Nhập tên kho..."
+                value={searchName}
+                onChange={(e) => setSearchName(e.target.value)}
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1 flex-1">
+              <label className="text-sm font-medium text-gray-700">Tìm kiếm theo địa chỉ</label>
+              <input
+                type="text"
+                placeholder="Nhập địa chỉ..."
+                value={searchAddress}
+                onChange={(e) => setSearchAddress(e.target.value)}
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-gray-700">Lọc trạng thái</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 md:w-48"
+              >
+                <option value="">Tất cả trạng thái</option>
+                <option value="ACTIVE">ACTIVE</option>
+                <option value="INACTIVE">INACTIVE</option>
+              </select>
+            </div>
+
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setSearchName('')
+                setSearchAddress('')
+                setStatusFilter('')
+              }}
+            >
+              Xóa bộ lọc
+            </Button>
+          </div>
+        )}
 
         {/* Data Table */}
         {loading ? (

@@ -110,21 +110,27 @@ export default function UsersPage() {
 
   // ── Data state ────────────────────────────────────────────────────────────
   const [users, setUsers]               = useState<User[]>([])
+  const [allUsers, setAllUsers]         = useState<User[]>([])
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [currentPage, setCurrentPage]   = useState(1)
   const [loading, setLoading]           = useState(true)
   const [roles, setRoles]               = useState<Array<{ id: number; name: string }>>([])
   const [stores, setStores]             = useState<Location[]>([])
   const [warehouses, setWarehouses]     = useState<Location[]>([])
+  
+  // Search and filter states
+  const [searchName, setSearchName]     = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
 
   // ── Derived ───────────────────────────────────────────────────────────────
   const filteredRoles     = roles.filter((r) => !HIDDEN_ROLES.includes(r.name))
   const locationOptions   = getLocationsForRole(role, stores, warehouses)
   const showLocation      = needsLocation(role)
 
-  const totalPages        = Math.max(1, Math.ceil(users.length / ITEMS_PER_PAGE))
+  const totalPages        = Math.max(1, Math.ceil(filteredUsers.length / ITEMS_PER_PAGE))
   const safeCurrentPage   = Math.min(currentPage, totalPages)
   const startIndex        = (safeCurrentPage - 1) * ITEMS_PER_PAGE
-  const paginatedUsers    = users.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+  const paginatedUsers    = filteredUsers.slice(startIndex, startIndex + ITEMS_PER_PAGE)
 
   // ── Loaders ───────────────────────────────────────────────────────────────
 
@@ -144,15 +150,22 @@ export default function UsersPage() {
         console.log('📥 Payload received:', payload)
         const data = Array.isArray(payload) ? payload : payload?.data
         console.log('📊 Processed data:', data ? `Array of ${data.length} items` : 'Empty')
-        setUsers(Array.isArray(data) ? data.map(mapApiUserToUi) : [])
+        const mappedUsers = Array.isArray(data) ? data.map(mapApiUserToUi) : []
+        setAllUsers(mappedUsers)
+        setUsers(mappedUsers)
+        setFilteredUsers(mappedUsers)
         console.log('✅ Users set in state')
       } else {
         console.error('❌ Response not ok:', response.status)
         setUsers([])
+        setAllUsers([])
+        setFilteredUsers([])
       }
     } catch (error) {
       console.error('Failed to load users:', error)
       setUsers([])
+      setAllUsers([])
+      setFilteredUsers([])
     } finally {
       setLoading(false)
     }
@@ -198,6 +211,18 @@ export default function UsersPage() {
   useEffect(() => {
     setCurrentPage(1)
   }, [users.length])
+
+  // Apply client-side filters
+  useEffect(() => {
+    const filtered = allUsers.filter(user => {
+      const matchesName = user.name.toLowerCase().includes(searchName.toLowerCase())
+      const matchesStatus = statusFilter === '' || user.status === statusFilter
+      return matchesName && matchesStatus
+    })
+    
+    setFilteredUsers(filtered)
+    setCurrentPage(1)
+  }, [searchName, statusFilter, allUsers])
 
   useEffect(() => {
     setLocationId('')
@@ -465,6 +490,46 @@ export default function UsersPage() {
           />
         ) : (
           <>
+            {/* Search and Filter Section */}
+            <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:gap-3">
+              <div className="flex flex-col gap-1 flex-1">
+                <label className="text-sm font-medium text-gray-700">Tìm kiếm theo tên</label>
+                <input
+                  type="text"
+                  placeholder="Nhập tên người dùng..."
+                  value={searchName}
+                  onChange={(e) => setSearchName(e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-gray-700">Lọc trạng thái</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 md:w-48"
+                >
+                  <option value="">Tất cả trạng thái</option>
+                  <option value="ACTIVE">Hoạt động</option>
+                  <option value="INACTIVE">Không hoạt động</option>
+                  <option value="SUSPENDED">Tạm khóa</option>
+                </select>
+              </div>
+
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setSearchName('')
+                  setStatusFilter('')
+                }}
+              >
+                Xóa bộ lọc
+              </Button>
+            </div>
+
+            {/* Data Table */}
             <DataTable
               data={paginatedUsers as unknown as Record<string, unknown>[]}
               columns={[
@@ -537,10 +602,10 @@ export default function UsersPage() {
               ]}
             />
 
-            {users.length > ITEMS_PER_PAGE && (
+            {filteredUsers.length > ITEMS_PER_PAGE && (
               <div className="mt-4 flex items-center justify-between">
                 <p className="text-sm text-gray-600">
-                  Hiển thị {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, users.length)} / {users.length} người dùng
+                  Hiển thị {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, filteredUsers.length)} / {filteredUsers.length} người dùng
                 </p>
                 <div className="flex items-center gap-2">
                   <Button size="sm" variant="outline" onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))} disabled={safeCurrentPage === 1}>

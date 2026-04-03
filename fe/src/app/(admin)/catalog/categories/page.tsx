@@ -62,6 +62,10 @@ export default function CategoriesPage() {
   const [editingName, setEditingName] = useState('')
   const [editingStatus, setEditingStatus] = useState('ACTIVE')
   const [editingIsDeleted, setEditingIsDeleted] = useState(false)
+  
+  // Search and filter states
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
 
   useEffect(() => {
     fetchCategories()
@@ -177,13 +181,20 @@ export default function CategoriesPage() {
     }
   }
 
-  const totalPages = Math.max(1, Math.ceil(categories.length / PAGE_SIZE))
-  const safeCurrentPage = Math.min(currentPage, totalPages)
-  const startIndex = (safeCurrentPage - 1) * PAGE_SIZE
-  const paginatedCategories = categories.slice(startIndex, startIndex + PAGE_SIZE)
+  // Apply search and status filters
+  const filteredCategories = categories.filter(category => {
+    const matchesSearch = category.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesStatus = statusFilter === '' || category.status === statusFilter
+    return matchesSearch && matchesStatus
+  })
+  
+  const filteredTotalPages = Math.max(1, Math.ceil(filteredCategories.length / PAGE_SIZE))
+  const filteredSafeCurrentPage = Math.min(currentPage, filteredTotalPages)
+  const filteredStartIndex = (filteredSafeCurrentPage - 1) * PAGE_SIZE
+  const paginatedCategories = filteredCategories.slice(filteredStartIndex, filteredStartIndex + PAGE_SIZE)
 
   const handleChangePage = (page: number) => {
-    if (page < 1 || page > totalPages) return
+    if (page < 1 || page > filteredTotalPages) return
     setCurrentPage(page)
   }
 
@@ -201,6 +212,53 @@ export default function CategoriesPage() {
       />
 
       <div className="card">
+        {/* Search and Filter Section */}
+        {!isLoading && !error && categories.length > 0 && (
+          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:gap-3">
+            <div className="flex flex-col gap-1 flex-1">
+              <label className="text-sm font-medium text-gray-700">Tìm kiếm theo tên</label>
+              <input
+                type="text"
+                placeholder="Nhập tên danh mục..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value)
+                  setCurrentPage(1)
+                }}
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-gray-700">Lọc trạng thái</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value)
+                  setCurrentPage(1)
+                }}
+                className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 md:w-48"
+              >
+                <option value="">Tất cả trạng thái</option>
+                <option value="ACTIVE">ACTIVE</option>
+                <option value="INACTIVE">INACTIVE</option>
+              </select>
+            </div>
+
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setSearchTerm('')
+                setStatusFilter('')
+                setCurrentPage(1)
+              }}
+            >
+              Xóa bộ lọc
+            </Button>
+          </div>
+        )}
+
         {/* Loading state */}
         {isLoading && (
           <div className="flex justify-center items-center py-12">
@@ -310,24 +368,24 @@ export default function CategoriesPage() {
 
             <div className="mt-4 flex items-center justify-between px-1">
               <p className="text-sm text-gray-600">
-                Hiển thị {startIndex + 1} - {Math.min(startIndex + PAGE_SIZE, categories.length)} trên {categories.length}
+                Hiển thị {filteredStartIndex + 1} - {Math.min(filteredStartIndex + PAGE_SIZE, filteredCategories.length)} trên {filteredCategories.length}
               </p>
 
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => handleChangePage(safeCurrentPage - 1)}
-                  disabled={safeCurrentPage === 1}
+                  onClick={() => handleChangePage(filteredSafeCurrentPage - 1)}
+                  disabled={filteredSafeCurrentPage === 1}
                 >
                   Trước
                 </Button>
 
-                {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((page) => (
+                {Array.from({ length: filteredTotalPages }, (_, idx) => idx + 1).map((page) => (
                   <Button
                     key={page}
                     size="sm"
-                    variant={page === safeCurrentPage ? 'primary' : 'outline'}
+                    variant={page === filteredSafeCurrentPage ? 'primary' : 'outline'}
                     onClick={() => handleChangePage(page)}
                   >
                     {page}
@@ -337,8 +395,8 @@ export default function CategoriesPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => handleChangePage(safeCurrentPage + 1)}
-                  disabled={safeCurrentPage === totalPages}
+                  onClick={() => handleChangePage(filteredSafeCurrentPage + 1)}
+                  disabled={filteredSafeCurrentPage === filteredTotalPages}
                 >
                   Sau
                 </Button>

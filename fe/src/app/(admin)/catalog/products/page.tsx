@@ -65,6 +65,10 @@ export default function ProductsPage() {
   const [status, setStatus] = useState<ProductStatus>('ACTIVE')
   const [supplierId, setSupplierId] = useState('')
   
+  // Search and filter states
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState<ProductStatus | ''>('')
+  
   // Additional fields from Swagger
   const [barcode, setBarcode] = useState('')
   const [description, setDescription] = useState('')
@@ -115,15 +119,28 @@ export default function ProductsPage() {
     }))
     .filter((cat) => !!cat.resolvedId)
 
-  const totalPages = Math.max(1, Math.ceil(products.length / ITEMS_PER_PAGE))
+  // Filter products based on search and status
+  const filteredProducts = products.filter((product) => {
+    const matchesSearch = 
+      searchTerm === '' ||
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.sku.toLowerCase().includes(searchTerm.toLowerCase())
+    
+    const matchesStatus = 
+      statusFilter === '' || product.status === statusFilter
+    
+    return matchesSearch && matchesStatus
+  })
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE))
   const safeCurrentPage = Math.min(currentPage, totalPages)
   const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE
   const endIndex = startIndex + ITEMS_PER_PAGE
-  const paginatedProducts = products.slice(startIndex, endIndex)
+  const paginatedProducts = filteredProducts.slice(startIndex, endIndex)
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [products.length])
+  }, [products.length, searchTerm, statusFilter])
 
   // Fetch products từ API backend
   const fetchCategories = useCallback(async () => {
@@ -690,9 +707,39 @@ export default function ProductsPage() {
           />
         )}
 
+        {/* No results state */}
+        {!isLoading && !error && products.length > 0 && filteredProducts.length === 0 && (
+          <div className="text-center py-8">
+            <p className="text-gray-500">Không tìm thấy sản phẩm phù hợp</p>
+          </div>
+        )}
+
         {/* Data table */}
         {!isLoading && !error && products.length > 0 && (
           <>
+            {/* Search and Filter Bar */}
+            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+              <div className="flex-1">
+                <Input
+                  placeholder="Tìm kiếm theo tên hoặc SKU..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  type="text"
+                />
+              </div>
+              <div className="w-full sm:w-48">
+                <select
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as ProductStatus | '')}
+                >
+                  <option value="">Tất cả trạng thái</option>
+                  <option value="ACTIVE">Hoạt động</option>
+                  <option value="INACTIVE">Không hoạt động</option>
+                </select>
+              </div>
+            </div>
+
             <DataTable
               data={paginatedProducts}
               columns={[
@@ -829,7 +876,7 @@ export default function ProductsPage() {
 
             <div className="flex items-center justify-between mt-4 px-1">
               <p className="text-sm text-gray-600">
-                Hiển thị {products.length === 0 ? 0 : startIndex + 1}-{Math.min(endIndex, products.length)} trên {products.length} sản phẩm
+                Hiển thị {filteredProducts.length === 0 ? 0 : startIndex + 1}-{Math.min(endIndex, filteredProducts.length)} trên {filteredProducts.length} sản phẩm
               </p>
               <div className="flex items-center gap-2">
                 <Button
