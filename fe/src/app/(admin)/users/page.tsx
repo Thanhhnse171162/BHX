@@ -31,7 +31,7 @@ interface Location {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const STORE_ROLES  = ['Store Manager', 'Store Staff']
+const STORE_ROLES  = ['Store Manager', 'Nhân viên']
 const WAREHOUSE_ROLES = ['Warehouse Manager', 'Warehouse Staff', 'Warehouse Admin']
 const ROLES_NEEDING_LOCATION = [...STORE_ROLES, ...WAREHOUSE_ROLES]
 const HIDDEN_ROLES = ['CUSTOMER', 'Customer']

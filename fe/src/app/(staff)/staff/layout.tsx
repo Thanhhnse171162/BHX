@@ -162,7 +162,7 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm text-gray-900 truncate">{user.name}</p>
-                  <p className="text-xs text-gray-500">Store Staff</p>
+                  <p className="text-xs text-gray-500">Nhân viên</p>
                 </div>
               </div>
               <button

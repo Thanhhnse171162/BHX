@@ -245,6 +245,10 @@ export default function WarehouseManagerRequestsPage() {
   const [selectedIncoming, setSelectedIncoming] = useState<TransferFromAPI | null>(null)
   const [incomingDetailLoadingId, setIncomingDetailLoadingId] = useState<string | null>(null)
 
+  // Search and filter for store/warehouse requests
+  const [requestSearch, setRequestSearch] = useState('')
+  const [requestStatusFilter, setRequestStatusFilter] = useState<'ALL' | RequestStatus>('ALL')
+
   // Action states for approve/reject
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null)
@@ -635,14 +639,38 @@ export default function WarehouseManagerRequestsPage() {
     }
     setPage(1)
     setIncomingPage(1)
+    setRequestSearch('')
+    setRequestStatusFilter('ALL')
   }
 
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1)
+  }, [requestSearch, requestStatusFilter])
+
   const filtered = useMemo(
-    () =>
-      requests.filter(
+    () => {
+      let result = requests.filter(
         (item) => item.type === activeTab && (activeTab === 'warehouse' || item.status !== 'Đã giao')
-      ),
-    [activeTab, requests],
+      )
+      
+      // Apply status filter
+      if (requestStatusFilter !== 'ALL') {
+        result = result.filter((item) => item.status === requestStatusFilter)
+      }
+      
+      // Apply search filter (search by request code and product name)
+      if (requestSearch.trim()) {
+        const query = requestSearch.trim().toLowerCase()
+        result = result.filter((item) =>
+          item.id.toLowerCase().includes(query) || 
+          item.productSummary.toLowerCase().includes(query)
+        )
+      }
+      
+      return result
+    },
+    [activeTab, requests, requestStatusFilter, requestSearch],
   )
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
@@ -1104,6 +1132,43 @@ export default function WarehouseManagerRequestsPage() {
                 {requestsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Filter className="w-4 h-4" />}
                 Làm mới
               </button>
+            </div>
+          </div>
+
+          {/* Filter and Search Bar */}
+          <div className="px-5 py-4 border-b border-gray-100 flex flex-wrap items-end gap-4">
+            <div className="flex flex-wrap items-end gap-4">
+              {/* Search by request code and product name */}
+              <div className="relative">
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Tìm kiếm</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={requestSearch}
+                    onChange={(e) => setRequestSearch(e.target.value)}
+                    placeholder="Mã yêu cầu, tên sản phẩm..."
+                    className="pl-9 pr-4 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#ea580c] focus:border-transparent min-w-[280px]"
+                  />
+                </div>
+              </div>
+
+              {/* Status Filter */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Trạng thái</label>
+                <select
+                  value={requestStatusFilter}
+                  onChange={(e) => setRequestStatusFilter(e.target.value as 'ALL' | RequestStatus)}
+                  className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#ea580c] focus:border-transparent"
+                >
+                  <option value="ALL">Tất cả</option>
+                  <option value="Chờ duyệt">Chờ duyệt</option>
+                  <option value="Đang xử lý">Đang xử lý</option>
+                  <option value="Đã duyệt">Đã duyệt</option>
+                  <option value="Đã giao">Đã giao</option>
+                  <option value="Từ chối">Từ chối</option>
+                </select>
+              </div>
             </div>
           </div>
 

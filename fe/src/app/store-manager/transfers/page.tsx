@@ -65,6 +65,7 @@ export default function StoreManagerTransfersPage() {
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
+  const [movementTypeFilter, setMovementTypeFilter] = useState('ALL')
   const [currentPage, setCurrentPage] = useState(1)
   const [selected, setSelected] = useState<StockMovementFromAPI | null>(null)
 
@@ -132,6 +133,7 @@ export default function StoreManagerTransfersPage() {
 
     const filtered = rows.filter((row) => {
       if (statusFilter !== 'ALL' && normalizeText(row.status) !== statusFilter) return false
+      if (movementTypeFilter !== 'ALL' && normalizeText(row.movementType) !== movementTypeFilter) return false
 
       if (!q) return true
       const joined = [
@@ -154,11 +156,11 @@ export default function StoreManagerTransfersPage() {
       if (Number.isNaN(db)) return -1
       return db - da
     })
-  }, [rows, search, statusFilter])
+  }, [rows, search, statusFilter, movementTypeFilter])
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, statusFilter])
+  }, [search, statusFilter, movementTypeFilter])
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
   const safePage = Math.min(currentPage, totalPages)
@@ -206,6 +208,20 @@ export default function StoreManagerTransfersPage() {
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
         <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
           <div className="flex flex-wrap items-end gap-3">
+            <label className="text-[11px] text-slate-500 font-semibold uppercase tracking-wide">
+              Loại di chuyển
+              <select
+                value={movementTypeFilter}
+                onChange={(e) => setMovementTypeFilter(e.target.value)}
+                className="block mt-1 min-w-[180px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 outline-none"
+              >
+                <option value="ALL">Tất cả</option>
+                <option value="INBOUND">Nhập kho</option>
+                <option value="OUTBOUND">Xuất kho</option>
+                <option value="TRANSFER">Điều chuyển</option>
+              </select>
+            </label>
+
             <label className="text-[11px] text-slate-500 font-semibold uppercase tracking-wide">
               Trạng thái
               <select

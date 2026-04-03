@@ -210,7 +210,7 @@ export default function CashierLayout({ children }: CashierLayoutProps) {
           <div className="flex items-center gap-3">
             <div className="text-right">
               <p className="text-[14px] font-semibold text-gray-900 leading-tight font-sans">{user.name}</p>
-              <p className="text-[12px] text-gray-500 font-sans">Store Staff</p>
+              <p className="text-[12px] text-gray-500 font-sans">Nhân viên</p>
             </div>
             <div className="w-9 h-9 rounded-full bg-green-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0 font-sans">
               {userInitial}

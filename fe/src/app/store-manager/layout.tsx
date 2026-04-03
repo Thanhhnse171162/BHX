@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import Link from 'next/link'
@@ -13,7 +13,6 @@ import {
   ClipboardCheck,
   AlertTriangle,
   LogOut,
-  Bell,
   PackagePlus,
 } from 'lucide-react'
 
@@ -22,7 +21,7 @@ interface StoreManagerLayoutProps {
 }
 
 const PRIMARY_NAV = [
-  { href: '/store-manager',                          label: 'Tổng quan',            icon: LayoutDashboard, exact: true  },
+  { href: '/store-manager',                          label: 'Doanh thu',            icon: LayoutDashboard, exact: true  },
   { href: '/store-manager/products',                 label: 'Sản phẩm',            icon: Archive,         exact: false },
   // { href: '/store-manager/inventory',                label: 'Tồn kho kệ hàng',     icon: Archive,         exact: false },
   { href: '/store-manager/inventory-aux',            label: 'Tồn kho kho phụ',     icon: Warehouse,       exact: false },
@@ -37,7 +36,7 @@ const MANAGEMENT_NAV: any[] = []
 const HIDDEN_SIDEBAR_LABELS = new Set(['Doanh thu', 'Quản lý đơn hàng', 'Quản lý khách hàng'])
 
 function getPageTitle(pathname: string): string {
-  if (pathname === '/store-manager') return 'Tổng Quan'
+  if (pathname === '/store-manager') return 'Doanh thu'
   if (pathname.startsWith('/store-manager/discounts'))         return 'Giảm Giá'
   if (pathname.startsWith('/store-manager/products'))          return 'Sản Phẩm'
   if (pathname.startsWith('/store-manager/inventory-aux'))     return 'Tồn Kho Phụ'
@@ -53,23 +52,6 @@ export default function StoreManagerLayout({ children }: StoreManagerLayoutProps
   const router = useRouter()
   const pathname = usePathname()
   const { user, isAuthenticated, logout, hydrated } = useAuthStore()
-  const [incidentCount, setIncidentCount] = useState<number>(0)
-
-  // Fetch unresolved incident count
-  useEffect(() => {
-    const fetchIncidentCount = async () => {
-      try {
-        const res = await fetch('/api/incidents/count')
-        if (res.ok) {
-          const data = await res.json()
-          setIncidentCount(data.count ?? 0)
-        }
-      } catch { /* silently fail */ }
-    }
-    fetchIncidentCount()
-    const interval = setInterval(fetchIncidentCount, 30_000)
-    return () => clearInterval(interval)
-  }, [])
 
   // Auth / role guard
   useEffect(() => {
@@ -208,14 +190,6 @@ export default function StoreManagerLayout({ children }: StoreManagerLayoutProps
           </div>
 
           <div className="flex items-center gap-3 ml-auto">
-            {/* Notification bell */}
-            <button className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors">
-              <Bell size={20} />
-              {incidentCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500" />
-              )}
-            </button>
-
             {/* User info */}
             <div className="flex items-center gap-2.5 pl-3 border-l border-gray-200">
               <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">

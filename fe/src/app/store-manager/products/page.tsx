@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { RefreshCw, Edit2, Download } from 'lucide-react'
+import { RefreshCw, Edit2, Download, Search } from 'lucide-react'
 import useAuthStore from '@/store/auth.store'
 import { InventoryAPIService, type InventoryItem } from '@/services/inventory-api.service'
 import { ProductAPIService, type ProductFromAPI } from '@/services/product-api.service'
@@ -65,6 +65,8 @@ export default function StoreManagerProductsPage() {
   const [exporting, setExporting] = useState(false)
   const [isExportConfirmOpen, setIsExportConfirmOpen] = useState(false)
   const [errorModal, setErrorModal] = useState<{ title: string; message: string; details?: string } | null>(null)
+  const [searchText, setSearchText] = useState('')
+  const [stockStatusFilter, setStockStatusFilter] = useState('ALL')
 
   const { locationType, locationId } = useMemo(() => resolveLocationContext(user), [user])
 
@@ -136,18 +138,46 @@ export default function StoreManagerProductsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, locationType, locationId, user])
 
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
+  const filteredRows = useMemo(() => {
+    const query = searchText.trim().toLowerCase()
+    return rows.filter((item) => {
+      // Filter by stock status
+      if (stockStatusFilter !== 'ALL') {
+        const isLowStock = item.isLowStock
+        if (stockStatusFilter === 'IN_STOCK' && isLowStock) return false
+        if (stockStatusFilter === 'OUT_OF_STOCK' && !isLowStock) return false
+      }
+
+      // Filter by search text
+      if (query) {
+        // Extract product name inline to avoid dependency issues
+        const fromNested = String(item.product?.name || '').trim()
+        const fromFlat = String(item.productName || item.name || '').trim()
+        const mapped = productMap[normalizeId(item.productId)]
+        const productName = (fromNested || fromFlat || mapped?.name || 'Sản phẩm chưa rõ tên').toLowerCase()
+        return productName.includes(query)
+      }
+
+      return true
+    })
+  }, [rows, searchText, stockStatusFilter, productMap])
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
   const safeCurrentPage = Math.min(currentPage, totalPages)
   const pagedRows = useMemo(() => {
     const start = (safeCurrentPage - 1) * PAGE_SIZE
-    return rows.slice(start, start + PAGE_SIZE)
-  }, [rows, safeCurrentPage])
+    return filteredRows.slice(start, start + PAGE_SIZE)
+  }, [filteredRows, safeCurrentPage])
 
   useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages)
     }
   }, [currentPage, totalPages])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchText, stockStatusFilter])
 
   const handlePageChange = (page: number) => {
     if (page < 1 || page > totalPages) return
@@ -311,10 +341,6 @@ export default function StoreManagerProductsPage() {
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-[30px] leading-[32px] font-extrabold text-slate-900">Sản phẩm theo cửa hàng</h1>
-          <p className="text-xs text-slate-500 mt-1">
-            locationType: <span className="font-semibold">{locationType || '-'}</span> 
-            
-          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={fetchInventory} className="gap-2" disabled={isLoading}>
@@ -334,6 +360,36 @@ export default function StoreManagerProductsPage() {
       )}
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-200 flex flex-wrap items-end gap-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="text-[11px] text-slate-500 font-semibold uppercase tracking-wide">
+              Tìm kiếm theo tên
+              <div className="relative mt-1 min-w-[280px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                <input
+                  type="text"
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  placeholder="Nhập tên sản phẩm..."
+                  className="w-full rounded-lg border border-slate-200 pl-9 pr-3 py-2 text-[13px] text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </label>
+
+            <label className="text-[11px] text-slate-500 font-semibold uppercase tracking-wide">
+              Trạng thái tồn kho
+              <select
+                value={stockStatusFilter}
+                onChange={(e) => setStockStatusFilter(e.target.value)}
+                className="block mt-1 min-w-[180px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="ALL">Tất cả</option>
+                <option value="IN_STOCK">Còn hàng</option>
+                <option value="OUT_OF_STOCK">Hết hàng</option>
+              </select>
+            </label>
+          </div>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-[13px]">
             <thead>
@@ -410,10 +466,10 @@ export default function StoreManagerProductsPage() {
           </table>
         </div>
 
-        {!isLoading && rows.length > 0 && (
+        {!isLoading && filteredRows.length > 0 && (
           <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3">
             <p className="text-xs text-slate-500">
-              Hiển thị {(safeCurrentPage - 1) * PAGE_SIZE + 1}-{Math.min(safeCurrentPage * PAGE_SIZE, rows.length)} / {rows.length} sản phẩm
+              Hiển thị {(safeCurrentPage - 1) * PAGE_SIZE + 1}-{Math.min(safeCurrentPage * PAGE_SIZE, filteredRows.length)} / {filteredRows.length} sản phẩm
             </p>
             <div className="flex items-center gap-2">
               <Button

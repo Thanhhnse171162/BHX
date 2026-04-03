@@ -200,7 +200,7 @@ export default function SchedulePage() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Position</p>
-                  <p className="font-semibold text-gray-900">Store Staff</p>
+                  <p className="font-semibold text-gray-900">Nhân viên</p>
                 </div>
               </div>
 

@@ -6,8 +6,6 @@ import Link from 'next/link'
 import {
   FileText,
   ShoppingBag,
-  Bell,
-  Settings,
   Search,
   Monitor,
   ReceiptText,
@@ -152,15 +150,6 @@ export default function CashierDashboard() {
       {/* Top Header */}
       <header className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between sticky top-0 z-30">
         <h1 className="text-2xl font-bold text-gray-900">Tổng quan hôm nay</h1>
-        <div className="flex items-center gap-3">
-          <button className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors relative">
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
-          </button>
-          <button className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors">
-            <Settings className="w-5 h-5" />
-          </button>
-        </div>
       </header>
 
       {/* Content */}

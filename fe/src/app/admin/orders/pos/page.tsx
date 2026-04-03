@@ -184,7 +184,7 @@ export default function AdminPOSOrdersPage() {
           storeId: 'store-1',
           storeName: 'BHX Quận 1',
           staffId: 'staff-1',
-          staffName: 'Store Staff',
+          staffName: 'Nhân viên',
           createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
           updatedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
         },
