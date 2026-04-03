@@ -24,13 +24,6 @@ type WeeklyDataPoint = {
   outgoing: number
 }
 
-type WarehouseDistributionItem = {
-  id: string
-  name: string
-  quantity: number
-  percentage: number
-}
-
 type InventoryHighlightRow = {
   id: string
   name: string
@@ -131,7 +124,6 @@ export default function WarehouseDashboard() {
     linkedWarehouses: 0,
   })
   const [weeklyData, setWeeklyData] = useState<WeeklyDataPoint[]>([])
-  const [distribution, setDistribution] = useState<WarehouseDistributionItem[]>([])
   const [highlights, setHighlights] = useState<InventoryHighlightRow[]>([])
   const [incomingRequests, setIncomingRequests] = useState<IncomingRequestRow[]>([])
 
@@ -222,22 +214,17 @@ export default function WarehouseDashboard() {
       })
 
       const highlightsData: InventoryHighlightRow[] = [...inventoryList]
-        .sort((a, b) => {
-          const score = (item: InventoryItem) => {
-            if (item.availableQuantity === 0) return 3
-            if (item.isLowStock) return 2
-            return 1
-          }
-          const scoreDiff = score(b) - score(a)
-          if (scoreDiff !== 0) return scoreDiff
-          return a.availableQuantity - b.availableQuantity
-        })
-        .slice(0, 5)
         .map((item) => ({
           product: productById.get(normalizeId(item.productId)),
           batch: latestBatchByProduct.get(normalizeId(item.productId)),
           source: item,
         }))
+        .sort((a, b) => {
+          const timeA = new Date(a.batch?.receivedAt || 0).getTime()
+          const timeB = new Date(b.batch?.receivedAt || 0).getTime()
+          return timeB - timeA
+        })
+        .slice(0, 5)
         .map(({ product, batch, source }) => ({
           id: source.id,
           name: source.product?.name || source.name || source.productName || product?.name || `SP-${source.productId.slice(0, 8)}`,
@@ -266,20 +253,17 @@ export default function WarehouseDashboard() {
           const sourceWarehouse = warehouseById.get(sourceWarehouseId)
           const sourceName = sourceWarehouse?.name || (req.fromWarehouseId ? `Kho ${String(req.fromWarehouseId).slice(0, 8)}` : 'N/A')
 
-          const firstItem = req.items?.[0]
-          const totalQty = (req.items || []).reduce((sum, item) => sum + Number(item.requestedQuantity || 0), 0)
-          const firstProductName = (() => {
-            const fromItem = String(firstItem?.productName ?? '').trim()
-            if (fromItem) return fromItem
-
-            const fromMap = firstItem?.productId
-              ? productById.get(normalizeId(firstItem.productId))?.name
-              : ''
-            return String(fromMap ?? '').trim() || 'Sản phẩm chưa đồng bộ'
-          })()
-          const productSummary = firstItem
-            ? `${firstProductName} (${totalQty})`
-            : `Tổng SL (${totalQty})`
+          const items = req.items || []
+          const totalQty = items.reduce((sum, item) => sum + Number(item.requestedQuantity || 0), 0)
+          
+          // Hiển thị tất cả sản phẩm trong request
+          const itemsDisplay = items.map((item) => {
+            const itemQty = item.requestedQuantity || 0
+            const productName = item.productName || productById.get(normalizeId(item.productId))?.name || `SP-${item.productId.slice(0, 8)}`
+            return `${productName} (${itemQty})`
+          }).join(', ')
+          
+          const productSummary = itemsDisplay || `Tổng SL (${totalQty})`
 
           return {
             id: req.id,
@@ -290,42 +274,6 @@ export default function WarehouseDashboard() {
           }
         })
       setIncomingRequests(recentRequests)
-
-      const distributionTargets: WarehouseFromAPI[] = []
-      const currentWarehouse = warehouseById.get(normalizedCurrentId)
-      if (currentWarehouse) distributionTargets.push(currentWarehouse)
-      distributionTargets.push(...childWarehouses)
-
-      if (distributionTargets.length > 0) {
-        const quantityByWarehouse = await Promise.all(
-          distributionTargets.map(async (wh) => {
-            const whInventory = await InventoryAPIService.getInventoryByWarehouse(wh.id).catch(() => [] as InventoryItem[])
-            const totalQty = whInventory.reduce((sum, item) => sum + Number(item.availableQuantity || item.quantity || 0), 0)
-            return { id: wh.id, name: wh.name || 'Kho', quantity: totalQty }
-          })
-        )
-
-        const maxQty = Math.max(...quantityByWarehouse.map((item) => item.quantity), 1)
-        const distributionData = quantityByWarehouse
-          .filter((item) => item.quantity > 0)
-          .slice(0, 5)
-          .map((item) => ({
-            ...item,
-            percentage: Math.round((item.quantity / maxQty) * 100),
-          }))
-
-        setDistribution(distributionData)
-      } else {
-        const fallbackQty = inventoryList.reduce((sum, item) => sum + Number(item.availableQuantity || item.quantity || 0), 0)
-        setDistribution([
-          {
-            id: workplaceId,
-            name: 'Kho hiện tại',
-            quantity: fallbackQty,
-            percentage: 100,
-          },
-        ])
-      }
 
       const dailyMap = new Map<string, WeeklyDataPoint>()
       const today = new Date()
@@ -572,33 +520,7 @@ export default function WarehouseDashboard() {
           </div>
         </div>
 
-        {/* Warehouse Distribution - Takes 1 column */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-gray-900">Phân bổ kho hàng</h3>
-          </div>
-          
-          <div className="space-y-4">
-            {distribution.length > 0 ? distribution.map((item) => {
-              const barColor = item.percentage >= 70 ? 'bg-green-600' : item.percentage >= 40 ? 'bg-orange-500' : 'bg-red-500'
 
-              return (
-                <div key={item.id}>
-                  <div className="flex items-center justify-between mb-2 gap-4">
-                    <span className="text-sm font-medium text-gray-700 truncate">{item.name.toUpperCase()}</span>
-                    <span className="text-sm font-bold text-gray-900 whitespace-nowrap">{item.percentage}% MỨC TỒN</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className={`${barColor} h-2 rounded-full`} style={{ width: `${item.percentage}%` }}></div>
-                  </div>
-                </div>
-              )
-            }) : (
-              <div className="text-sm text-gray-500">Chưa có dữ liệu phân bổ kho.</div>
-            )}
-          </div>
-
-        </div>
       </div>
 
       {/* Bottom Section: Inventory Highlights and Incoming Requests */}
