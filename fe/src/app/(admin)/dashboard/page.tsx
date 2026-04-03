@@ -433,13 +433,17 @@ export default function DashboardPage() {
     loadInventoryData()
   }, [selectedStore])
 
-  // Fetch warehouses (stores) from API
+  // Fetch stores from API (filter out warehouses)
   useEffect(() => {
     async function loadStores() {
       try {
         const warehouses = await WarehouseAPIService.getAll()
-        // Transform warehouse data to Store interface
-        const transformedStores: Store[] = warehouses
+        // Filter to only show stores (those with "Cửa Hàng" in the name)
+        const storesOnly = warehouses.filter(w => 
+          w.name.toLowerCase().includes('cửa hàng')
+        )
+        // Transform store data to Store interface
+        const transformedStores: Store[] = storesOnly
           .map((w, idx) => ({
             rank: idx + 1,
             name: w.name,
