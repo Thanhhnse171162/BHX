@@ -332,8 +332,106 @@ export default function DashboardPage() {
   const [selectedStore,   setSelectedStore]   = useState<Store | null>(null)
   const [dateFrom,        setDateFrom]        = useState('01/05/2024')
   const [dateTo,          setDateTo]          = useState('24/05/2024')
+  const [orderCount,      setOrderCount]      = useState<number | null>(null)
+  const [totalRevenue,    setTotalRevenue]    = useState<number | null>(null)
+  const [totalStock,      setTotalStock]      = useState<number | null>(null)
 
   const storeName = selectedStore ? selectedStore.name : 'Tất cả cửa hàng'
+
+  // Fetch orders count and revenue when store is selected
+  useEffect(() => {
+    async function loadOrderData() {
+      try {
+        // Fetch invoices based on selected store
+        let url = '/api/cashier/invoices/list'
+        
+        const response = await fetch(url)
+        if (response.ok) {
+          const data = await response.json()
+          const invoices = Array.isArray(data) ? data : data?.data || []
+          
+          let filteredInvoices = invoices
+          
+          // If a store is selected, filter invoices by store
+          if (selectedStore) {
+            filteredInvoices = invoices.filter((inv: any) => {
+              // Check multiple possible fields for store/warehouse identifier
+              const storeInfo = [
+                inv.storeName || '',
+                inv.store || '',
+                inv.warehouse || '',
+                inv.location || '',
+                inv.branch || '',
+                inv.warehouseName || '',
+              ].join(' ').toLowerCase()
+              
+              return storeInfo.includes(selectedStore.name.toLowerCase())
+            })
+          }
+          
+          // Set order count
+          setOrderCount(filteredInvoices.length)
+          
+          // Calculate total revenue from invoices
+          const totalRev = filteredInvoices.reduce((sum: number, inv: any) => {
+            const amount = inv.totalAmount || inv.total || inv.subtotal || 0
+            return sum + (typeof amount === 'string' ? parseFloat(amount) : amount)
+          }, 0)
+          setTotalRevenue(totalRev > 0 ? totalRev : null)
+        }
+      } catch (error) {
+        console.error('Failed to load order data:', error)
+        setOrderCount(null)
+        setTotalRevenue(null)
+      }
+    }
+
+    loadOrderData()
+  }, [selectedStore])
+
+  // Fetch total inventory stock
+  useEffect(() => {
+    async function loadInventoryData() {
+      try {
+        // Fetch inventory data
+        const response = await fetch('/api/inventory')
+        if (response.ok) {
+          const data = await response.json()
+          const inventoryItems = Array.isArray(data) ? data : data?.data || []
+          
+          let filteredInventory = inventoryItems
+          
+          // If a store is selected, filter inventory by store
+          if (selectedStore) {
+            filteredInventory = inventoryItems.filter((item: any) => {
+              const locationInfo = [
+                item.warehouseName || '',
+                item.warehouse || '',
+                item.storeName || '',
+                item.store || '',
+                item.location || '',
+              ].join(' ').toLowerCase()
+              
+              return locationInfo.includes(selectedStore.name.toLowerCase())
+            })
+          }
+          
+          // Calculate total quantity
+          const totalQty = filteredInventory.reduce((sum: number, item: any) => {
+            const qty = item.quantity || item.availableQuantity || item.qty || 0
+            return sum + (typeof qty === 'string' ? parseFloat(qty) : qty)
+          }, 0)
+          
+          setTotalStock(totalQty > 0 ? totalQty : 0)
+        }
+      } catch (error) {
+        console.error('Failed to load inventory data:', error)
+        setTotalStock(0)
+      }
+    }
+
+    loadInventoryData()
+  }, [selectedStore])
 
   // Fetch warehouses (stores) from API
   useEffect(() => {
@@ -393,9 +491,9 @@ export default function DashboardPage() {
       {/* Metric cards — no trend bar, no small % */}
       <div className="grid grid-cols-3 gap-3.5 mb-5">
         {[
-          { label: 'Tổng doanh thu cửa hàng', value: '—' },
-          { label: 'Số hóa đơn',              value: '—' },
-          { label: 'Tăng trưởng doanh thu',   value: '—' },
+          { label: 'Tổng doanh thu cửa hàng', value: totalRevenue !== null ? `${(totalRevenue / 1000000).toFixed(1)}M₫` : '—' },
+          { label: 'Số hóa đơn',              value: orderCount !== null ? String(orderCount) : '—' },
+          { label: 'Tổng tồn kho hệ thống',   value: totalStock !== null ? String(totalStock) : '—' },
         ].map(m => (
           <div key={m.label} className="bg-white border border-gray-100 rounded-xl p-4">
             <div className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-2">{m.label}</div>
