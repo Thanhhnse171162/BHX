@@ -179,7 +179,7 @@ export default function WarehouseDashboard() {
         activeStores: activeStoreIds.size,
       })
 
-      const highlightsData = [...inventoryList]
+      const highlightsData: InventoryHighlightRow[] = [...inventoryList]
         .sort((a, b) => {
           const score = (item: InventoryItem) => {
             if (item.availableQuantity === 0) return 3
@@ -198,10 +198,10 @@ export default function WarehouseDashboard() {
           quantity: item.availableQuantity,
           status:
             item.availableQuantity === 0
-              ? 'out-of-stock'
+              ? ('out-of-stock' as const)
               : item.isLowStock
-              ? 'low-stock'
-              : 'in-stock',
+              ? ('low-stock' as const)
+              : ('in-stock' as const),
         }))
       setHighlights(highlightsData)
 
