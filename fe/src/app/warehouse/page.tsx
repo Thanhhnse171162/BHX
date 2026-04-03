@@ -18,6 +18,8 @@ import { RestockAPIService, RestockRequestFromAPI } from '@/services/restock-api
 import { WarehouseAPIService, WarehouseFromAPI } from '@/services/warehouse-api.service'
 import { StockMovementAPIService, StockMovementFromAPI } from '@/services/stock-movement-api.service'
 import { UserAPIService, UserInfoFromAPI } from '@/services/user-api.service'
+import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
+import { ProductBatchAPIService, ProductBatchFromAPI } from '@/services/product-batch-api.service'
 
 type WeeklyDataPoint = {
   day: string
@@ -37,6 +39,7 @@ type InventoryHighlightRow = {
   name: string
   sku: string
   quantity: number
+  lot: string
   status: 'in-stock' | 'low-stock' | 'out-of-stock'
 }
 
@@ -97,6 +100,29 @@ function getWorkplaceType(user: ReturnType<typeof useAuthStore.getState>['user']
   return null
 }
 
+function pickLatestBatchByProduct(batches: ProductBatchFromAPI[]): Map<string, ProductBatchFromAPI> {
+  const latestByProduct = new Map<string, ProductBatchFromAPI>()
+
+  batches.forEach((batch) => {
+    const productId = normalizeId(batch.productId)
+    if (!productId) return
+
+    const current = latestByProduct.get(productId)
+    if (!current) {
+      latestByProduct.set(productId, batch)
+      return
+    }
+
+    const currentTime = new Date(current.receivedAt || 0).getTime()
+    const nextTime = new Date(batch.receivedAt || 0).getTime()
+    if (nextTime > currentTime) {
+      latestByProduct.set(productId, batch)
+    }
+  })
+
+  return latestByProduct
+}
+
 export default function WarehouseDashboard() {
   const router = useRouter()
   const { user, hydrated } = useAuthStore()
@@ -130,20 +156,32 @@ export default function WarehouseDashboard() {
     setError(null)
 
     try {
-      const [inventory, requestData, movementData, warehouseData, userData] = await Promise.all([
+      const [inventory, requestData, warehouseData, userData, productData, batchData] = await Promise.all([
         InventoryAPIService.getInventoryByLocation(workplaceType, workplaceId),
         workplaceType === 'WAREHOUSE'
           ? RestockAPIService.getByParentWarehouse(workplaceId).catch(() => RestockAPIService.getByWarehouse(workplaceId))
           : RestockAPIService.getByWarehouse(workplaceId),
-        StockMovementAPIService.getByLocation(workplaceId).catch(() => [] as StockMovementFromAPI[]),
         WarehouseAPIService.getAll().catch(() => [] as WarehouseFromAPI[]),
         UserAPIService.getAll().catch(() => [] as UserInfoFromAPI[]),
+        ProductAPIService.getAllProducts().catch(() => [] as ProductFromAPI[]),
+        workplaceType === 'WAREHOUSE'
+          ? ProductBatchAPIService.getByWarehouse(workplaceId).catch(() => [] as ProductBatchFromAPI[])
+          : Promise.resolve([] as ProductBatchFromAPI[]),
       ])
 
       const inventoryList = Array.isArray(inventory) ? inventory : []
       const requestList = Array.isArray(requestData) ? requestData : []
-      const movementList = Array.isArray(movementData) ? movementData : []
       const warehouseList = Array.isArray(warehouseData) ? warehouseData : []
+      const products = Array.isArray(productData) ? productData : []
+      const batches = Array.isArray(batchData) ? batchData : []
+
+      const productById = new Map<string, ProductFromAPI>()
+      products.forEach((product) => {
+        const id = normalizeId(product.id)
+        if (id) productById.set(id, product)
+      })
+
+      const latestBatchByProduct = pickLatestBatchByProduct(batches)
 
       const normalizedCurrentId = normalizeId(workplaceId)
       const warehouseById = new Map<string, WarehouseFromAPI>()
@@ -156,6 +194,16 @@ export default function WarehouseDashboard() {
         const parentId = normalizeId(wh.parentId ?? wh.parent_id)
         return parentId === normalizedCurrentId
       })
+
+      const movementLocationIds = Array.from(
+        new Set([workplaceId, ...childWarehouses.map((wh) => wh.id)].filter(Boolean))
+      )
+      const movementChunks = await Promise.all(
+        movementLocationIds.map((locationId) =>
+          StockMovementAPIService.getByLocation(locationId).catch(() => [] as StockMovementFromAPI[])
+        )
+      )
+      const movementList = movementChunks.flat()
 
       const activeStoreIds = new Set<string>()
       userData.forEach((account) => {
@@ -191,23 +239,24 @@ export default function WarehouseDashboard() {
           return a.availableQuantity - b.availableQuantity
         })
         .slice(0, 5)
-        .map((item) => {
-          let statusValue: 'in-stock' | 'low-stock' | 'out-of-stock'
-          if (item.availableQuantity === 0) {
-            statusValue = 'out-of-stock'
-          } else if (item.isLowStock) {
-            statusValue = 'low-stock'
-          } else {
-            statusValue = 'in-stock'
-          }
-          return {
-            id: item.id,
-            name: item.product?.name || item.name || item.productName || 'Sản phẩm',
-            sku: item.product?.sku || item.sku || 'N/A',
-            quantity: item.availableQuantity,
-            status: statusValue,
-          }
-        })
+        .map((item) => ({
+          product: productById.get(normalizeId(item.productId)),
+          batch: latestBatchByProduct.get(normalizeId(item.productId)),
+          source: item,
+        }))
+        .map(({ product, batch, source }) => ({
+          id: source.id,
+          name: source.product?.name || source.name || source.productName || product?.name || `SP-${source.productId.slice(0, 8)}`,
+          sku: source.product?.sku || source.sku || product?.sku || `SKU-${source.productId.slice(0, 8).toUpperCase()}`,
+          quantity: source.availableQuantity,
+          lot: String(batch?.batchNumber || '').trim() || 'CHUA_CO_LO',
+          status:
+            source.availableQuantity === 0
+              ? ('out-of-stock' as const)
+              : source.isLowStock
+              ? ('low-stock' as const)
+              : ('in-stock' as const),
+        }))
       setHighlights(highlightsData)
 
       const recentRequests = requestList
@@ -322,6 +371,10 @@ export default function WarehouseDashboard() {
     () => Math.max(...weeklyData.flatMap((d) => [d.incoming, d.outgoing]), 1),
     [weeklyData]
   )
+  const hasThroughputData = useMemo(
+    () => weeklyData.some((d) => d.incoming > 0 || d.outgoing > 0),
+    [weeklyData]
+  )
 
   return (
     <div className="space-y-6 p-6 bg-gray-50">
@@ -425,7 +478,7 @@ export default function WarehouseDashboard() {
           
           {/* Bar Chart */}
           <div className="flex items-end justify-between h-64 gap-4">
-            {weeklyData.length > 0 ? weeklyData.map((data, index) => (
+            {weeklyData.length > 0 && hasThroughputData ? weeklyData.map((data, index) => (
               <div key={`${data.day}-${index}`} className="flex-1 flex flex-col items-center gap-2">
                 <div className="w-full flex flex-col items-center gap-1 flex-1 justify-end">
                   <div 
@@ -441,7 +494,7 @@ export default function WarehouseDashboard() {
               </div>
             )) : (
               <div className="w-full h-full flex items-center justify-center text-sm text-gray-500">
-                Chưa có dữ liệu thông lượng 6 ngày gần nhất
+                Chưa có dữ liệu nhập/xuất kho trong 6 ngày gần nhất
               </div>
             )}
           </div>
@@ -523,7 +576,7 @@ export default function WarehouseDashboard() {
                     </td>
                     <td className="py-3 px-2 text-sm text-gray-600">{item.sku}</td>
                     <td className="py-3 px-2 text-sm font-semibold text-gray-900">{item.quantity}</td>
-                    <td className="py-3 px-2 text-sm text-gray-600">--</td>
+                    <td className="py-3 px-2 text-sm text-gray-600">{item.lot}</td>
                     <td className="py-3 px-2">
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                         item.status === 'in-stock' ? 'bg-green-100 text-green-700' :
