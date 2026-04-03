@@ -179,7 +179,7 @@ export default function WarehouseDashboard() {
         activeStores: activeStoreIds.size,
       })
 
-      const highlightsData = [...inventoryList]
+      const highlightsData: InventoryHighlightRow[] = [...inventoryList]
         .sort((a, b) => {
           const score = (item: InventoryItem) => {
             if (item.availableQuantity === 0) return 3
