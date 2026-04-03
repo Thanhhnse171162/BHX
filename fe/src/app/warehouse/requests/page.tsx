@@ -294,6 +294,7 @@ export default function WarehouseRequestsPage() {
   const [products, setProducts] = useState<ProductFromAPI[]>([])
   const [isLoadingProducts, setIsLoadingProducts] = useState(false)
   const [batches, setBatches] = useState<ProductBatchFromAPI[]>([])
+  const [batchNumberMap, setBatchNumberMap] = useState<Record<string, string>>({})
   const [isLoadingBatches, setIsLoadingBatches] = useState(false)
   const [warehouses, setWarehouses] = useState<AdminWarehouse[]>([])
   const [isLoadingWarehouses, setIsLoadingWarehouses] = useState(false)
@@ -514,6 +515,48 @@ export default function WarehouseRequestsPage() {
     return () => { cancelled = true }
   }, [selectedTransfer?.fromLocationId, selectedTransfer, token])
 
+  // ── Resolve batch number by batchId for detail view ───────────────────────
+  useEffect(() => {
+    if (!selectedTransfer?.items?.length || !token) return
+
+    const missingBatchIds = Array.from(
+      new Set(
+        selectedTransfer.items
+          .map((item: any) => String(item.batchId ?? '').trim())
+          .filter(Boolean),
+      ),
+    ).filter((id) => !batchNumberMap[id])
+
+    if (!missingBatchIds.length) return
+
+    let cancelled = false
+    ;(async () => {
+      const entries = await Promise.all(
+        missingBatchIds.map(async (id) => {
+          try {
+            const detail = await ProductBatchAPIService.getById(id)
+            return [id, String(detail?.batchNumber ?? '').trim()] as const
+          } catch {
+            return [id, ''] as const
+          }
+        }),
+      )
+
+      if (cancelled) return
+
+      setBatchNumberMap((prev) => {
+        const next = { ...prev }
+        for (const [id, batchNo] of entries) {
+          if (batchNo) next[id] = batchNo
+        }
+        return next
+      })
+    })()
+
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only fetch unresolved batch ids for selected transfer
+  }, [selectedTransfer, token])
+
   // ── Auto-fill transfer form from selected request ─────────────────────────
   useEffect(() => {
     if (!showTransferModal) return
@@ -625,6 +668,14 @@ export default function WarehouseRequestsPage() {
     () => requests.filter(r => r.status === 'APPROVED' || r.status === 'PROCESSING'),
     [requests]
   )
+  const requestNumberById = useMemo(() => {
+    const map = new Map<string, string>()
+    requests.forEach((r) => {
+      const idKey = normalizeId(r.id)
+      if (idKey) map.set(idKey, r.requestNumber || r.id)
+    })
+    return map
+  }, [requests])
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
   const fmtDate = (d: string | null | undefined) => {
@@ -643,6 +694,12 @@ export default function WarehouseRequestsPage() {
     if (!id) return '—'
     if (id === user?.id) return user.name
     return userNameMap[id] || `${id.slice(0, 8)}...${id.slice(-4)}`
+  }
+  const getRequestLabel = (id?: string | null) => {
+    if (!id) return '—'
+    const key = normalizeId(id)
+    const requestNo = requestNumberById.get(key)
+    return requestNo || 'Yêu cầu chưa đồng bộ'
   }
   const toDateTimeLocalValue = (date: Date) => {
     const offset = date.getTimezoneOffset()
@@ -1373,7 +1430,7 @@ export default function WarehouseRequestsPage() {
                         <tr><td colSpan={6} className="px-4 py-6 text-center text-xs text-gray-400">Không có sản phẩm</td></tr>
                       ) : selectedRequest.items.map((item: RestockRequestItem, idx: number) => {
                         const product = products.find(p => p.id === item.productId)
-                        const productName = item.productName || product?.name || item.productId || '—'
+                        const productName = item.productName || product?.name || 'Sản phẩm chưa đồng bộ'
                         const productUnit = item.unit || product?.unit || '—'
                         return (
                           <tr key={item.id} className={idx !== selectedRequest.items.length - 1 ? 'border-b border-gray-100' : ''}>
@@ -1466,8 +1523,7 @@ export default function WarehouseRequestsPage() {
                 <tr key={t.id} className={`border-b border-gray-50 hover:bg-gray-50 transition-colors ${idx === trPagination.paginated.length - 1 ? 'border-b-0' : ''}`}>
                   <td className="px-5 py-3.5 font-semibold text-blue-600 font-mono text-xs">{t.transferNumber}</td>
                   <td className="px-5 py-3.5 text-gray-500 text-xs font-mono">
-                    {/* NOTE: map restockRequestId from TransferFromAPI when field confirmed */}
-                    {(t as any).restockRequestId ? String((t as any).restockRequestId).slice(0, 8) + '...' : '—'}
+                    {getRequestLabel((t as any).restockRequestId)}
                   </td>
                   <td className="px-5 py-3.5 text-gray-600 text-xs">{t.fromLocationId ? getWarehouseLabel(t.fromLocationId) : '—'}</td>
                   <td className="px-5 py-3.5 text-gray-600 text-xs">{t.toLocationId ? getWarehouseLabel(t.toLocationId) : '—'}</td>
@@ -1598,9 +1654,14 @@ export default function WarehouseRequestsPage() {
                         <tr><td colSpan={6} className="px-4 py-6 text-center text-xs text-gray-400">Không có sản phẩm</td></tr>
                       ) : selectedTransfer.items.map((item: any, idx: number) => {
                         const product = products.find(p => p.id === item.productId)
-                        const productName = item.productName || product?.name || item.productId || '—'
-                        const batch = batches.find(b => b.id === item.batchId)
-                        const batchName = item.batchNumber || batch?.batchNumber || '—'
+                        const productName = item.productName || product?.name || 'Sản phẩm chưa đồng bộ'
+                        const batchId = String(item.batchId ?? '').trim()
+                        const batch = batches.find(b => normalizeId(b.id) === normalizeId(batchId))
+                        const batchName =
+                          String(item.batchNumber || '').trim() ||
+                          String(batch?.batchNumber || '').trim() ||
+                          String(batchNumberMap[batchId] || '').trim() ||
+                          (batchId ? 'Lô chưa đồng bộ' : '—')
                         return (
                           <tr key={item.id} className={idx !== selectedTransfer.items.length - 1 ? 'border-b border-gray-100' : ''}>
                             <td className="px-4 py-3 font-medium text-gray-800">{productName}</td>
