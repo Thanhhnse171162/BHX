@@ -224,7 +224,7 @@ export default function WarehouseDashboard() {
           const timeB = b.batch?.receivedAt ? new Date(b.batch.receivedAt).getTime() : 0
           return timeB - timeA
         })
-        .slice(0, 5)
+        .slice(0, 10)
         .map(({ product, batch, source }) => ({
           id: source.id,
           name: source.product?.name || source.name || source.productName || product?.name || 'Sản phẩm',
@@ -332,16 +332,17 @@ export default function WarehouseDashboard() {
     return fallback
   }, [weeklyData])
 
-  const chartMaxValue = useMemo(
-    () => Math.max(...throughputData.flatMap((d) => [d.incoming, d.outgoing]), 1),
-    [throughputData]
-  )
+  const chartMaxValue = useMemo(() => {
+    const rawMax = Math.max(...throughputData.flatMap((d) => [d.incoming, d.outgoing]), 1)
+    // Keep a visual headroom so the highest point does not touch the top edge.
+    return Math.max(Math.ceil(rawMax * 1.15), rawMax + 1)
+  }, [throughputData])
 
   const chartGeometry = useMemo(() => {
     const width = 960
     const height = 220
-    const leftPad = 16
-    const rightPad = 16
+    const leftPad = 56
+    const rightPad = 24
     const topPad = 12
     const bottomPad = 20
     const drawWidth = width - leftPad - rightPad
@@ -453,10 +454,9 @@ export default function WarehouseDashboard() {
 
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Stock Levels & Throughput - Takes 2 columns */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      {/* Throughput Section */}
+      <div>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-bold text-gray-900">Mức độ tồn kho & Thông lượng</h3>
             <div className="flex items-center gap-4 text-sm">
@@ -485,18 +485,29 @@ export default function WarehouseDashboard() {
                 rx="8"
               />
 
-              {[0.25, 0.5, 0.75].map((ratio) => {
-                const y = chartGeometry.topPad + chartGeometry.drawHeight * ratio
+              {[1, 0.8, 0.6, 0.4, 0.2, 0].map((ratio) => {
+                const y = chartGeometry.topPad + (1 - ratio) * chartGeometry.drawHeight
                 return (
-                  <line
-                    key={ratio}
-                    x1={chartGeometry.leftPad}
-                    x2={chartGeometry.leftPad + chartGeometry.drawWidth}
-                    y1={y}
-                    y2={y}
-                    stroke="#F3F4F6"
-                    strokeWidth="1"
-                  />
+                  <g key={ratio}>
+                    <line
+                      x1={chartGeometry.leftPad}
+                      x2={chartGeometry.leftPad + chartGeometry.drawWidth}
+                      y1={y}
+                      y2={y}
+                      stroke="#F3F4F6"
+                      strokeWidth="1"
+                    />
+                    <text
+                      x={chartGeometry.leftPad - 8}
+                      y={y + 4}
+                      textAnchor="end"
+                      fontSize="10"
+                      fill="#6B7280"
+                      fontWeight="500"
+                    >
+                      {Math.round(ratio * 100)}%
+                    </text>
+                  </g>
                 )
               })}
 
@@ -511,7 +522,10 @@ export default function WarehouseDashboard() {
               ))}
             </svg>
 
-            <div className="mt-2 grid grid-cols-6 text-center">
+            <div
+              className="mt-2 grid text-center"
+              style={{ gridTemplateColumns: `repeat(${throughputData.length}, minmax(0, 1fr))`, paddingLeft: '56px', paddingRight: '24px' }}
+            >
               {throughputData.map((item, idx) => (
                 <span key={`${item.day}-${idx}`} className="text-xs text-gray-600 font-medium uppercase">
                   {item.day}
@@ -520,8 +534,6 @@ export default function WarehouseDashboard() {
             </div>
           </div>
         </div>
-
-
       </div>
 
       {/* Bottom Section: Inventory Highlights and Incoming Requests */}
