@@ -367,14 +367,68 @@ export default function WarehouseDashboard() {
     void loadDashboardData()
   }, [loadDashboardData])
 
-  const maxValue = useMemo(
-    () => Math.max(...weeklyData.flatMap((d) => [d.incoming, d.outgoing]), 1),
-    [weeklyData]
+  const throughputData = useMemo<WeeklyDataPoint[]>(() => {
+    if (weeklyData.length > 0) return weeklyData
+
+    const today = new Date()
+    const fallback: WeeklyDataPoint[] = []
+    for (let offset = 5; offset >= 0; offset -= 1) {
+      const date = new Date(today)
+      date.setDate(today.getDate() - offset)
+      fallback.push({ day: WEEKDAY_LABELS[date.getDay()], incoming: 0, outgoing: 0 })
+    }
+    return fallback
+  }, [weeklyData])
+
+  const chartMaxValue = useMemo(
+    () => Math.max(...throughputData.flatMap((d) => [d.incoming, d.outgoing]), 1),
+    [throughputData]
   )
-  const hasThroughputData = useMemo(
-    () => weeklyData.some((d) => d.incoming > 0 || d.outgoing > 0),
-    [weeklyData]
-  )
+
+  const chartGeometry = useMemo(() => {
+    const width = 960
+    const height = 220
+    const leftPad = 16
+    const rightPad = 16
+    const topPad = 12
+    const bottomPad = 20
+    const drawWidth = width - leftPad - rightPad
+    const drawHeight = height - topPad - bottomPad
+    const step = throughputData.length > 1 ? drawWidth / (throughputData.length - 1) : 0
+
+    const buildPath = (key: 'incoming' | 'outgoing') => throughputData
+      .map((point, index) => {
+        const x = leftPad + step * index
+        const y = topPad + (1 - point[key] / chartMaxValue) * drawHeight
+        return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`
+      })
+      .join(' ')
+
+    const incomingPoints = throughputData.map((point, index) => {
+      const x = leftPad + step * index
+      const y = topPad + (1 - point.incoming / chartMaxValue) * drawHeight
+      return { x, y }
+    })
+
+    const outgoingPoints = throughputData.map((point, index) => {
+      const x = leftPad + step * index
+      const y = topPad + (1 - point.outgoing / chartMaxValue) * drawHeight
+      return { x, y }
+    })
+
+    return {
+      width,
+      height,
+      leftPad,
+      topPad,
+      drawWidth,
+      drawHeight,
+      incomingPath: buildPath('incoming'),
+      outgoingPath: buildPath('outgoing'),
+      incomingPoints,
+      outgoingPoints,
+    }
+  }, [throughputData, chartMaxValue])
 
   return (
     <div className="space-y-6 p-6 bg-gray-50">
@@ -476,27 +530,53 @@ export default function WarehouseDashboard() {
             </div>
           </div>
           
-          {/* Bar Chart */}
-          <div className="flex items-end justify-between h-64 gap-4">
-            {weeklyData.length > 0 && hasThroughputData ? weeklyData.map((data, index) => (
-              <div key={`${data.day}-${index}`} className="flex-1 flex flex-col items-center gap-2">
-                <div className="w-full flex flex-col items-center gap-1 flex-1 justify-end">
-                  <div 
-                    className="w-full bg-green-200 rounded-t transition-all hover:bg-green-300"
-                    style={{ height: `${(data.outgoing / maxValue) * 100}%` }}
-                  ></div>
-                  <div 
-                    className="w-full bg-green-600 rounded-t transition-all hover:bg-green-700"
-                    style={{ height: `${(data.incoming / maxValue) * 100}%` }}
-                  ></div>
-                </div>
-                <span className="text-xs text-gray-600 font-medium uppercase">{data.day}</span>
-              </div>
-            )) : (
-              <div className="w-full h-full flex items-center justify-center text-sm text-gray-500">
-                Chưa có dữ liệu nhập/xuất kho trong 6 ngày gần nhất
-              </div>
-            )}
+          {/* Line Chart */}
+          <div className="h-64">
+            <svg viewBox={`0 0 ${chartGeometry.width} ${chartGeometry.height}`} className="w-full h-[220px]">
+              <rect
+                x={chartGeometry.leftPad}
+                y={chartGeometry.topPad}
+                width={chartGeometry.drawWidth}
+                height={chartGeometry.drawHeight}
+                fill="transparent"
+                stroke="#E5E7EB"
+                strokeWidth="1"
+                rx="8"
+              />
+
+              {[0.25, 0.5, 0.75].map((ratio) => {
+                const y = chartGeometry.topPad + chartGeometry.drawHeight * ratio
+                return (
+                  <line
+                    key={ratio}
+                    x1={chartGeometry.leftPad}
+                    x2={chartGeometry.leftPad + chartGeometry.drawWidth}
+                    y1={y}
+                    y2={y}
+                    stroke="#F3F4F6"
+                    strokeWidth="1"
+                  />
+                )
+              })}
+
+              <path d={chartGeometry.outgoingPath} fill="none" stroke="#86EFAC" strokeWidth="3" strokeLinecap="round" />
+              <path d={chartGeometry.incomingPath} fill="none" stroke="#22C55E" strokeWidth="3" strokeLinecap="round" />
+
+              {chartGeometry.outgoingPoints.map((point, index) => (
+                <circle key={`out-${index}`} cx={point.x} cy={point.y} r="3.5" fill="#86EFAC" />
+              ))}
+              {chartGeometry.incomingPoints.map((point, index) => (
+                <circle key={`in-${index}`} cx={point.x} cy={point.y} r="3.5" fill="#22C55E" />
+              ))}
+            </svg>
+
+            <div className="mt-2 grid grid-cols-6 text-center">
+              {throughputData.map((item, idx) => (
+                <span key={`${item.day}-${idx}`} className="text-xs text-gray-600 font-medium uppercase">
+                  {item.day}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
 
