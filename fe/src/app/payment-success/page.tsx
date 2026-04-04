@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle, RotateCcw, Loader, AlertCircle } from 'lucide-react'
-import Link from 'next/link'
 
 interface OrderDetails {
   orderId: string
@@ -18,7 +17,7 @@ interface OrderDetails {
   }>
 }
 
-export default function PaymentSuccessPage() {
+function PaymentSuccessContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [order, setOrder] = useState<OrderDetails | null>(null)
@@ -235,5 +234,22 @@ export default function PaymentSuccessPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function PaymentSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 flex items-center justify-center p-4">
+          <div className="text-center">
+            <Loader size={48} className="mx-auto mb-4 text-purple-600 animate-spin" />
+            <p className="text-gray-600">Đang tải...</p>
+          </div>
+        </div>
+      }
+    >
+      <PaymentSuccessContent />
+    </Suspense>
   )
 }
