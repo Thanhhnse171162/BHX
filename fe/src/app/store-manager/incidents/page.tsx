@@ -184,6 +184,8 @@ async function buildReporterNameMap(reports: DamageReportFromAPI[]): Promise<Map
           if (localUser) {
             const localName = resolveUserDisplayName(localUser)
             if (localName) return [id, localName] as const
+            // User found but no name -> map to a placeholder
+            return [id, '(Chưa cập nhật tên)'] as const
           }
         } catch (error) {
           console.warn(`Local lookup failed for ${id}:`, error)
@@ -194,13 +196,15 @@ async function buildReporterNameMap(reports: DamageReportFromAPI[]): Promise<Map
           if (iamUser) {
             const iamName = resolveUserDisplayName(iamUser)
             if (iamName) return [id, iamName] as const
+            // User found but no name -> map to a placeholder
+            return [id, '(Chưa cập nhật tên)'] as const
           }
         } catch (error) {
           console.warn(`IAM lookup failed for ${id}:`, error)
         }
 
-        // Keep unresolved IDs unmapped so a later retry can still resolve names.
-        return null
+        // User not found in any system -> map to a placeholder
+        return [id, '(Người dùng không tồn tại)'] as const
       })
     )
 
@@ -238,8 +242,12 @@ function mapDamageReportToIncident(
   if (!reporter && reportedBy) {
     const normalizedId = normalizeUuid(reportedBy)
     const mappedName = reporterNameMap.get(normalizedId)
-    if (mappedName && !looksLikeUuid(mappedName)) {
+    if (mappedName) {
       reporter = mappedName.trim()
+      // DEBUG: Log if we're using a UUID as a name (user not found in system)
+      if (looksLikeUuid(reporter)) {
+        console.warn(`[Incident] Reporter UUID not resolved: ${reportedBy} -> no user found`)
+      }
     }
   }
   
