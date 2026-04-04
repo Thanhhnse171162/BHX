@@ -13,42 +13,6 @@ function getForwardAuthHeader(request: NextRequest): string {
   return cookieToken ? `Bearer ${cookieToken}` : ''
 }
 
-// Fallback data when backend is unavailable
-const generateFallbackTopProducts = () => {
-  return [
-    {
-      productId: '1',
-      productName: 'Sản phẩm A',
-      quantitySold: 1250,
-      revenue: 45000000,
-    },
-    {
-      productId: '2',
-      productName: 'Sản phẩm B',
-      quantitySold: 980,
-      revenue: 38500000,
-    },
-    {
-      productId: '3',
-      productName: 'Sản phẩm C',
-      quantitySold: 750,
-      revenue: 32200000,
-    },
-    {
-      productId: '4',
-      productName: 'Sản phẩm D',
-      quantitySold: 640,
-      revenue: 28900000,
-    },
-    {
-      productId: '5',
-      productName: 'Sản phẩm E',
-      quantitySold: 520,
-      revenue: 24100000,
-    },
-  ]
-}
-
 export async function GET(request: NextRequest) {
   try {
     const authHeader = getForwardAuthHeader(request)
@@ -75,27 +39,19 @@ export async function GET(request: NextRequest) {
       headers['Authorization'] = authHeader
     }
 
-    try {
-      const response = await axios.get(url, { headers, timeout: 5000 })
-      console.log('[Top Products API] Successfully fetched from backend')
-      return NextResponse.json(response.data)
-    } catch (backendError: any) {
-      // Backend error - log and return fallback data
-      console.error('[Top Products API] Backend error:', {
-        status: backendError.response?.status,
-        message: backendError.message,
-        url: backendError.config?.url,
-      })
-      
-      // Return fallback data instead of 500 error
-      const fallbackData = generateFallbackTopProducts()
-      console.log('[Top Products API] Returning fallback data with', fallbackData.length, 'products')
-      return NextResponse.json(fallbackData)
-    }
+    console.log('[Top Products API] Requesting:', url)
+    const response = await axios.get(url, { headers, timeout: 5000 })
+    console.log('[Top Products API] Response:', response.status, response.data)
+    return NextResponse.json(response.data)
   } catch (error: any) {
-    console.error('[Top Products API] Unexpected error:', error.message)
-    // Return fallback data on any error
-    const fallbackData = generateFallbackTopProducts()
-    return NextResponse.json(fallbackData)
+    console.error('[Top Products API] Error:', {
+      status: error.response?.status,
+      message: error.message,
+      data: error.response?.data,
+    })
+    return NextResponse.json({ 
+      error: error.message,
+      details: error.response?.data 
+    }, { status: error.response?.status || 500 })
   }
 }

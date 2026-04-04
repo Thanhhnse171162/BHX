@@ -336,7 +336,6 @@ export default function DashboardPage() {
   const [selectedStore,   setSelectedStore]   = useState<Store | null>(null)
   const [dateFrom,        setDateFrom]        = useState('01/05/2024')
   const [dateTo,          setDateTo]          = useState('24/05/2024')
-  const [orderCount,      setOrderCount]      = useState<number | null>(null)
   const [totalRevenue,    setTotalRevenue]    = useState<number | null>(null)
   const [totalStock,      setTotalStock]      = useState<number | null>(null)
   const [topStores,       setTopStores]       = useState<Store[]>([])
@@ -349,164 +348,127 @@ export default function DashboardPage() {
 
   const storeName = selectedStore ? selectedStore.name : 'Tất cả cửa hàng'
 
-  // Fetch orders count and revenue when store is selected
-  useEffect(() => {
-    async function loadOrderData() {
-      try {
-        // Fetch invoices based on selected store
-        let url = '/api/cashier/invoices/list'
+  // Fetch all data using reports APIs (like store-manager)
+  const fetchAllData = async () => {
+    try {
+      const token = useAuthStore.getState().token
+      if (!token) {
+        console.warn('[Admin] No token available')
+        return
+      }
+
+      const headers: HeadersInit = { Authorization: `Bearer ${token}` }
+      const baseParams = new URLSearchParams()
+      baseParams.set('period', 'LAST_7_DAYS')
+      baseParams.set('groupBy', 'DAY')
+
+      // Fetch revenue trend
+      const fetchRevenueTrend = fetch(
+        `/api/reports/revenue-trend?${baseParams.toString()}`,
+        { headers, signal: AbortSignal.timeout(10000) }
+      )
+        .then(res => {
+          console.log('[Admin] Revenue Trend:', res.status)
+          if (!res.ok) return null
+          return res.json()
+        })
+        .catch(err => {
+          console.error('[Admin] Revenue Trend error:', err)
+          return null
+        })
+
+      // Fetch top products
+      const fetchTopProducts = fetch(
+        `/api/reports/top-products?topN=5&${baseParams.toString()}`,
+        { headers, signal: AbortSignal.timeout(10000) }
+      )
+        .then(res => {
+          console.log('[Admin] Top Products:', res.status)
+          if (!res.ok) return null
+          return res.json()
+        })
+        .catch(err => {
+          console.error('[Admin] Top Products error:', err)
+          return null
+        })
+
+      // Fetch inventory summary
+      const fetchInventory = fetch(
+        `/api/reports/inventory-summary?${baseParams.toString()}`,
+        { headers, signal: AbortSignal.timeout(10000) }
+      )
+        .then(res => {
+          console.log('[Admin] Inventory Summary:', res.status)
+          if (!res.ok) return null
+          return res.json()
+        })
+        .catch(err => {
+          console.error('[Admin] Inventory Summary error:', err)
+          return null
+        })
+
+      // Execute all APIs in parallel
+      const [trendData, topData, invData] = await Promise.all([
+        fetchRevenueTrend,
+        fetchTopProducts,
+        fetchInventory,
+      ])
+
+      // Process revenue trend
+      if (Array.isArray(trendData) && trendData.length > 0) {
+        const revenueValues = trendData.map((item: any) => {
+          const rev = item.revenue || 0
+          return typeof rev === 'string' ? parseFloat(rev) : rev
+        })
         
-        const response = await fetch(url)
-        if (response.ok) {
-          const data = await response.json()
-          const invoices = Array.isArray(data) ? data : data?.data || []
+        if (revenueValues.length > 0) {
+          setChartData({
+            tuan:    revenueValues,
+            ngay:    [revenueValues[revenueValues.length - 1]],
+            hom_qua: [revenueValues.length > 1 ? revenueValues[revenueValues.length - 2] : revenueValues[revenueValues.length - 1]],
+          })
           
-          let filteredInvoices = invoices
-          
-          // If a store is selected, filter invoices by store
-          if (selectedStore) {
-            filteredInvoices = invoices.filter((inv: any) => {
-              // Check multiple possible fields for store/warehouse identifier
-              const storeInfo = [
-                inv.storeName || '',
-                inv.store || '',
-                inv.warehouse || '',
-                inv.location || '',
-                inv.branch || '',
-                inv.warehouseName || '',
-              ].join(' ').toLowerCase()
-              
-              return storeInfo.includes(selectedStore.name.toLowerCase())
-            })
-          }
-          
-          // Set order count
-          setOrderCount(filteredInvoices.length)
-          
-          // Calculate total revenue from invoices
-          const totalRev = filteredInvoices.reduce((sum: number, inv: any) => {
-            const amount = inv.totalAmount || inv.total || inv.subtotal || 0
-            return sum + (typeof amount === 'string' ? parseFloat(amount) : amount)
-          }, 0)
+          const totalRev = revenueValues.reduce((sum, val) => sum + val, 0)
           setTotalRevenue(totalRev > 0 ? totalRev : null)
         }
-      } catch (error) {
-        console.error('Failed to load order data:', error)
-        setOrderCount(null)
-        setTotalRevenue(null)
       }
-    }
 
-    loadOrderData()
-  }, [selectedStore])
-
-  // Fetch orders count and revenue when store is selected
-  useEffect(() => {
-    async function loadOrderData() {
-      try {
-        // Fetch invoices based on selected store
-        let url = '/api/cashier/invoices/list'
-        
-        const response = await fetch(url)
-        if (response.ok) {
-          const data = await response.json()
-          const invoices = Array.isArray(data) ? data : data?.data || []
-          
-          let filteredInvoices = invoices
-          
-          // If a store is selected, filter invoices by store
-          if (selectedStore) {
-            filteredInvoices = invoices.filter((inv: any) => {
-              // Check multiple possible fields for store/warehouse identifier
-              const storeInfo = [
-                inv.storeName || '',
-                inv.store || '',
-                inv.warehouse || '',
-                inv.location || '',
-                inv.branch || '',
-                inv.warehouseName || '',
-              ].join(' ').toLowerCase()
-              
-              return storeInfo.includes(selectedStore.name.toLowerCase())
-            })
+      // Process top products
+      if (Array.isArray(topData) && topData.length > 0) {
+        const maxRev = topData[0]?.revenue || 1
+        const transformedProducts: Product[] = topData.slice(0, 5).map((item: any) => ({
+          icon: '📦',
+          name: item.productName || item.name || 'Unknown',
+          cat: 'Product',
+          rev: `${(item.revenue || 0).toLocaleString('vi-VN')}đ`,
+          qty: String(item.quantitySold || 0),
+          detail: {
+            growth: `+${Math.round(((item.revenue || 0) / maxRev) * 100)}%`,
+            stores: [],
           }
-          
-          // Set order count
-          setOrderCount(filteredInvoices.length)
-          
-          // Calculate total revenue from invoices
-          const totalRev = filteredInvoices.reduce((sum: number, inv: any) => {
-            const amount = inv.totalAmount || inv.total || inv.subtotal || 0
-            return sum + (typeof amount === 'string' ? parseFloat(amount) : amount)
-          }, 0)
-          setTotalRevenue(totalRev > 0 ? totalRev : null)
-        }
-      } catch (error) {
-        console.error('Failed to load order data:', error)
-        setOrderCount(null)
-        setTotalRevenue(null)
+        }))
+        setTopProducts(transformedProducts)
       }
-    }
 
-    loadOrderData()
-  }, [selectedStore])
-
-  // Fetch total inventory stock
-  useEffect(() => {
-    async function loadInventoryData() {
-      try {
-        // Fetch inventory data
-        const response = await fetch('/api/inventory')
-        if (response.ok) {
-          const data = await response.json()
-          const inventoryItems = Array.isArray(data) ? data : data?.data || []
-          
-          let filteredInventory = inventoryItems
-          
-          // If a store is selected, filter inventory by store
-          if (selectedStore) {
-            filteredInventory = inventoryItems.filter((item: any) => {
-              const locationInfo = [
-                item.warehouseName || '',
-                item.warehouse || '',
-                item.storeName || '',
-                item.store || '',
-                item.location || '',
-              ].join(' ').toLowerCase()
-              
-              return locationInfo.includes(selectedStore.name.toLowerCase())
-            })
-          }
-          
-          // Calculate total quantity
-          const totalQty = filteredInventory.reduce((sum: number, item: any) => {
-            const qty = item.quantity || item.availableQuantity || item.qty || 0
-            return sum + (typeof qty === 'string' ? parseFloat(qty) : qty)
-          }, 0)
-          
-          setTotalStock(totalQty > 0 ? totalQty : 0)
-        }
-      } catch (error) {
-        console.error('Failed to load inventory data:', error)
-        setTotalStock(0)
+      // Process inventory
+      if (invData) {
+        setTotalStock(invData.totalStock || 0)
       }
+    } catch (error) {
+      console.error('[Admin] Fatal error:', error)
     }
+  }
 
-    loadInventoryData()
-  }, [selectedStore])
-
-  // Fetch stores from API (filter out warehouses)
+  // Load stores on mount
   useEffect(() => {
     async function loadStores() {
       try {
         const warehouses = await WarehouseAPIService.getAll()
-        // Filter to only show stores (those with "Cửa Hàng" in the name)
         const storesOnly = warehouses.filter(w => 
           w.name.toLowerCase().includes('cửa hàng')
         )
         
         if (storesOnly.length > 0) {
-          // Transform store data to Store interface
           const transformedStores: Store[] = storesOnly
             .map((w, idx) => ({
               rank: idx + 1,
@@ -520,123 +482,16 @@ export default function DashboardPage() {
           setTopStores(transformedStores)
         }
       } catch (error) {
-        console.error('Failed to load stores from Warehouse API:', error)
+        console.error('Failed to load stores:', error)
       }
     }
 
     loadStores()
   }, [])
 
-  // Fetch revenue trend data for chart
+  // Load data on mount
   useEffect(() => {
-    async function loadRevenueTrend() {
-      try {
-        const token = useAuthStore.getState().token
-        if (!token) {
-          console.warn('No token available for revenue trend request')
-          return
-        }
-
-        const headers: HeadersInit = { Authorization: `Bearer ${token}` }
-        const params = new URLSearchParams()
-        params.set('period', 'LAST_7_DAYS')
-        params.set('groupBy', 'DAY')
-
-        const response = await fetch(`/api/reports/revenue-trend?${params.toString()}`, { 
-          headers,
-          signal: AbortSignal.timeout(10000)
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          const trendData = Array.isArray(data) ? data : data?.data || []
-          
-          // Extract revenue values for chart from time + revenue
-          const revenueValues = trendData.map((item: any) => {
-            const rev = item.revenue || 0
-            return typeof rev === 'string' ? parseFloat(rev) : rev
-          })
-          
-          if (revenueValues.length > 0) {
-            // Update chart data with actual data
-            setChartData({
-              tuan:    revenueValues,
-              ngay:    [revenueValues[revenueValues.length - 1]],
-              hom_qua: [revenueValues[revenueValues.length - 2]],
-            })
-          }
-        } else {
-          console.error(`[Revenue Trend API] Error: ${response.status} ${response.statusText}`)
-          setChartData({
-            tuan:    [],
-            ngay:    [],
-            hom_qua: [],
-          })
-        }
-      } catch (error) {
-        console.error('Failed to load revenue trend:', error)
-        setChartData({
-          tuan:    [],
-          ngay:    [],
-          hom_qua: [],
-        })
-      }
-    }
-
-    loadRevenueTrend()
-  }, [])
-
-  // Fetch top products data
-  useEffect(() => {
-    async function loadTopProducts() {
-      try {
-        const token = useAuthStore.getState().token
-        if (!token) {
-          console.warn('No token available for top products request')
-          return
-        }
-
-        const headers: HeadersInit = { Authorization: `Bearer ${token}` }
-        const params = new URLSearchParams()
-        params.set('topN', '5')
-
-        const response = await fetch(`/api/reports/top-products?${params.toString()}`, { 
-          headers,
-          signal: AbortSignal.timeout(10000)
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          const topProductsData = Array.isArray(data) ? data : data?.data || []
-          
-          // Transform API data to Product interface
-          // API returns: productId, productName, quantitySold, revenue
-          const transformedProducts: Product[] = topProductsData.map((item: any) => ({
-            icon: '📦',
-            name: item.productName || 'Unknown',
-            cat: 'Product',
-            rev: `${(item.revenue || 0).toLocaleString('vi-VN')}đ`,
-            qty: String(item.quantitySold || 0),
-            detail: {
-              growth: '+0%',
-              stores: [],
-            }
-          }))
-          
-          if (transformedProducts.length > 0) {
-            setTopProducts(transformedProducts)
-          }
-        } else {
-          console.error(`[Top Products API] Error: ${response.status} ${response.statusText}`)
-          setTopProducts([])
-        }
-      } catch (error) {
-        console.error('Failed to load top products:', error)
-        setTopProducts([])
-      }
-    }
-
-    loadTopProducts()
+    fetchAllData()
   }, [])
 
   return (
@@ -668,10 +523,9 @@ export default function DashboardPage() {
       </div>
 
       {/* Metric cards — no trend bar, no small % */}
-      <div className="grid grid-cols-3 gap-3.5 mb-5">
+      <div className="grid grid-cols-2 gap-3.5 mb-5">
         {[
           { label: 'Tổng doanh thu cửa hàng', value: totalRevenue !== null ? `${(totalRevenue / 1000000).toFixed(1)}M₫` : '—' },
-          { label: 'Số hóa đơn',              value: orderCount !== null ? String(orderCount) : '—' },
           { label: 'Tổng tồn kho hệ thống',   value: totalStock !== null ? String(totalStock) : '—' },
         ].map(m => (
           <div key={m.label} className="bg-white border border-gray-100 rounded-xl p-4">

@@ -13,19 +13,6 @@ function getForwardAuthHeader(request: NextRequest): string {
   return cookieToken ? `Bearer ${cookieToken}` : ''
 }
 
-// Fallback data when backend is unavailable
-const generateFallbackRevenueTrend = () => {
-  const today = new Date()
-  return Array.from({ length: 7 }, (_, i) => {
-    const date = new Date(today)
-    date.setDate(date.getDate() - (6 - i))
-    return {
-      time: date.toISOString().split('T')[0],
-      revenue: 2500000 + Math.random() * 2000000, // Random revenue between 2.5M - 4.5M
-    }
-  })
-}
-
 export async function GET(request: NextRequest) {
   try {
     const authHeader = getForwardAuthHeader(request)
@@ -52,7 +39,7 @@ export async function GET(request: NextRequest) {
     if (toDate) queryParams.append('toDate', toDate)
 
     const url = `${REPORTS_SERVICE_URL}/api/reports/revenue-trend?${queryParams.toString()}`
-    console.log('[Revenue Trend API] Forwarding to:', url)
+    console.log('[Revenue Trend API] Requesting:', url)
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -61,27 +48,18 @@ export async function GET(request: NextRequest) {
       headers['Authorization'] = authHeader
     }
 
-    try {
-      const response = await axios.get(url, { headers, timeout: 5000 })
-      console.log('[Revenue Trend API] Response data points:', Array.isArray(response.data) ? response.data.length : response.data?.data?.length || 0)
-      return NextResponse.json(response.data)
-    } catch (backendError: any) {
-      // Backend error - log and return fallback data
-      console.error('[Revenue Trend API] Backend error:', {
-        status: backendError.response?.status,
-        message: backendError.message,
-        url: backendError.config?.url,
-      })
-      
-      // Return fallback data instead of 500 error
-      const fallbackData = generateFallbackRevenueTrend()
-      console.log('[Revenue Trend API] Returning fallback data with', fallbackData.length, 'points')
-      return NextResponse.json(fallbackData)
-    }
+    const response = await axios.get(url, { headers, timeout: 5000 })
+    console.log('[Revenue Trend API] Response:', response.status, response.data)
+    return NextResponse.json(response.data)
   } catch (error: any) {
-    console.error('[Revenue Trend API] Unexpected error:', error.message)
-    // Return fallback data on any error
-    const fallbackData = generateFallbackRevenueTrend()
-    return NextResponse.json(fallbackData)
+    console.error('[Revenue Trend API] Error:', {
+      status: error.response?.status,
+      message: error.message,
+      data: error.response?.data,
+    })
+    return NextResponse.json({ 
+      error: error.message,
+      details: error.response?.data 
+    }, { status: error.response?.status || 500 })
   }
 }
