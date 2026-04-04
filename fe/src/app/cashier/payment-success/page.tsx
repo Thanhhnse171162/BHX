@@ -195,14 +195,6 @@ function PaymentSuccessContent() {
 
           {/* Content */}
           <div className="p-6">
-            {/* Amount */}
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 mb-6">
-              <p className="text-gray-500 text-sm mb-1">Số tiền thanh toán</p>
-              <p className="text-3xl font-bold text-green-600">
-                {order.totalAmount.toLocaleString('vi-VN')}đ
-              </p>
-            </div>
-
             {/* Order Details */}
             <div className="space-y-3 mb-6">
               <div className="flex justify-between items-center border-b border-gray-100 pb-3">
