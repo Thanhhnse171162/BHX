@@ -1,13 +1,26 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { Search, Filter, Package, CheckCircle, AlertTriangle, XCircle, Download, Loader2, Edit2 } from 'lucide-react'
+import { Search, Filter, Package, CheckCircle, AlertTriangle, XCircle, Loader2, Edit2 } from 'lucide-react'
 import { Button } from '@/shared/ui/Button'
 import { Input } from '@/shared/ui/Input'
 import Modal from '@/shared/ui/Modal'
 import { InventoryAPIService } from '@/services/inventory-api.service'
 import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
 import { useAuthStore } from '@/store/auth.store'
+
+const WORKPLACE_LOCATION_NAMES: Record<string, string> = {
+  'a0000001-0001-0001-0001-000000000001': 'Kho HCM',
+  'a0000001-0001-0001-0001-000000000002': 'Kho Chi Nhánh Quận 12',
+  'a0000001-0001-0001-0001-000000000003': 'Kho Chi Nhánh Bình Dương',
+  'a0000001-0001-0001-0001-000000000004': 'Kho Chi Nhánh Long An',
+  'b0000001-0001-0001-0001-000000000001': 'Cửa Hàng Thủ Đức',
+  'b0000001-0001-0001-0001-000000000002': 'Cửa Hàng Giải Phóng HCM',
+  'b0000001-0001-0001-0001-000000000003': 'Cửa Hàng Bình Dương',
+  'b0000001-0001-0001-0001-000000000004': 'Cửa Hàng Củ Chi',
+  'b0000001-0001-0001-0001-000000000005': 'Cửa Hàng Biên Hòa',
+  'b0000001-0001-0001-0001-000000000006': 'Cửa Hàng Quận 7',
+}
 
 interface InventoryItemDisplay {
   id: string
@@ -238,6 +251,12 @@ export default function InventoryListPage() {
     }
   }, [inventory])
 
+  const workplaceName = useMemo(() => {
+    const normalizedWorkplaceId = String(user?.workplaceId ?? '').trim().toLowerCase()
+    if (!normalizedWorkplaceId) return ''
+    return WORKPLACE_LOCATION_NAMES[normalizedWorkplaceId] || String(user?.workplaceId || '')
+  }, [user?.workplaceId])
+
   const getStatusBadge = (status: string) => {
     const config = {
       'in-stock': { label: 'In Stock', class: 'bg-green-100 text-green-800', icon: CheckCircle },
@@ -256,30 +275,22 @@ export default function InventoryListPage() {
     )
   }
 
-  const handleExport = () => {
-    alert('Xuất file Excel danh sách tồn kho')
-  }
-
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Inventory List</h1>
           <p className="text-gray-600 mt-1">
-            {user?.workplaceType && user?.workplaceId ? (
+            {user?.workplaceType && workplaceName ? (
               <>
-                Tồn kho {user.workplaceType === 'STORE' ? 'Cửa hàng' : 'Kho'} - ID: {user.workplaceId}
+                Tồn kho {user.workplaceType === 'STORE' ? 'Cửa hàng' : 'Kho'} - {workplaceName}
               </>
             ) : (
               'Danh sách tồn kho'
             )}
           </p>
         </div>
-        <Button variant="outline" onClick={handleExport} disabled={loading}>
-          <Download className="w-4 h-4 mr-2" />
-          Xuất Excel
-        </Button>
       </div>
 
       {/* Loading State */}

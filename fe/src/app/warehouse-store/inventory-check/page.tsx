@@ -2,7 +2,7 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
 import {
-  ClipboardCheck, Download, CheckCircle, AlertTriangle,
+  ClipboardCheck, CheckCircle, AlertTriangle,
   Search, X, Calendar, FileText, TrendingDown, Package, Eye,
   Filter, ChevronDown, ChevronLeft, ChevronRight,
 } from 'lucide-react';
@@ -447,10 +447,6 @@ export default function Page() {
               )}
             </p>
           </div>
-          <Button variant="outline" size="sm">
-            <Download className="w-4 h-4 mr-1.5" />
-            Xuất báo cáo
-          </Button>
         </div>
 
         {/* scrollable table */}

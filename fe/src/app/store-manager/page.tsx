@@ -6,7 +6,6 @@ import {
   Package,
   AlertTriangle,
   XCircle,
-  Download,
   Search,
   RefreshCw,
   Check,
@@ -415,10 +414,6 @@ export default function StoreManagerDashboard() {
             Theo dõi doanh thu theo ngày và theo khoảng thời gian
           </p>
         </div>
-        <button className="flex items-center gap-2 rounded-lg border border-[#d4e0c8] bg-white px-4 py-2 text-xs font-semibold text-[#3b6b22] transition hover:bg-[#f0f5eb]">
-          <Download size={13} />
-          Xuất báo cáo
-        </button>
       </div>
 
       {/* Filter bar */}

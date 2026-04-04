@@ -33,7 +33,7 @@ const PRIMARY_NAV = [
 
 const MANAGEMENT_NAV: any[] = []
 
-const HIDDEN_SIDEBAR_LABELS = new Set(['Doanh thu', 'Quản lý đơn hàng', 'Quản lý khách hàng'])
+const HIDDEN_SIDEBAR_LABELS = new Set(['Quản lý đơn hàng', 'Quản lý khách hàng'])
 
 function getPageTitle(pathname: string): string {
   if (pathname === '/store-manager') return 'Doanh thu'
