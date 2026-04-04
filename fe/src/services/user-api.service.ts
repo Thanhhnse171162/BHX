@@ -25,6 +25,19 @@ const localApiClient: AxiosInstance = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+localApiClient.interceptors.request.use(async (config) => {
+  const token = await waitForAuthHydration()
+
+  if (token) {
+    config.headers = config.headers || {}
+    if (!config.headers.Authorization) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+  }
+
+  return config
+})
+
 export interface UserInfoFromAPI {
   id: string
   full_name?: string
