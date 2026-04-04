@@ -31,8 +31,8 @@ const nextConfig = {
   },
   // Proxy API calls to backend services to avoid CORS issues
   async rewrites() {
-    const IAM_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://13.229.29.52:5000'
-    const WAREHOUSE_URL = process.env.NEXT_PUBLIC_WAREHOUSE_URL || 'http://13.229.29.52:5003'
+    const IAM_URL = new URL(process.env.NEXT_PUBLIC_IAM_URL || 'http://13.229.29.52:5000').origin
+    const WAREHOUSE_URL = new URL(process.env.NEXT_PUBLIC_WAREHOUSE_URL || 'http://13.229.29.52:5003').origin
     return [
       {
         source: '/iam/:path*',
