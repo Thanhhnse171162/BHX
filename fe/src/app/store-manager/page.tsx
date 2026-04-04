@@ -171,14 +171,18 @@ export default function StoreManagerDashboard() {
         
         if (res.ok) {
           const data = await res.json()
-          const storeList = Array.isArray(data) ? data : data.data || []
+          let storeList = Array.isArray(data) ? data : data.data || []
+          
+          // Only keep user's current workplace/store
+          if (user?.workplaceId) {
+            storeList = storeList.filter((s: Store) => s.id === user.workplaceId)
+          }
+          
           console.log('Stores loaded:', storeList)
           setStores(storeList)
           
-          // If user has workplace, set it as default; otherwise use first store
-          if (user?.workplaceId && storeList.some((s: Store) => s.id === user.workplaceId)) {
-            setSelectedStoreId(user.workplaceId)
-          } else if (storeList.length > 0) {
+          // Set the store automatically (should be only 1)
+          if (storeList.length > 0) {
             setSelectedStoreId(storeList[0].id)
           }
         } else {
@@ -461,7 +465,7 @@ export default function StoreManagerDashboard() {
       <div className="mb-4 flex flex-wrap items-end gap-4 rounded-xl border border-[#e4edd9] bg-white px-5 py-4">
         {/* Store selection */}
         <div className="flex flex-col gap-1 relative">
-          {stores.length > 0 && (
+          {stores.length > 1 && (
             <div className="relative">
               <button
                 onClick={() => setShowStoreMenu(!showStoreMenu)}
@@ -499,6 +503,11 @@ export default function StoreManagerDashboard() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+          {stores.length === 1 && selectedStore && (
+            <div className="text-sm font-semibold text-[#2d4a1a] px-4 py-2">
+              {selectedStore.name}
             </div>
           )}
         </div>
