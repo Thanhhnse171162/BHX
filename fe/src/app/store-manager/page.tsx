@@ -328,8 +328,14 @@ export default function StoreManagerDashboard() {
           value: typeof item.revenue === 'number' ? item.revenue : 0,
         }))
         setChartData(transformedData)
+        
+        // Calculate total revenue from trend data
+        const totalRevenue = transformedData.reduce((sum, item) => sum + item.value, 0)
+        setRevenue(totalRevenue.toLocaleString('vi-VN'))
+        console.log('Total revenue calculated:', totalRevenue)
       } else {
         console.warn('No trend data received')
+        setRevenue('0')
       }
 
       // Process top products
