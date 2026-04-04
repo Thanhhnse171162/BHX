@@ -3,7 +3,7 @@ import axios from 'axios'
 
 export const dynamic = 'force-dynamic'
 
-const REPORTS_SERVICE_URL = process.env.SALES_URL || process.env.NEXT_PUBLIC_SALES_URL || 'http://13.229.29.52:5006'
+const REPORTS_SERVICE_URL = 'http://13.229.29.52:5006' // Backend reporting service
 
 function getForwardAuthHeader(request: NextRequest): string {
   const authHeader = request.headers.get('authorization')
@@ -16,8 +16,8 @@ function getForwardAuthHeader(request: NextRequest): string {
 export async function GET(request: NextRequest) {
   try {
     const authHeader = getForwardAuthHeader(request)
-    const period = request.nextUrl.searchParams.get('period') || 'LAST_7_DAYS'
-    const groupBy = request.nextUrl.searchParams.get('groupBy') || 'DAY'
+    const period = request.nextUrl.searchParams.get('period')
+    const groupBy = request.nextUrl.searchParams.get('groupBy')
     const storeId = request.nextUrl.searchParams.get('storeId')
     const fromDate = request.nextUrl.searchParams.get('fromDate')
     const toDate = request.nextUrl.searchParams.get('toDate')
@@ -43,7 +43,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(response.data)
   } catch (error: any) {
     console.error('Failed to fetch revenue trend:', error.message)
-    // Return empty array on error
-    return NextResponse.json([], { status: 200 })
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

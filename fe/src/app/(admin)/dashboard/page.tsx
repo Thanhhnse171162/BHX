@@ -503,21 +503,23 @@ export default function DashboardPage() {
         const storesOnly = warehouses.filter(w => 
           w.name.toLowerCase().includes('cửa hàng')
         )
-        // Transform store data to Store interface
-        const transformedStores: Store[] = storesOnly
-          .map((w, idx) => ({
-            rank: idx + 1,
-            name: w.name,
-            loc: 'HCM', // Default location, adjust if you have location data
-            rev: '0đ', // This would come from actual revenue data
-            revNum: 0,
-          }))
-          .sort((a, b) => a.name.localeCompare(b.name))
         
-        setTopStores(transformedStores)
+        if (storesOnly.length > 0) {
+          // Transform store data to Store interface
+          const transformedStores: Store[] = storesOnly
+            .map((w, idx) => ({
+              rank: idx + 1,
+              name: w.name,
+              loc: 'HCM',
+              rev: '0đ',
+              revNum: 0,
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name))
+          
+          setTopStores(transformedStores)
+        }
       } catch (error) {
-        console.error('Failed to load stores:', error)
-        setTopStores([])
+        console.error('Failed to load stores from Warehouse API:', error)
       }
     }
 
@@ -533,18 +535,20 @@ export default function DashboardPage() {
           const data = await response.json()
           const trendData = Array.isArray(data) ? data : data?.data || []
           
-          // Extract revenue values for chart
+          // Extract revenue values for chart from time + revenue
           const revenueValues = trendData.map((item: any) => {
             const rev = item.revenue || 0
             return typeof rev === 'string' ? parseFloat(rev) : rev
           })
           
-          // Update chart data
-          setChartData({
-            tuan:    revenueValues,
-            ngay:    revenueValues.length > 0 ? [revenueValues[revenueValues.length - 1]] : [],
-            hom_qua: revenueValues.length > 1 ? [revenueValues[revenueValues.length - 2]] : [],
-          })
+          if (revenueValues.length > 0) {
+            // Update chart data with actual data
+            setChartData({
+              tuan:    revenueValues,
+              ngay:    [revenueValues[revenueValues.length - 1]],
+              hom_qua: [revenueValues[revenueValues.length - 2]],
+            })
+          }
         }
       } catch (error) {
         console.error('Failed to load revenue trend:', error)
@@ -564,23 +568,25 @@ export default function DashboardPage() {
           const topProductsData = Array.isArray(data) ? data : data?.data || []
           
           // Transform API data to Product interface
+          // API returns: productId, productName, quantitySold, revenue
           const transformedProducts: Product[] = topProductsData.map((item: any) => ({
-            icon: '📦', // Default icon, can be customized per category
-            name: item.productName || item.name || 'Unknown',
-            cat: item.category || 'Uncategorized',
+            icon: '📦',
+            name: item.productName || 'Unknown',
+            cat: 'Product', // API doesn't return category
             rev: `${(item.revenue || 0).toLocaleString('vi-VN')}đ`,
             qty: String(item.quantitySold || 0),
             detail: {
-              growth: item.growth || '+0%',
-              stores: item.stores || [],
+              growth: '+0%', // API doesn't have growth data
+              stores: [],
             }
           }))
           
-          setTopProducts(transformedProducts)
+          if (transformedProducts.length > 0) {
+            setTopProducts(transformedProducts)
+          }
         }
       } catch (error) {
         console.error('Failed to load top products:', error)
-        setTopProducts([])
       }
     }
 
