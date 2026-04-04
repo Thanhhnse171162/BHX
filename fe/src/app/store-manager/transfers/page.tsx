@@ -70,6 +70,7 @@ export default function StoreManagerTransfersPage() {
   const [selected, setSelected] = useState<StockMovementFromAPI | null>(null)
 
   const [productNameById, setProductNameById] = useState<Record<string, string>>({})
+  const [productUnitById, setProductUnitById] = useState<Record<string, string>>({})
   const [batchNumberById, setBatchNumberById] = useState<Record<string, string>>({})
 
   const PAGE_SIZE = 10
@@ -93,12 +94,16 @@ export default function StoreManagerTransfersPage() {
       ])
 
       const nextProductMap: Record<string, string> = {}
+      const nextProductUnitMap: Record<string, string> = {}
       for (const p of products ?? []) {
         const id = normalizeId((p as any)?.id)
         const name = String((p as any)?.name ?? '').trim()
+        const unit = String((p as any)?.unit ?? '').trim()
         if (id && name) nextProductMap[id] = name
+        if (id && unit) nextProductUnitMap[id] = unit
       }
       setProductNameById(nextProductMap)
+      setProductUnitById(nextProductUnitMap)
 
       const nextBatchMap: Record<string, string> = {}
       for (const b of batches ?? []) {
@@ -378,6 +383,10 @@ export default function StoreManagerTransfersPage() {
                         String(item.productName || '').trim() ||
                         productNameById[normalizeId(item.productId)] ||
                         item.productId
+                      const unitName =
+                        String(item.unit || '').trim() ||
+                        productUnitById[normalizeId(item.productId)] ||
+                        '—'
                       const batchName = item.batchId
                         ? batchNumberById[normalizeId(item.batchId)] || item.batchId
                         : '—'
@@ -386,7 +395,7 @@ export default function StoreManagerTransfersPage() {
                         <tr key={item.id} className="border-t border-slate-100">
                           <td className="px-4 py-3 text-slate-800">{productName}</td>
                           <td className="px-4 py-3 text-slate-700">{batchName}</td>
-                          <td className="px-4 py-3 text-slate-700">{item.unit || '—'}</td>
+                          <td className="px-4 py-3 text-slate-700">{unitName}</td>
                           <td className="px-4 py-3 text-right text-slate-900 font-semibold">{Number(item.quantity || 0).toLocaleString('vi-VN')}</td>
                         </tr>
                       )

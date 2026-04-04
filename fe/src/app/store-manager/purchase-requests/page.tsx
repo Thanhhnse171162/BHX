@@ -42,6 +42,11 @@ interface PurchaseRequest {
   note?: string
 }
 
+interface ProductLookup {
+  name: string
+  sku: string
+}
+
 function mapStatus(status: string): RequestStatus {
   if (status === 'APPROVED') return 'Đã duyệt'
   if (status === 'REJECTED') return 'Từ chối'
@@ -69,7 +74,7 @@ function getRequesterDisplayName(req: RestockRequestFromAPI, userMap: Record<str
   )
 }
 
-function mapToRows(req: RestockRequestFromAPI, productMap: Record<string, string>, userMap: Record<string, string>): PurchaseRequest[] {
+function mapToRows(req: RestockRequestFromAPI, productMap: Record<string, ProductLookup>, userMap: Record<string, string>): PurchaseRequest[] {
   // If no items, create one row with request-level info
   if (!req.items || req.items.length === 0) {
     const userName = getRequesterDisplayName(req, userMap)
@@ -89,13 +94,14 @@ function mapToRows(req: RestockRequestFromAPI, productMap: Record<string, string
 
   // Create one row per item, each with the request number but different product details
   return req.items.map((item, idx) => {
-    const productName = item.productName || productMap[item.productId] || '--'
+    const productInfo = productMap[item.productId]
+    const productName = item.productName || productInfo?.name || '--'
     const userName = getRequesterDisplayName(req, userMap)
     
     return {
       id: req.requestNumber || req.id,
       product: productName,
-      sku: item.productId || '--',
+      sku: productInfo?.sku || '--',
       quantity: item.requestedQuantity || 0,
       unit: item.unit || '',
       reason: item.reason || '--',
@@ -190,11 +196,14 @@ export default function PurchaseRequestsPage() {
       setLoadError(null)
 
       // Load products to map productId → name
-      const productMap: Record<string, string> = {}
+      const productMap: Record<string, ProductLookup> = {}
       try {
         const products = await ProductAPIService.getAllProducts()
         for (const p of products) {
-          productMap[p.id] = p.name
+          productMap[p.id] = {
+            name: p.name,
+            sku: p.sku,
+          }
         }
       } catch {
         // If products can't be loaded, continue without mapping
