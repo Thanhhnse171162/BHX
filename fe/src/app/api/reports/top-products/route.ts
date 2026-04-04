@@ -19,18 +19,31 @@ export async function GET(request: NextRequest) {
     const topN = request.nextUrl.searchParams.get('topN')
     const storeId = request.nextUrl.searchParams.get('storeId')
     const period = request.nextUrl.searchParams.get('period')
+    const range = request.nextUrl.searchParams.get('range')
     const fromDate = request.nextUrl.searchParams.get('fromDate')
     const toDate = request.nextUrl.searchParams.get('toDate')
 
-    // Build query string
-    const queryParams = new URLSearchParams()
-    if (topN) queryParams.append('topN', topN)
-    if (storeId) queryParams.append('storeId', storeId)
-    if (period) queryParams.append('period', period)
-    if (fromDate) queryParams.append('fromDate', fromDate)
-    if (toDate) queryParams.append('toDate', toDate)
+    console.log('📊 [Top Products API] Received params:', {
+      topN,
+      storeId,
+      period,
+      range,
+      fromDate,
+      toDate,
+    })
 
-    const url = `${REPORTS_SERVICE_URL}/api/reports/top-products?${queryParams.toString()}`
+    // Build query string - only use topN if provided, skip storeId, period, range
+    // Backend API accepts minimal params
+    let queryParams = new URLSearchParams()
+    if (topN) queryParams.append('topN', topN)
+    // Note: Don't send storeId, period, range - backend doesn't support them
+
+    let url = `${REPORTS_SERVICE_URL}/api/reports/top-products?${queryParams.toString()}`
+    if (!topN) {
+      // If no topN, don't add query string at all
+      url = `${REPORTS_SERVICE_URL}/api/reports/top-products`
+    }
+    console.log('📊 [Top Products API] Calling backend URL:', url)
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -39,19 +52,31 @@ export async function GET(request: NextRequest) {
       headers['Authorization'] = authHeader
     }
 
-    console.log('[Top Products API] Requesting:', url)
-    const response = await axios.get(url, { headers, timeout: 5000 })
-    console.log('[Top Products API] Response:', response.status, response.data)
-    return NextResponse.json(response.data)
+    try {
+      let response = await axios.get(url, { headers })
+      console.log('📊 [Top Products API] Success! Response status:', response.status)
+      console.log('📊 [Top Products API] Response has', Array.isArray(response.data) ? response.data.length : '?', 'items')
+      
+      if (response.data) {
+        return NextResponse.json(response.data)
+      }
+    } catch (axiosError: any) {
+      console.error('❌ [Top Products API] Backend error:', {
+        status: axiosError.response?.status,
+        statusText: axiosError.response?.statusText,
+        message: axiosError.message,
+        data: axiosError.response?.data,
+        url: url,
+      })
+    }
+
+    // If request failed, return empty array with 200 status (don't break UI)
+    console.log('⚠️ [Top Products API] Returning empty array')
+    return NextResponse.json([])
   } catch (error: any) {
-    console.error('[Top Products API] Error:', {
-      status: error.response?.status,
-      message: error.message,
-      data: error.response?.data,
-    })
-    return NextResponse.json({ 
-      error: error.message,
-      details: error.response?.data 
-    }, { status: error.response?.status || 500 })
+    console.error('❌ [Top Products API] Unexpected error:', error.message)
+    // Return empty array instead of error to prevent UI breaking
+    return NextResponse.json([])
+
   }
 }

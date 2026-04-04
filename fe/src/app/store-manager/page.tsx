@@ -20,6 +20,18 @@ interface Staff { id: string; name: string; email?: string }
 
 type TimeRange = 'today' | 'yesterday' | '7days' | 'month' | 'custom'
 
+// ─── Helper: Check if data is mock/placeholder
+function isMockData(data: any): boolean {
+  if (!Array.isArray(data) || data.length === 0) return false
+  
+  // Check if products have placeholder names like "Sản phẩm A", "Sản phẩm B", etc.
+  const mockPattern = /Sản phẩm\s+[A-Z]|Product\s+[A-Z]|Item\s+[A-Z]/i
+  return data.some((p: any) => {
+    const name = p.productName || p.name || ''
+    return mockPattern.test(name)
+  })
+}
+
 // ─── Custom SVG Revenue Chart ─────────────────────────────────────────────────
 function RevenueChart({ chartData }: { chartData: ChartPoint[] }) {
   if (!chartData.length) {
@@ -343,8 +355,15 @@ export default function StoreManagerDashboard() {
       }
 
       // Process top products
+      console.log('🔍 Top Products API Response:', JSON.stringify(topData, null, 2))
       if (Array.isArray(topData) && topData.length > 0) {
-        console.log('Processing top products:', topData)
+        // Check if returned data is mock data
+        if (isMockData(topData)) {
+          console.warn('⚠️ Detected mock/placeholder product data! Real data may not be available for current filters.')
+        }
+        
+        console.log('✅ Processing top products:', topData.length, 'items')
+        console.log('📝 First product:', topData[0])
         const maxRev = topData[0]?.revenue || 1
         const transformedProducts = topData.slice(0, 5).map((p: any) => ({
           name: p.productName || p.name || 'N/A',
@@ -352,9 +371,10 @@ export default function StoreManagerDashboard() {
           revenue: (p.revenue || 0).toLocaleString('vi-VN'),
           pct: Math.round(((p.revenue || 0) / maxRev) * 100),
         }))
+        console.log('✅ Transformed products:', transformedProducts)
         setProducts(transformedProducts)
       } else {
-        console.warn('No top products data received')
+        console.warn('⚠️ No top products data received. Response was:', topData)
       }
 
       // Process inventory
