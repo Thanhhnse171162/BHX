@@ -284,6 +284,7 @@ export default function StoreManagerDashboard() {
       // ── Fetch Revenue Trend Data (for chart) ─────────────────────────────────
       try {
         const trendParams = new URLSearchParams()
+        trendParams.set('storeId', selectedStoreId) // Add storeId
         if (activeRange !== 'custom') {
           trendParams.set('period', activeRange)
         } else {
@@ -315,6 +316,7 @@ export default function StoreManagerDashboard() {
       try {
         const topParams = new URLSearchParams()
         topParams.set('topN', '5') // Get top 5 products
+        topParams.set('storeId', selectedStoreId) // Add storeId
         if (activeRange !== 'custom') {
           topParams.set('period', activeRange)
         } else {
