@@ -297,7 +297,7 @@ export default function StoreManagerDashboard() {
 
       // Fetch inventory summary
       const fetchInventory = fetch(
-        `/api/inventory/low-stock-alerts?${baseParams.toString()}`,
+        `/api/inventory?${baseParams.toString()}`,
         { headers, signal: AbortSignal.timeout(10000) }
       )
         .then(res => {
@@ -354,24 +354,43 @@ export default function StoreManagerDashboard() {
       }
 
       // Process inventory
-      if (Array.isArray(invData) && invData.length > 0) {
-        console.log('Processing inventory data:', invData)
-        const lowStockItems = invData.filter((i: any) => {
-          const qty = i.quantity || i.currentStock || 0
-          return qty > 0 && qty < (i.minimumStock || 10)
+      let inventoryItems: any[] = []
+      
+      // Handle response format: could be array or { data: [...] }
+      if (Array.isArray(invData)) {
+        inventoryItems = invData
+      } else if (invData && Array.isArray(invData.data)) {
+        inventoryItems = invData.data
+      }
+      
+      if (inventoryItems.length > 0) {
+        console.log('Processing inventory data:', inventoryItems.length, 'items')
+        
+        const lowStockItems = inventoryItems.filter((i: any) => {
+          const qty = i.quantity || i.currentStock || i.stock || 0
+          const minStock = i.minimumStock || i.reorderLevel || 10
+          return qty > 0 && qty < minStock
         })
-        const outStockItems = invData.filter((i: any) => {
-          const qty = i.quantity || i.currentStock || 0
+        
+        const outStockItems = inventoryItems.filter((i: any) => {
+          const qty = i.quantity || i.currentStock || i.stock || 0
           return qty === 0
         })
-        const totalStock = invData.reduce((sum: number, i: any) => {
-          return sum + (i.quantity || i.currentStock || i.totalQuantity || 0)
+        
+        const totalStock = inventoryItems.reduce((sum: number, i: any) => {
+          return sum + (i.quantity || i.currentStock || i.stock || i.totalQuantity || 0)
         }, 0)
+        
+        console.log(`Inventory Summary: Total=${totalStock}, LowStock=${lowStockItems.length}, OutOfStock=${outStockItems.length}`)
+        
+        setStockCount(totalStock)
         setLowCount(lowStockItems.length)
         setOutCount(outStockItems.length)
-        setStockCount(totalStock)
       } else {
-        console.warn('No inventory data received')
+        console.warn('No inventory data received or empty array')
+        setStockCount(0)
+        setLowCount(0)
+        setOutCount(0)
       }
     } catch (err) {
       console.error('Fatal error in fetchAll:', err)
