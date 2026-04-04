@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { CheckCircle, Home, RotateCcw, Loader, AlertCircle } from 'lucide-react'
+import { CheckCircle, RotateCcw, Loader, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 
 interface OrderDetails {
