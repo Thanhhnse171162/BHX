@@ -26,6 +26,7 @@ function PaymentSuccessContent() {
 
   const orderId = searchParams.get('orderId') || searchParams.get('orderld')
   const resultCode = searchParams.get('resultCode')
+  const amountParam = searchParams.get('amount')
   const isSuccess = resultCode === '0'
 
   useEffect(() => {
@@ -40,47 +41,77 @@ function PaymentSuccessContent() {
         // Try to fetch invoice/order details from API
         console.log('Fetching invoice for:', orderId)
         
-        const response = await fetch(`/api/cashier/invoices/list`)
-        if (response.ok) {
-          const data = await response.json()
-          console.log('Invoices response:', data)
-          
-          // Find the invoice with matching orderId
-          const invoices = Array.isArray(data) ? data : data.data || data.invoices || []
-          const foundInvoice = invoices.find((inv: any) => 
-            String(inv.id || inv.invoiceNumber || '').includes(orderId) ||
-            String(orderId).includes(String(inv.id || inv.invoiceNumber || ''))
-          )
-          
-          if (foundInvoice) {
-            setOrder({
-              orderId: foundInvoice.id || foundInvoice.invoiceNumber || orderId,
-              totalAmount: foundInvoice.totalAmount || foundInvoice.amount || 0,
-              customerName: foundInvoice.customerName || 'Khách hàng',
-              paymentMethod: foundInvoice.paymentMethod || 'MoMo',
-              timestamp: foundInvoice.createdAt ? new Date(foundInvoice.createdAt).toLocaleString('vi-VN') : new Date().toLocaleString('vi-VN'),
-              items: foundInvoice.items || foundInvoice.products || [],
-            })
-          } else {
-            // If not found, show error but don't fail completely
-            console.warn('Invoice not found in list, showing basic info')
-            setOrder({
-              orderId: orderId,
-              totalAmount: 0,
-              customerName: 'Khách hàng',
-              paymentMethod: 'MoMo',
-              timestamp: new Date().toLocaleString('vi-VN'),
-              items: [],
-            })
+        // Extract saleId from orderId (format: SALE-20260404-2CB1C3D8-...)
+        const saleId = orderId.includes('SALE-') ? orderId.split('-').slice(0, 4).join('-') : orderId
+        
+        let foundInvoice = null
+        let totalAmountFromApi = 0
+
+        // Try 1: Fetch from /api/sales/{saleId}
+        try {
+          const saleResponse = await fetch(`/api/sales/${saleId}?_ts=${Date.now()}`, {
+            method: 'GET',
+            cache: 'no-store',
+            headers: { 'Accept': 'application/json' }
+          })
+          if (saleResponse.ok) {
+            const saleData = await saleResponse.json().catch(() => null)
+            if (saleData) {
+              console.log('Sale API response:', saleData)
+              totalAmountFromApi = saleData.totalAmount || saleData.amount || saleData.total || 0
+              if (totalAmountFromApi > 0) {
+                foundInvoice = saleData
+              }
+            }
           }
-        } else {
-          // API error, use basic info
-          console.warn('API error:', response.status)
-          setError(`Không thể tải chi tiết hóa đơn (${response.status})`)
+        } catch (err) {
+          console.log('Sale API fetch failed, trying invoices list...')
         }
+
+        // Try 2: Fetch from /api/cashier/invoices/list
+        if (!foundInvoice) {
+          const response = await fetch(`/api/cashier/invoices/list`)
+          if (response.ok) {
+            const data = await response.json()
+            console.log('Invoices response:', data)
+            
+            const invoices = Array.isArray(data) ? data : data.data || data.invoices || []
+            foundInvoice = invoices.find((inv: any) => 
+              String(inv.id || inv.invoiceNumber || '').includes(orderId) ||
+              String(orderId).includes(String(inv.id || inv.invoiceNumber || ''))
+            )
+            
+            if (foundInvoice) {
+              totalAmountFromApi = foundInvoice.totalAmount || foundInvoice.amount || 0
+            }
+          }
+        }
+
+        // Set order with data from API or fallback to query parameters
+        const finalAmount = amountParam ? parseInt(amountParam) : totalAmountFromApi
+        setOrder({
+          orderId: foundInvoice?.id || foundInvoice?.invoiceNumber || orderId,
+          totalAmount: finalAmount,
+          customerName: foundInvoice?.customerName || 'Khách hàng',
+          paymentMethod: foundInvoice?.paymentMethod || 'MoMo',
+          timestamp: foundInvoice?.createdAt ? new Date(foundInvoice.createdAt).toLocaleString('vi-VN') : new Date().toLocaleString('vi-VN'),
+          items: foundInvoice?.items || foundInvoice?.products || [],
+        })
       } catch (err) {
         console.error('Error fetching invoice:', err)
-        setError('Không thể tải chi tiết hóa đơn')
+        // Still show order with amount from query param
+        if (amountParam) {
+          setOrder({
+            orderId: orderId,
+            totalAmount: parseInt(amountParam),
+            customerName: 'Khách hàng',
+            paymentMethod: 'MoMo',
+            timestamp: new Date().toLocaleString('vi-VN'),
+            items: [],
+          })
+        } else {
+          setError('Không thể tải chi tiết hóa đơn')
+        }
       } finally {
         setIsLoading(false)
       }
