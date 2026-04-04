@@ -359,8 +359,9 @@ export default function DashboardPage() {
 
       const headers: HeadersInit = { Authorization: `Bearer ${token}` }
       const baseParams = new URLSearchParams()
-      // Remove unsupported params: only send period (like remote version does)
+      // Send both period and range like store-manager does
       baseParams.set('period', 'LAST_7_DAYS')
+      baseParams.set('range', 'LAST_7_DAYS')
 
       // Fetch revenue trend
       const fetchRevenueTrend = fetch(
