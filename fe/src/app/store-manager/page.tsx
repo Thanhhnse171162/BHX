@@ -281,6 +281,70 @@ export default function StoreManagerDashboard() {
         console.error('Revenue fetch error:', revErr)
       }
 
+      // ── Fetch Revenue Trend Data (for chart) ─────────────────────────────────
+      try {
+        const trendParams = new URLSearchParams()
+        if (activeRange !== 'custom') {
+          trendParams.set('period', activeRange)
+        } else {
+          if (dateFrom) trendParams.set('fromDate', dateFrom)
+          if (dateTo) trendParams.set('toDate', dateTo)
+        }
+        const trendQs = `?${trendParams.toString()}`
+        const trendRes = await fetch(`/api/reports/revenue-trend${trendQs}`, { headers })
+        if (trendRes.ok) {
+          const trendData = await trendRes.json()
+          console.log('Revenue Trend API Response:', trendData)
+
+          // Transform trend data to chart format: {time, revenue} -> {day, value}
+          if (Array.isArray(trendData) && trendData.length > 0) {
+            const transformedData = trendData.map((item: any) => ({
+              day: item.time || item.date || item.day || '',
+              value: typeof item.revenue === 'number' ? item.revenue : 0,
+            }))
+            setChartData(transformedData)
+          }
+        } else {
+          console.error('Revenue Trend API error:', trendRes.status, await trendRes.text())
+        }
+      } catch (trendErr) {
+        console.error('Revenue Trend fetch error:', trendErr)
+      }
+
+      // ── Fetch Top Products Data ─────────────────────────────────────────────
+      try {
+        const topParams = new URLSearchParams()
+        topParams.set('topN', '5') // Get top 5 products
+        if (activeRange !== 'custom') {
+          topParams.set('period', activeRange)
+        } else {
+          if (dateFrom) topParams.set('fromDate', dateFrom)
+          if (dateTo) topParams.set('toDate', dateTo)
+        }
+        const topQs = `?${topParams.toString()}`
+        const topRes = await fetch(`/api/reports/top-products${topQs}`, { headers })
+        if (topRes.ok) {
+          const topData = await topRes.json()
+          console.log('Top Products API Response:', topData)
+
+          // Transform top products data
+          if (Array.isArray(topData) && topData.length > 0) {
+            const maxRev = topData[0]?.revenue || 1
+            const transformedProducts = topData.slice(0, 5).map((p: any) => ({
+              name: p.productName || p.name || 'N/A',
+              units: parseInt(p.quantitySold || p.unitsSold || p.units || 0),
+              revenue: (p.revenue || 0).toLocaleString('vi-VN'),
+              pct: Math.round(((p.revenue || 0) / maxRev) * 100),
+            }))
+            setProducts(transformedProducts)
+          }
+        } else {
+          console.error('Top Products API error:', topRes.status, await topRes.text())
+        }
+      } catch (topErr) {
+        console.error('Top Products fetch error:', topErr)
+      }
+
       // ── Fetch Inventory Data (no staffId filter) ────────────────────────────
       try {
         const invParams = new URLSearchParams()
