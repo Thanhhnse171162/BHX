@@ -225,168 +225,133 @@ export default function StoreManagerDashboard() {
 
       const headers: HeadersInit = { Authorization: `Bearer ${token}` }
 
-      // Revenue params - include staffId if selected
-      const params = new URLSearchParams()
-      params.set('storeId', selectedStoreId)
+      // Build query parameters
+      const baseParams = new URLSearchParams()
+      baseParams.set('storeId', selectedStoreId)
       if (selectedStaffId) {
-        params.set('staffId', selectedStaffId)
+        baseParams.set('staffId', selectedStaffId)
       }
       if (activeRange !== 'custom') {
-        params.set('range', activeRange)
+        baseParams.set('period', activeRange)
+        baseParams.set('range', activeRange)
       } else {
-        if (dateFrom) params.set('from', dateFrom)
-        if (dateTo) params.set('to', dateTo)
-      }
-      const qs = `?${params.toString()}`
-
-      // ── Fetch Revenue Data ──────────────────────────────────────────────────
-      try {
-        const revenueRes = await fetch(`/api/reports/manager/revenue${qs}`, { headers })
-        if (revenueRes.ok) {
-          const data = await revenueRes.json()
-          console.log('Revenue API Response:', data)
-
-          // Set total revenue
-          const totalRev = data?.totalRevenue || 0
-          setRevenue(totalRev.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' }))
-
-          // Set chart data
-          const chartD = data?.chartData || []
-          if (Array.isArray(chartD) && chartD.length > 0) {
-            setChartData(
-              chartD.map((d: any) => ({
-                day: d.day || d.date || d.label || '',
-                value: typeof d.value === 'number' ? d.value : (d.revenue || 0),
-              }))
-            )
-          }
-
-          // Set top products
-          const topProds = data?.topProducts || []
-          if (Array.isArray(topProds) && topProds.length > 0) {
-            const maxRev = topProds[0]?.revenue || 1
-            setProducts(
-              topProds.slice(0, 5).map((p: any) => ({
-                name: p.productName || p.name || 'N/A',
-                units: parseInt(p.unitsSold || p.units || 0),
-                revenue: (p.revenue || 0).toLocaleString('vi-VN'),
-                pct: Math.round(((p.revenue || 0) / maxRev) * 100),
-              }))
-            )
-          }
-        } else {
-          console.error('Revenue API error:', revenueRes.status, await revenueRes.text())
+        if (dateFrom) {
+          baseParams.set('from', dateFrom)
+          baseParams.set('fromDate', dateFrom)
         }
-      } catch (revErr) {
-        console.error('Revenue fetch error:', revErr)
+        if (dateTo) {
+          baseParams.set('to', dateTo)
+          baseParams.set('toDate', dateTo)
+        }
       }
 
-      // ── Fetch Revenue Trend Data (for chart) ─────────────────────────────────
-      try {
-        const trendParams = new URLSearchParams()
-        trendParams.set('storeId', selectedStoreId) // Add storeId
-        if (activeRange !== 'custom') {
-          trendParams.set('period', activeRange)
-        } else {
-          if (dateFrom) trendParams.set('fromDate', dateFrom)
-          if (dateTo) trendParams.set('toDate', dateTo)
-        }
-        const trendQs = `?${trendParams.toString()}`
-        const trendRes = await fetch(`/api/reports/revenue-trend${trendQs}`, { headers })
-        if (trendRes.ok) {
-          const trendData = await trendRes.json()
-          console.log('Revenue Trend API Response:', trendData)
-
-          // Transform trend data to chart format: {time, revenue} -> {day, value}
-          if (Array.isArray(trendData) && trendData.length > 0) {
-            const transformedData = trendData.map((item: any) => ({
-              day: item.time || item.date || item.day || '',
-              value: typeof item.revenue === 'number' ? item.revenue : 0,
-            }))
-            setChartData(transformedData)
+      // Fetch revenue trend data (for chart)
+      const fetchRevenueTrend = fetch(
+        `/api/reports/revenue-trend?${baseParams.toString()}`,
+        { headers, signal: AbortSignal.timeout(10000) }
+      )
+        .then(res => {
+          console.log('Revenue Trend Response:', res.status)
+          if (!res.ok) {
+            console.error('Revenue Trend API error:', res.status)
+            return null
           }
-        } else {
-          console.error('Revenue Trend API error:', trendRes.status, await trendRes.text())
-        }
-      } catch (trendErr) {
-        console.error('Revenue Trend fetch error:', trendErr)
+          return res.json()
+        })
+        .catch(err => {
+          console.error('Revenue Trend fetch error:', err)
+          return null
+        })
+
+      // Fetch top products data
+      const fetchTopProducts = fetch(
+        `/api/reports/top-products?topN=5&${baseParams.toString()}`,
+        { headers, signal: AbortSignal.timeout(10000) }
+      )
+        .then(res => {
+          console.log('Top Products Response:', res.status)
+          if (!res.ok) {
+            console.error('Top Products API error:', res.status)
+            return null
+          }
+          return res.json()
+        })
+        .catch(err => {
+          console.error('Top Products fetch error:', err)
+          return null
+        })
+
+      // Fetch inventory summary
+      const fetchInventory = fetch(
+        `/api/inventory/low-stock-alerts?${baseParams.toString()}`,
+        { headers, signal: AbortSignal.timeout(10000) }
+      )
+        .then(res => {
+          console.log('Inventory Response:', res.status)
+          if (!res.ok) {
+            console.error('Inventory API error:', res.status)
+            return null
+          }
+          return res.json()
+        })
+        .catch(err => {
+          console.error('Inventory fetch error:', err)
+          return null
+        })
+
+      // Execute all 3 API calls in parallel
+      const [trendData, topData, invData] = await Promise.all([
+        fetchRevenueTrend,
+        fetchTopProducts,
+        fetchInventory,
+      ])
+
+      // Process revenue trend
+      if (Array.isArray(trendData) && trendData.length > 0) {
+        console.log('Processing trend data:', trendData)
+        const transformedData = trendData.map((item: any) => ({
+          day: item.time || item.date || item.day || '',
+          value: typeof item.revenue === 'number' ? item.revenue : 0,
+        }))
+        setChartData(transformedData)
+      } else {
+        console.warn('No trend data received')
       }
 
-      // ── Fetch Top Products Data ─────────────────────────────────────────────
-      try {
-        const topParams = new URLSearchParams()
-        topParams.set('topN', '5') // Get top 5 products
-        topParams.set('storeId', selectedStoreId) // Add storeId
-        if (activeRange !== 'custom') {
-          topParams.set('period', activeRange)
-        } else {
-          if (dateFrom) topParams.set('fromDate', dateFrom)
-          if (dateTo) topParams.set('toDate', dateTo)
-        }
-        const topQs = `?${topParams.toString()}`
-        const topRes = await fetch(`/api/reports/top-products${topQs}`, { headers })
-        if (topRes.ok) {
-          const topData = await topRes.json()
-          console.log('Top Products API Response:', topData)
-
-          // Transform top products data
-          if (Array.isArray(topData) && topData.length > 0) {
-            const maxRev = topData[0]?.revenue || 1
-            const transformedProducts = topData.slice(0, 5).map((p: any) => ({
-              name: p.productName || p.name || 'N/A',
-              units: parseInt(p.quantitySold || p.unitsSold || p.units || 0),
-              revenue: (p.revenue || 0).toLocaleString('vi-VN'),
-              pct: Math.round(((p.revenue || 0) / maxRev) * 100),
-            }))
-            setProducts(transformedProducts)
-          }
-        } else {
-          console.error('Top Products API error:', topRes.status, await topRes.text())
-        }
-      } catch (topErr) {
-        console.error('Top Products fetch error:', topErr)
+      // Process top products
+      if (Array.isArray(topData) && topData.length > 0) {
+        console.log('Processing top products:', topData)
+        const maxRev = topData[0]?.revenue || 1
+        const transformedProducts = topData.slice(0, 5).map((p: any) => ({
+          name: p.productName || p.name || 'N/A',
+          units: parseInt(p.quantitySold || p.unitsSold || p.units || 0),
+          revenue: (p.revenue || 0).toLocaleString('vi-VN'),
+          pct: Math.round(((p.revenue || 0) / maxRev) * 100),
+        }))
+        setProducts(transformedProducts)
+      } else {
+        console.warn('No top products data received')
       }
 
-      // ── Fetch Inventory Data (no staffId filter) ────────────────────────────
-      try {
-        const invParams = new URLSearchParams()
-        invParams.set('storeId', selectedStoreId)
-        if (activeRange !== 'custom') {
-          invParams.set('range', activeRange)
-        } else {
-          if (dateFrom) invParams.set('from', dateFrom)
-          if (dateTo) invParams.set('to', dateTo)
-        }
-        const invQs = `?${invParams.toString()}`
-        const invRes = await fetch(`/api/inventory/low-stock-alerts${invQs}`, { headers })
-        if (invRes.ok) {
-          const data = await invRes.json()
-          console.log('Inventory API Response:', data)
-
-          const items = Array.isArray(data) ? data : (data?.data || [])
-          if (Array.isArray(items) && items.length > 0) {
-            // Calculate counts
-            const lowStockItems = items.filter((i: any) => {
-              const qty = i.quantity || i.currentStock || 0
-              return qty > 0 && qty < (i.minimumStock || 10)
-            })
-            const outStockItems = items.filter((i: any) => {
-              const qty = i.quantity || i.currentStock || 0
-              return qty === 0
-            })
-            const totalStock = items.reduce((sum: number, i: any) => {
-              return sum + (i.quantity || i.currentStock || i.totalQuantity || 0)
-            }, 0)
-
-            setLowCount(lowStockItems.length)
-            setOutCount(outStockItems.length)
-            setStockCount(totalStock)
-          }
-        } else {
-          console.error('Inventory API error:', invRes.status, await invRes.text())
-        }
-      } catch (invErr) {
-        console.error('Inventory fetch error:', invErr)
+      // Process inventory
+      if (Array.isArray(invData) && invData.length > 0) {
+        console.log('Processing inventory data:', invData)
+        const lowStockItems = invData.filter((i: any) => {
+          const qty = i.quantity || i.currentStock || 0
+          return qty > 0 && qty < (i.minimumStock || 10)
+        })
+        const outStockItems = invData.filter((i: any) => {
+          const qty = i.quantity || i.currentStock || 0
+          return qty === 0
+        })
+        const totalStock = invData.reduce((sum: number, i: any) => {
+          return sum + (i.quantity || i.currentStock || i.totalQuantity || 0)
+        }, 0)
+        setLowCount(lowStockItems.length)
+        setOutCount(outStockItems.length)
+        setStockCount(totalStock)
+      } else {
+        console.warn('No inventory data received')
       }
     } catch (err) {
       console.error('Fatal error in fetchAll:', err)
