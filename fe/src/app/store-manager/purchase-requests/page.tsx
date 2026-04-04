@@ -243,30 +243,20 @@ export default function PurchaseRequestsPage() {
         return
       }
 
-      // Load resiliently: by-warehouse can return 401 in some deployments.
-      const [byWarehouseResult, getAllResult] = await Promise.allSettled([
-        RestockAPIService.getByWarehouse(warehouseId),
-        RestockAPIService.getAll(),
-      ])
-
-      const byWarehouse = byWarehouseResult.status === 'fulfilled' ? byWarehouseResult.value : []
-      const all = getAllResult.status === 'fulfilled' ? getAllResult.value : []
-
-      if (byWarehouseResult.status === 'rejected' && getAllResult.status === 'rejected') {
-        throw byWarehouseResult.reason || getAllResult.reason || new Error('Không thể tải dữ liệu yêu cầu nhập hàng')
+      // Try the scoped endpoint first to avoid calling global endpoint unnecessarily.
+      let merged: RestockRequestFromAPI[] = []
+      try {
+        merged = await RestockAPIService.getByWarehouse(warehouseId)
+      } catch {
+        // Fallback only when by-warehouse fails.
+        const all = await RestockAPIService.getAll()
+        const wid = warehouseId.toLowerCase()
+        merged = all.filter((r) => {
+          const toVal = (r.toWarehouseId || '').toLowerCase()
+          const fromVal = (r.fromWarehouseId || '').toLowerCase()
+          return toVal === wid || fromVal === wid
+        })
       }
-
-      const wid = warehouseId.toLowerCase()
-      const sameWarehouse = all.filter((r) => {
-        const toVal = (r.toWarehouseId || '').toLowerCase()
-        const fromVal = (r.fromWarehouseId || '').toLowerCase()
-        return toVal === wid || fromVal === wid
-      })
-
-      const byId = new Map<string, RestockRequestFromAPI>()
-      for (const r of byWarehouse) byId.set(r.id, r)
-      for (const r of sameWarehouse) byId.set(r.id, r)
-      const merged = Array.from(byId.values())
 
       // Resolve missing requester names by user id one-by-one.
       const unresolvedRequesterIds = Array.from(new Set(
