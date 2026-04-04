@@ -326,7 +326,7 @@ export default function StoreManagerDashboard() {
       // Process revenue trend
       if (Array.isArray(trendData) && trendData.length > 0) {
         console.log('[Frontend] Processing trend data:', trendData.length, 'items')
-        console.log('[Frontend] Trend data sample:', trendData.slice(0, 2))
+        console.log('[Frontend] FULL Trend data:', JSON.stringify(trendData, null, 2))
         const transformedData = trendData.map((item: any) => ({
           day: item.time || item.date || item.day || '',
           value: typeof item.revenue === 'number' ? item.revenue : 0,
