@@ -178,7 +178,11 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function PurchaseRequestsPage() {
-  const user = useAuthStore((s) => s.user)
+  const { user, token, hydrated } = useAuthStore((s) => ({
+    user: s.user,
+    token: s.token,
+    hydrated: s.hydrated,
+  }))
   const [requests, setRequests]       = useState<PurchaseRequest[]>([])
   const [search, setSearch]           = useState('')
   const [statusFilter, setStatus]     = useState<string>('Tất cả')
@@ -191,6 +195,15 @@ export default function PurchaseRequestsPage() {
   const todayStr = new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
   const loadRequests = useCallback(async () => {
+    if (!hydrated) return
+
+    if (!token) {
+      setRequests([])
+      setLoadError('Phiên đăng nhập đã hết hạn hoặc chưa sẵn sàng. Vui lòng đăng nhập lại.')
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
       setLoadError(null)
@@ -223,21 +236,6 @@ export default function PurchaseRequestsPage() {
         // If users can't be loaded, continue without mapping
       }
 
-      // Always try IAM users to fill in missing entries
-      try {
-        const iamUsers = await UserAPIService.getIamUsersList()
-        for (const u of iamUsers) {
-          const normalizedId = normalizeId(u.id)
-          // Only add if not already in map
-          if (!userMap[normalizedId]) {
-            const userName = u.full_name || u.fullName || u.name || u.email || u.id
-            userMap[normalizedId] = userName
-          }
-        }
-      } catch {
-        // If IAM users can't be loaded, continue
-      }
-
       const warehouseId = user?.workplaceId ?? user?.storeId ?? user?.warehouseId ?? ''
       if (!warehouseId) {
         setRequests([])
@@ -245,27 +243,30 @@ export default function PurchaseRequestsPage() {
         return
       }
 
-      // Match BE behavior exactly: GET /api/restock-requests/by-warehouse/{warehouseId}
-      const byWarehouse = await RestockAPIService.getByWarehouse(warehouseId)
+      // Load resiliently: by-warehouse can return 401 in some deployments.
+      const [byWarehouseResult, getAllResult] = await Promise.allSettled([
+        RestockAPIService.getByWarehouse(warehouseId),
+        RestockAPIService.getAll(),
+      ])
 
-      // Safety merge: some environments return fewer items from one endpoint.
-      // If getAll is allowed, merge same-warehouse rows and de-duplicate by id.
-      let merged = byWarehouse
-      try {
-        const all = await RestockAPIService.getAll()
-        const wid = warehouseId.toLowerCase()
-        const sameWarehouse = all.filter((r) => {
-          const toVal = (r.toWarehouseId || '').toLowerCase()
-          const fromVal = (r.fromWarehouseId || '').toLowerCase()
-          return toVal === wid || fromVal === wid
-        })
-        const byId = new Map<string, RestockRequestFromAPI>()
-        for (const r of byWarehouse) byId.set(r.id, r)
-        for (const r of sameWarehouse) byId.set(r.id, r)
-        merged = Array.from(byId.values())
-      } catch {
-        // Ignore if getAll is forbidden for current role.
+      const byWarehouse = byWarehouseResult.status === 'fulfilled' ? byWarehouseResult.value : []
+      const all = getAllResult.status === 'fulfilled' ? getAllResult.value : []
+
+      if (byWarehouseResult.status === 'rejected' && getAllResult.status === 'rejected') {
+        throw byWarehouseResult.reason || getAllResult.reason || new Error('Không thể tải dữ liệu yêu cầu nhập hàng')
       }
+
+      const wid = warehouseId.toLowerCase()
+      const sameWarehouse = all.filter((r) => {
+        const toVal = (r.toWarehouseId || '').toLowerCase()
+        const fromVal = (r.fromWarehouseId || '').toLowerCase()
+        return toVal === wid || fromVal === wid
+      })
+
+      const byId = new Map<string, RestockRequestFromAPI>()
+      for (const r of byWarehouse) byId.set(r.id, r)
+      for (const r of sameWarehouse) byId.set(r.id, r)
+      const merged = Array.from(byId.values())
 
       // Resolve missing requester names by user id one-by-one.
       const unresolvedRequesterIds = Array.from(new Set(
@@ -294,7 +295,7 @@ export default function PurchaseRequestsPage() {
     } finally {
       setLoading(false)
     }
-  }, [user?.warehouseId, user?.workplaceId, user?.storeId])
+  }, [hydrated, token, user?.warehouseId, user?.workplaceId, user?.storeId])
 
   useEffect(() => {
     loadRequests()
