@@ -474,11 +474,9 @@ export default function IncidentsPage() {
       setProducts(prods)
       setRawReports(reports)
       const reporterNameMap = await buildReporterNameMap(reports)
-      setReporterNames(Object.fromEntries(reporterNameMap))
-      const nameMap = Object.entries(reporterNameMap).reduce(
-        (acc, [k, v]) => ({ ...acc, [k]: v }),
-        {} as Record<string, string>
-      )
+      const nameMap = Object.fromEntries(reporterNameMap)
+      console.log('[loadReports] nameMap from buildReporterNameMap:', nameMap)
+      setReporterNames(nameMap)
       rebuildIncidents(reports, prods, nameMap)
     } catch {
       setIncidents([])
