@@ -145,6 +145,8 @@ async function buildReporterNameMap(reports: DamageReportFromAPI[]): Promise<Map
 
   if (ids.length === 0) return new Map()
 
+  console.log('[buildReporterNameMap] Finding names for reporter IDs:', ids)
+
   const idToName = new Map<string, string>()
 
   try {
@@ -155,6 +157,7 @@ async function buildReporterNameMap(reports: DamageReportFromAPI[]): Promise<Map
     ])
 
     const users = [...iamUsers, ...localUsers]
+    console.log('[buildReporterNameMap] Fetched', users.length, 'total users from API')
     
     // Build map from all fetched users
     users.forEach((user) => {
@@ -166,6 +169,9 @@ async function buildReporterNameMap(reports: DamageReportFromAPI[]): Promise<Map
         const normalized = normalizeUuid(id)
         if (normalized && !idToName.has(normalized)) {
           idToName.set(normalized, name)
+          if (ids.includes(normalized)) {
+            console.log(`  ✓ Mapped ${normalized} -> "${name}"`)
+          }
         }
       })
     })
@@ -175,6 +181,7 @@ async function buildReporterNameMap(reports: DamageReportFromAPI[]): Promise<Map
 
   // For any unresolved IDs, do individual lookups
   const unresolvedIds = ids.filter((id) => !idToName.has(id))
+  console.log('[buildReporterNameMap] Unresolved IDs after batch fetch:', unresolvedIds)
   
   if (unresolvedIds.length > 0) {
     const resolved = await Promise.all(
@@ -183,7 +190,10 @@ async function buildReporterNameMap(reports: DamageReportFromAPI[]): Promise<Map
           const localUser = await UserAPIService.getById(id)
           if (localUser) {
             const localName = resolveUserDisplayName(localUser)
-            if (localName) return [id, localName] as const
+            if (localName) {
+              console.log(`  ✓ Individual lookup: ${id} -> "${localName}" (local)`)
+              return [id, localName] as const
+            }
             // User found but no name -> map to a placeholder
             return [id, '(Chưa cập nhật tên)'] as const
           }
@@ -195,7 +205,10 @@ async function buildReporterNameMap(reports: DamageReportFromAPI[]): Promise<Map
           const iamUser = await UserAPIService.getIamDetailsById(id)
           if (iamUser) {
             const iamName = resolveUserDisplayName(iamUser)
-            if (iamName) return [id, iamName] as const
+            if (iamName) {
+              console.log(`  ✓ Individual lookup: ${id} -> "${iamName}" (IAM)`)
+              return [id, iamName] as const
+            }
             // User found but no name -> map to a placeholder
             return [id, '(Chưa cập nhật tên)'] as const
           }
@@ -204,6 +217,7 @@ async function buildReporterNameMap(reports: DamageReportFromAPI[]): Promise<Map
         }
 
         // User not found in any system -> map to a placeholder
+        console.warn(`  ✗ User not found: ${id}`)
         return [id, '(Người dùng không tồn tại)'] as const
       })
     )
@@ -436,6 +450,8 @@ export default function IncidentsPage() {
 
   const rebuildIncidents = useCallback((reps: DamageReportFromAPI[], prods: ProductFromAPI[], names: Record<string, string>) => {
     const reporterNameMap = new Map(Object.entries(names))
+    // DEBUG: Log reporter names being used
+    console.log('[Incidents] Reporter names map:', reporterNameMap)
     setIncidents(reps.map((row) => mapDamageReportToIncident(row, prods, reporterNameMap)))
   }, [])
 

@@ -73,21 +73,45 @@ export class UserAPIService {
         return []
       }
 
-      const res = await localApiClient.get('/users')
-      const payload = res.data
-      
-      let users: UserInfoFromAPI[] = []
-      if (Array.isArray(payload)) {
-        users = payload
-      } else if (payload?.data && Array.isArray(payload.data)) {
-        users = payload.data
-      }
-      
-      if (users.length > 0) {
-        return users
+      // Try /api/users first
+      try {
+        const res = await localApiClient.get('/users')
+        const payload = res.data
+        
+        let users: UserInfoFromAPI[] = []
+        if (Array.isArray(payload)) {
+          users = payload
+        } else if (payload?.data && Array.isArray(payload.data)) {
+          users = payload.data
+        }
+        
+        if (users.length > 0) {
+          return users
+        }
+      } catch (error) {
+        console.warn('UserAPIService.getAll(/api/users) failed, trying /api/users/list:', error)
       }
 
-      return users
+      // Fallback to /api/users/list
+      try {
+        const res = await localApiClient.get('/users/list')
+        const payload = res.data
+        
+        let users: UserInfoFromAPI[] = []
+        if (Array.isArray(payload)) {
+          users = payload
+        } else if (payload?.data && Array.isArray(payload.data)) {
+          users = payload.data
+        }
+        
+        if (users.length > 0) {
+          return users
+        }
+      } catch (error) {
+        console.warn('UserAPIService.getAll(/api/users/list) also failed:', error)
+      }
+
+      return []
     } catch (error) {
       console.warn('UserAPIService.getAll failed:', error)
       return []
