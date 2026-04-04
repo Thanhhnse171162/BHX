@@ -22,6 +22,14 @@ export async function GET(request: NextRequest) {
     const fromDate = request.nextUrl.searchParams.get('fromDate')
     const toDate = request.nextUrl.searchParams.get('toDate')
 
+    console.log('[Revenue Trend API] Received params:', {
+      period,
+      groupBy,
+      storeId,
+      fromDate,
+      toDate,
+    })
+
     // Build query string
     const queryParams = new URLSearchParams()
     if (period) queryParams.append('period', period)
@@ -31,6 +39,7 @@ export async function GET(request: NextRequest) {
     if (toDate) queryParams.append('toDate', toDate)
 
     const url = `${REPORTS_SERVICE_URL}/api/reports/revenue-trend?${queryParams.toString()}`
+    console.log('[Revenue Trend API] Forwarding to:', url)
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -40,6 +49,7 @@ export async function GET(request: NextRequest) {
     }
 
     const response = await axios.get(url, { headers })
+    console.log('[Revenue Trend API] Response data points:', Array.isArray(response.data) ? response.data.length : response.data?.data?.length || 0)
     return NextResponse.json(response.data)
   } catch (error: any) {
     console.error('Failed to fetch revenue trend:', error.message)

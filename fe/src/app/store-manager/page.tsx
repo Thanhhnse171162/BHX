@@ -223,6 +223,8 @@ export default function StoreManagerDashboard() {
   const fetchAll = async () => {
     try {
       setLoading(true)
+      console.log('>>> fetchAll called, activeRange:', activeRange, 'storeId:', selectedStoreId)
+      
       // Reset KPI values
       setRevenue('—')
       setChartData([])
@@ -258,6 +260,7 @@ export default function StoreManagerDashboard() {
           baseParams.set('toDate', dateTo)
         }
       }
+      console.log('>>> baseParams:', baseParams.toString())
 
       // Fetch revenue trend data (for chart)
       const fetchRevenueTrend = fetch(
@@ -265,15 +268,15 @@ export default function StoreManagerDashboard() {
         { headers, signal: AbortSignal.timeout(10000) }
       )
         .then(res => {
-          console.log('Revenue Trend Response:', res.status)
+          console.log('[Frontend] Revenue Trend Response:', res.status)
           if (!res.ok) {
-            console.error('Revenue Trend API error:', res.status)
+            console.error('[Frontend] Revenue Trend API error:', res.status)
             return null
           }
           return res.json()
         })
         .catch(err => {
-          console.error('Revenue Trend fetch error:', err)
+          console.error('[Frontend] Revenue Trend fetch error:', err)
           return null
         })
 
@@ -322,7 +325,8 @@ export default function StoreManagerDashboard() {
 
       // Process revenue trend
       if (Array.isArray(trendData) && trendData.length > 0) {
-        console.log('Processing trend data:', trendData)
+        console.log('[Frontend] Processing trend data:', trendData.length, 'items')
+        console.log('[Frontend] Trend data sample:', trendData.slice(0, 2))
         const transformedData = trendData.map((item: any) => ({
           day: item.time || item.date || item.day || '',
           value: typeof item.revenue === 'number' ? item.revenue : 0,
@@ -332,9 +336,9 @@ export default function StoreManagerDashboard() {
         // Calculate total revenue from trend data
         const totalRevenue = transformedData.reduce((sum, item) => sum + item.value, 0)
         setRevenue(totalRevenue.toLocaleString('vi-VN'))
-        console.log('Total revenue calculated:', totalRevenue)
+        console.log('[Frontend] Total revenue calculated:', totalRevenue)
       } else {
-        console.warn('No trend data received')
+        console.warn('[Frontend] No trend data received')
         setRevenue('0')
       }
 
