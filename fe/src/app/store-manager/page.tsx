@@ -161,10 +161,18 @@ export default function StoreManagerDashboard() {
     const initStores = async () => {
       try {
         const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
-        const res = await fetch('/api/warehouse/list', { headers })
+        // Try warehouses endpoint first
+        let res = await fetch('/api/warehouses', { headers })
+        
+        // If that fails, try warehouse/list
+        if (!res.ok) {
+          res = await fetch('/api/warehouse/list', { headers })
+        }
+        
         if (res.ok) {
           const data = await res.json()
           const storeList = Array.isArray(data) ? data : data.data || []
+          console.log('Stores loaded:', storeList)
           setStores(storeList)
           
           // If user has workplace, set it as default; otherwise use first store
@@ -173,6 +181,8 @@ export default function StoreManagerDashboard() {
           } else if (storeList.length > 0) {
             setSelectedStoreId(storeList[0].id)
           }
+        } else {
+          console.error('Failed to load stores:', res.status)
         }
       } catch (err) {
         console.error('Failed to load stores:', err)
