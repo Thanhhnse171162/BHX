@@ -73,10 +73,20 @@ export class UserAPIService {
         return []
       }
 
+      console.log('🔐 Token ready, fetching users...')
+
       // Try /api/users first
       try {
+        console.log('📡 Attempting GET /api/users')
         const res = await localApiClient.get('/users')
         const payload = res.data
+        
+        console.log('✅ /api/users response:', {
+          status: res.status,
+          payload: JSON.stringify(payload).substring(0, 300),
+          isArray: Array.isArray(payload),
+          hasData: payload?.data && Array.isArray(payload.data),
+        })
         
         let users: UserInfoFromAPI[] = []
         if (Array.isArray(payload)) {
@@ -86,16 +96,25 @@ export class UserAPIService {
         }
         
         if (users.length > 0) {
+          console.log(`✅ Got ${users.length} users from /api/users. First user:`, users[0])
           return users
         }
       } catch (error) {
-        console.warn('UserAPIService.getAll(/api/users) failed, trying /api/users/list:', error)
+        console.warn('⚠️ UserAPIService.getAll(/api/users) failed:', error instanceof Error ? error.message : error)
       }
 
       // Fallback to /api/users/list
       try {
+        console.log('📡 Attempting GET /api/users/list')
         const res = await localApiClient.get('/users/list')
         const payload = res.data
+        
+        console.log('✅ /api/users/list response:', {
+          status: res.status,
+          payload: JSON.stringify(payload).substring(0, 300),
+          isArray: Array.isArray(payload),
+          hasData: payload?.data && Array.isArray(payload.data),
+        })
         
         let users: UserInfoFromAPI[] = []
         if (Array.isArray(payload)) {
@@ -105,12 +124,14 @@ export class UserAPIService {
         }
         
         if (users.length > 0) {
+          console.log(`✅ Got ${users.length} users from /api/users/list. First user:`, users[0])
           return users
         }
       } catch (error) {
-        console.warn('UserAPIService.getAll(/api/users/list) also failed:', error)
+        console.warn('⚠️ UserAPIService.getAll(/api/users/list) also failed:', error instanceof Error ? error.message : error)
       }
 
+      console.warn('❌ Both endpoints returned empty or error')
       return []
     } catch (error) {
       console.warn('UserAPIService.getAll failed:', error)
