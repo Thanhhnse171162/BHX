@@ -359,8 +359,8 @@ export default function DashboardPage() {
 
       const headers: HeadersInit = { Authorization: `Bearer ${token}` }
       const baseParams = new URLSearchParams()
+      // Remove unsupported params: only send period (like remote version does)
       baseParams.set('period', 'LAST_7_DAYS')
-      baseParams.set('groupBy', 'DAY')
 
       // Fetch revenue trend
       const fetchRevenueTrend = fetch(
@@ -394,7 +394,7 @@ export default function DashboardPage() {
 
       // Fetch inventory summary
       const fetchInventory = fetch(
-        `/api/reports/inventory-summary?${baseParams.toString()}`,
+        `/api/inventory?${baseParams.toString()}`,
         { headers, signal: AbortSignal.timeout(10000) }
       )
         .then(res => {
