@@ -161,7 +161,7 @@ export default function StoreManagerDashboard() {
     const initStores = async () => {
       try {
         const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
-        const res = await fetch('/api/Warehouse/list', { headers })
+        const res = await fetch('/api/warehouse/list', { headers })
         if (res.ok) {
           const data = await res.json()
           const storeList = Array.isArray(data) ? data : data.data || []
