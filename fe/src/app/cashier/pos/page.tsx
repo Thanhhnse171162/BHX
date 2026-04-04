@@ -365,6 +365,36 @@ export default function POSPage() {
   const scanRef                               = useRef<HTMLInputElement>(null)
   const orderNumber                           = useRef(`#${Math.floor(10000 + Math.random() * 90000)}`)
 
+  // ✅ Initialize state from sessionStorage (persist payment state across navigation)
+  useEffect(() => {
+    if (!hydrated) return
+    try {
+      const savedState = sessionStorage.getItem('pos_payment_state')
+      if (savedState) {
+        const state = JSON.parse(savedState)
+        if (state.paymentResult) setPaymentResult(state.paymentResult)
+        if (state.paymentDisplayStatus) setPaymentDisplayStatus(state.paymentDisplayStatus)
+        if (state.cart && Array.isArray(state.cart) && state.cart.length > 0) setCart(state.cart)
+      }
+    } catch (e) {
+      console.error('Failed to restore payment state:', e)
+    }
+  }, [hydrated])
+
+  // ✅ Persist payment state to sessionStorage whenever it changes
+  useEffect(() => {
+    if (!hydrated) return
+    try {
+      sessionStorage.setItem('pos_payment_state', JSON.stringify({
+        paymentResult,
+        paymentDisplayStatus,
+        cart,
+      }))
+    } catch (e) {
+      console.error('Failed to persist payment state:', e)
+    }
+  }, [paymentResult, paymentDisplayStatus, cart, hydrated])
+
   // Fetch products
   useEffect(() => {
     if (!hydrated) return
@@ -437,6 +467,12 @@ export default function POSPage() {
     setPaymentError(null)
     setPaymentResult(null)
     setPaymentDisplayStatus(null)
+    // ✅ Also clear sessionStorage when clearing order
+    try {
+      sessionStorage.removeItem('pos_payment_state')
+    } catch (e) {
+      console.error('Failed to clear payment state from sessionStorage:', e)
+    }
   }
 
   const handleBarcodeScan = (e: React.FormEvent) => {
@@ -485,6 +521,8 @@ export default function POSPage() {
         } : prev)
         if (isPaymentCompleted(latest)) {
           setPaymentDisplayStatus('COMPLETE')
+          // ✅ Clear cart when payment is confirmed completed
+          setCart([])
           setIsPollingPayment(false)
         }
       } catch { /* keep polling silently */ }
@@ -608,16 +646,20 @@ export default function POSPage() {
       if (!response.ok) throw new Error(extractApiErrorMessage(result))
       const sale = result as SimpleSaleResponse
       setPaymentResult(sale)
-      setPaymentDisplayStatus(
-        paymentMethod === 'MOMO'
-          ? (isPaymentCompleted(sale) ? 'COMPLETE' : 'PENDING')
-          : 'PAID'
-      )
-      setCart([])
+      const displayStatus = paymentMethod === 'MOMO'
+        ? (isPaymentCompleted(sale) ? 'COMPLETE' : 'PENDING')
+        : 'PAID'
+      setPaymentDisplayStatus(displayStatus)
+      // ✅ Only clear cart if payment is immediately complete (CASH) or already paid
+      if (displayStatus !== 'PENDING') {
+        setCart([])
+      }
     } catch (err: unknown) {
       setPaymentError((err as Error)?.message || 'Không thể thanh toán. Vui lòng thử lại.')
     } finally {
       setSubmittingPayment(false)
+    }
+  }
     }
   }
 
