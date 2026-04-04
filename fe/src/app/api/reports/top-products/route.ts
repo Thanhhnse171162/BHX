@@ -32,17 +32,18 @@ export async function GET(request: NextRequest) {
       toDate,
     })
 
-    // Build query string - try with all params first
+    // Build query string - only use topN if provided, skip storeId, period, range
+    // Backend API accepts minimal params
     let queryParams = new URLSearchParams()
     if (topN) queryParams.append('topN', topN)
-    if (storeId) queryParams.append('storeId', storeId)
-    if (period) queryParams.append('period', period)
-    if (range) queryParams.append('range', range)
-    if (fromDate) queryParams.append('fromDate', fromDate)
-    if (toDate) queryParams.append('toDate', toDate)
+    // Note: Don't send storeId, period, range - backend doesn't support them
 
     let url = `${REPORTS_SERVICE_URL}/api/reports/top-products?${queryParams.toString()}`
-    console.log('📊 [Top Products API] First attempt URL:', url)
+    if (!topN) {
+      // If no topN, don't add query string at all
+      url = `${REPORTS_SERVICE_URL}/api/reports/top-products`
+    }
+    console.log('📊 [Top Products API] Calling backend URL:', url)
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -51,39 +52,30 @@ export async function GET(request: NextRequest) {
       headers['Authorization'] = authHeader
     }
 
-    let response = await axios.get(url, { headers })
-    console.log('📊 [Top Products API] Backend response status:', response.status)
-    console.log('📊 [Top Products API] Backend response type:', Array.isArray(response.data) ? 'array' : typeof response.data)
-    console.log('📊 [Top Products API] Response data:', JSON.stringify(response.data).substring(0, 500))
-
-    // If we got a response, return it
-    if (response.data && (Array.isArray(response.data) ? response.data.length > 0 : Object.keys(response.data).length > 0)) {
-      console.log('✅ [Top Products API] Returning response with', Array.isArray(response.data) ? response.data.length : 'data')
-      return NextResponse.json(response.data)
-    }
-
-    // If response is empty/invalid, try without storeId as fallback
-    if (storeId) {
-      console.log('⚠️ [Top Products API] Response was empty/invalid, retrying without storeId...')
-      queryParams = new URLSearchParams()
-      if (topN) queryParams.append('topN', topN)
-      if (period) queryParams.append('period', period)
-      if (range) queryParams.append('range', range)
-      if (fromDate) queryParams.append('fromDate', fromDate)
-      if (toDate) queryParams.append('toDate', toDate)
-
-      url = `${REPORTS_SERVICE_URL}/api/reports/top-products?${queryParams.toString()}`
-      console.log('📊 [Top Products API] Retry URL (without storeId):', url)
+    try {
+      let response = await axios.get(url, { headers })
+      console.log('📊 [Top Products API] Success! Response status:', response.status)
+      console.log('📊 [Top Products API] Response has', Array.isArray(response.data) ? response.data.length : '?', 'items')
       
-      const retryResponse = await axios.get(url, { headers })
-      console.log('📊 [Top Products API] Retry response status:', retryResponse.status)
-      return NextResponse.json(retryResponse.data)
+      if (response.data) {
+        return NextResponse.json(response.data)
+      }
+    } catch (axiosError: any) {
+      console.error('❌ [Top Products API] Backend error:', {
+        status: axiosError.response?.status,
+        statusText: axiosError.response?.statusText,
+        message: axiosError.message,
+        data: axiosError.response?.data,
+        url: url,
+      })
     }
 
-    return NextResponse.json(response.data)
+    // If request failed, return empty array with 200 status (don't break UI)
+    console.log('⚠️ [Top Products API] Returning empty array')
+    return NextResponse.json([])
   } catch (error: any) {
-    console.error('❌ [Top Products API] Failed to fetch:', error.message)
-    console.error('❌ [Top Products API] Full error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('❌ [Top Products API] Unexpected error:', error.message)
+    // Return empty array instead of error to prevent UI breaking
+    return NextResponse.json([])
   }
 }
