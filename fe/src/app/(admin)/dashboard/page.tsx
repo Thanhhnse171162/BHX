@@ -532,12 +532,21 @@ export default function DashboardPage() {
     async function loadRevenueTrend() {
       try {
         const token = useAuthStore.getState().token
-        const headers: HeadersInit = {}
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`
+        if (!token) {
+          console.warn('No token available for revenue trend request')
+          return
         }
 
-        const response = await fetch('/api/reports/revenue-trend?period=LAST_7_DAYS&groupBy=DAY', { headers })
+        const headers: HeadersInit = { Authorization: `Bearer ${token}` }
+        const params = new URLSearchParams()
+        params.set('period', 'LAST_7_DAYS')
+        params.set('groupBy', 'DAY')
+
+        const response = await fetch(`/api/reports/revenue-trend?${params.toString()}`, { 
+          headers,
+          signal: AbortSignal.timeout(10000)
+        })
+        
         if (response.ok) {
           const data = await response.json()
           const trendData = Array.isArray(data) ? data : data?.data || []
@@ -558,20 +567,18 @@ export default function DashboardPage() {
           }
         } else {
           console.error(`[Revenue Trend API] Error: ${response.status} ${response.statusText}`)
-          // Use fallback data when API fails
           setChartData({
-            tuan:    [2500, 3000, 2800, 3200, 2900, 3100, 2700],
-            ngay:    [2700],
-            hom_qua: [3100],
+            tuan:    [],
+            ngay:    [],
+            hom_qua: [],
           })
         }
       } catch (error) {
         console.error('Failed to load revenue trend:', error)
-        // Use fallback data on network error
         setChartData({
-          tuan:    [2500, 3000, 2800, 3200, 2900, 3100, 2700],
-          ngay:    [2700],
-          hom_qua: [3100],
+          tuan:    [],
+          ngay:    [],
+          hom_qua: [],
         })
       }
     }
@@ -584,12 +591,20 @@ export default function DashboardPage() {
     async function loadTopProducts() {
       try {
         const token = useAuthStore.getState().token
-        const headers: HeadersInit = {}
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`
+        if (!token) {
+          console.warn('No token available for top products request')
+          return
         }
 
-        const response = await fetch('/api/reports/top-products?topN=5', { headers })
+        const headers: HeadersInit = { Authorization: `Bearer ${token}` }
+        const params = new URLSearchParams()
+        params.set('topN', '5')
+
+        const response = await fetch(`/api/reports/top-products?${params.toString()}`, { 
+          headers,
+          signal: AbortSignal.timeout(10000)
+        })
+        
         if (response.ok) {
           const data = await response.json()
           const topProductsData = Array.isArray(data) ? data : data?.data || []
@@ -599,11 +614,11 @@ export default function DashboardPage() {
           const transformedProducts: Product[] = topProductsData.map((item: any) => ({
             icon: '📦',
             name: item.productName || 'Unknown',
-            cat: 'Product', // API doesn't return category
+            cat: 'Product',
             rev: `${(item.revenue || 0).toLocaleString('vi-VN')}đ`,
             qty: String(item.quantitySold || 0),
             detail: {
-              growth: '+0%', // API doesn't have growth data
+              growth: '+0%',
               stores: [],
             }
           }))
@@ -613,97 +628,11 @@ export default function DashboardPage() {
           }
         } else {
           console.error(`[Top Products API] Error: ${response.status} ${response.statusText}`)
-          // Use fallback data when API fails
-          const fallbackProducts: Product[] = [
-            {
-              icon: '📦',
-              name: 'Sản phẩm A',
-              cat: 'Điện tử',
-              rev: '45,000,000đ',
-              qty: '1250',
-              detail: { growth: '+12%', stores: [] },
-            },
-            {
-              icon: '📦',
-              name: 'Sản phẩm B',
-              cat: 'Thực phẩm',
-              rev: '38,500,000đ',
-              qty: '980',
-              detail: { growth: '+8%', stores: [] },
-            },
-            {
-              icon: '📦',
-              name: 'Sản phẩm C',
-              cat: 'Quần áo',
-              rev: '32,200,000đ',
-              qty: '750',
-              detail: { growth: '+5%', stores: [] },
-            },
-            {
-              icon: '📦',
-              name: 'Sản phẩm D',
-              cat: 'Mỹ phẩm',
-              rev: '28,900,000đ',
-              qty: '640',
-              detail: { growth: '+3%', stores: [] },
-            },
-            {
-              icon: '📦',
-              name: 'Sản phẩm E',
-              cat: 'Khác',
-              rev: '24,100,000đ',
-              qty: '520',
-              detail: { growth: '+1%', stores: [] },
-            },
-          ]
-          setTopProducts(fallbackProducts)
+          setTopProducts([])
         }
       } catch (error) {
         console.error('Failed to load top products:', error)
-        // Use fallback data on network error
-        const fallbackProducts: Product[] = [
-          {
-            icon: '📦',
-            name: 'Sản phẩm A',
-            cat: 'Điện tử',
-            rev: '45,000,000đ',
-            qty: '1250',
-            detail: { growth: '+12%', stores: [] },
-          },
-          {
-            icon: '📦',
-            name: 'Sản phẩm B',
-            cat: 'Thực phẩm',
-            rev: '38,500,000đ',
-            qty: '980',
-            detail: { growth: '+8%', stores: [] },
-          },
-          {
-            icon: '📦',
-            name: 'Sản phẩm C',
-            cat: 'Quần áo',
-            rev: '32,200,000đ',
-            qty: '750',
-            detail: { growth: '+5%', stores: [] },
-          },
-          {
-            icon: '📦',
-            name: 'Sản phẩm D',
-            cat: 'Mỹ phẩm',
-            rev: '28,900,000đ',
-            qty: '640',
-            detail: { growth: '+3%', stores: [] },
-          },
-          {
-            icon: '📦',
-            name: 'Sản phẩm E',
-            cat: 'Khác',
-            rev: '24,100,000đ',
-            qty: '520',
-            detail: { growth: '+1%', stores: [] },
-          },
-        ]
-        setTopProducts(fallbackProducts)
+        setTopProducts([])
       }
     }
 
