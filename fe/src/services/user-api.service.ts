@@ -60,7 +60,6 @@ export class UserAPIService {
         return []
       }
 
-      console.log('📍 UserAPIService.getAll() - Trying local /api/users')
       const res = await localApiClient.get('/users')
       const payload = res.data
       
@@ -72,19 +71,12 @@ export class UserAPIService {
       }
       
       if (users.length > 0) {
-        console.log(`✅ Local /api/users returned ${users.length} users`)
         return users
       }
-    } catch (error) {
-      console.warn('❌ Local /api/users failed, trying IAM directly:', error)
-    }
 
-    // Fallback: Call IAM directly from frontend (has auth token)
-    try {
-      console.log('📍 Falling back to IAM service (direct)')
-      return await this.getIamUsersList()
-    } catch (iamError) {
-      console.error('❌ IAM users also failed:', iamError)
+      return users
+    } catch (error) {
+      console.warn('UserAPIService.getAll failed:', error)
       return []
     }
   }
@@ -107,16 +99,11 @@ export class UserAPIService {
       // If we got here and payload exists, it's valid
       if (payload && Object.keys(payload).length > 0) return payload as UserInfoFromAPI
     } catch (error) {
-      console.warn(`Local user endpoint failed for ${id}, trying IAM:`, error)
-    }
-
-    // Fall back to IAM endpoint
-    try {
-      return await this.getIamDetailsById(id)
-    } catch (error) {
-      console.error(`Error fetching user ${id} from IAM:`, error)
+      console.warn(`UserAPIService.getById failed for ${id}:`, error)
       return null
     }
+
+    return null
   }
 
   static async getIamDetailsById(id: string): Promise<UserInfoFromAPI | null> {
@@ -149,41 +136,37 @@ export class UserAPIService {
         return []
       }
 
-      console.log('📍 Trying IAM proxy endpoint: /api/users/list')
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       }
 
-      const res = await fetch('/api/users/list', {
-        method: 'GET',
-        headers,
-        credentials: 'include',
-      })
+      const tryFetch = async (url: string) => {
+        const res = await fetch(url, {
+          method: 'GET',
+          headers,
+          credentials: 'include',
+        })
 
-      console.log(`   Response status: ${res.status}`)
-
-      if (res.ok) {
-        const payload = await res.json().catch(() => null)
-        let users: UserInfoFromAPI[] = []
-
-        if (Array.isArray(payload)) {
-          users = payload
-        } else if (payload?.data && Array.isArray(payload.data)) {
-          users = payload.data
+        if (!res.ok) {
+          return null
         }
 
-        console.log(`✅ IAM proxy endpoint returned ${users.length} users`)
-        return users
+        const payload = await res.json().catch(() => null)
+        if (Array.isArray(payload)) return payload as UserInfoFromAPI[]
+        if (payload?.data && Array.isArray(payload.data)) return payload.data as UserInfoFromAPI[]
+        return []
       }
 
-      const statusText = await res.text().catch(() => '')
-      console.warn(`⚠️ IAM proxy endpoint returned status ${res.status}`)
-      if (statusText) console.warn(`   Error: ${statusText.substring(0, 100)}`)
+      const usersFromUsers = await tryFetch('/api/users')
+      if (usersFromUsers) return usersFromUsers
+
+      const usersFromList = await tryFetch('/api/users/list')
+      if (usersFromList) return usersFromList
 
       return []
     } catch (error) {
-      console.error('❌ getIamUsersList error:', error)
+      console.warn('getIamUsersList failed:', error)
       return []
     }
   }

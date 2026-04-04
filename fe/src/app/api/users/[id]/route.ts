@@ -4,12 +4,14 @@ const IAM_SERVICE_URL = process.env.NEXT_PUBLIC_IAM_URL || 'http://13.229.29.52:
 
 async function proxyIamRequest(request: NextRequest, path: string, init: RequestInit = {}) {
   const authHeader = request.headers.get('authorization') || ''
+  const cookieToken = request.cookies.get('auth_token')?.value
+  const authorization = authHeader || (cookieToken ? `Bearer ${cookieToken}` : '')
 
   const response = await fetch(`${IAM_SERVICE_URL}${path}`, {
     ...init,
     headers: {
       ...(init.headers || {}),
-      Authorization: authHeader,
+      Authorization: authorization,
     },
   })
 
