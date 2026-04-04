@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(response.data)
   } catch (error: any) {
-    console.error('Failed to fetch revenue trend:', error.message)
+    console.error('❌ [Revenue Trend API] Failed to fetch:', error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

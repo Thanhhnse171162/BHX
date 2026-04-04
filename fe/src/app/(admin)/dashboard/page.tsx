@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { WarehouseAPIService } from '@/services/warehouse-api.service'
+import { useAuthStore } from '@/store/auth.store'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -530,7 +531,22 @@ export default function DashboardPage() {
   useEffect(() => {
     async function loadRevenueTrend() {
       try {
-        const response = await fetch('/api/reports/revenue-trend?period=LAST_7_DAYS&groupBy=DAY')
+        const token = useAuthStore.getState().token
+        if (!token) {
+          console.warn('No token available for revenue trend request')
+          return
+        }
+
+        const headers: HeadersInit = { Authorization: `Bearer ${token}` }
+        const params = new URLSearchParams()
+        params.set('period', 'LAST_7_DAYS')
+        params.set('groupBy', 'DAY')
+
+        const response = await fetch(`/api/reports/revenue-trend?${params.toString()}`, { 
+          headers,
+          signal: AbortSignal.timeout(10000)
+        })
+        
         if (response.ok) {
           const data = await response.json()
           const trendData = Array.isArray(data) ? data : data?.data || []
@@ -549,9 +565,21 @@ export default function DashboardPage() {
               hom_qua: [revenueValues[revenueValues.length - 2]],
             })
           }
+        } else {
+          console.error(`[Revenue Trend API] Error: ${response.status} ${response.statusText}`)
+          setChartData({
+            tuan:    [],
+            ngay:    [],
+            hom_qua: [],
+          })
         }
       } catch (error) {
         console.error('Failed to load revenue trend:', error)
+        setChartData({
+          tuan:    [],
+          ngay:    [],
+          hom_qua: [],
+        })
       }
     }
 
@@ -562,7 +590,21 @@ export default function DashboardPage() {
   useEffect(() => {
     async function loadTopProducts() {
       try {
-        const response = await fetch('/api/reports/top-products?topN=5')
+        const token = useAuthStore.getState().token
+        if (!token) {
+          console.warn('No token available for top products request')
+          return
+        }
+
+        const headers: HeadersInit = { Authorization: `Bearer ${token}` }
+        const params = new URLSearchParams()
+        params.set('topN', '5')
+
+        const response = await fetch(`/api/reports/top-products?${params.toString()}`, { 
+          headers,
+          signal: AbortSignal.timeout(10000)
+        })
+        
         if (response.ok) {
           const data = await response.json()
           const topProductsData = Array.isArray(data) ? data : data?.data || []
@@ -572,11 +614,11 @@ export default function DashboardPage() {
           const transformedProducts: Product[] = topProductsData.map((item: any) => ({
             icon: '📦',
             name: item.productName || 'Unknown',
-            cat: 'Product', // API doesn't return category
+            cat: 'Product',
             rev: `${(item.revenue || 0).toLocaleString('vi-VN')}đ`,
             qty: String(item.quantitySold || 0),
             detail: {
-              growth: '+0%', // API doesn't have growth data
+              growth: '+0%',
               stores: [],
             }
           }))
@@ -584,9 +626,13 @@ export default function DashboardPage() {
           if (transformedProducts.length > 0) {
             setTopProducts(transformedProducts)
           }
+        } else {
+          console.error(`[Top Products API] Error: ${response.status} ${response.statusText}`)
+          setTopProducts([])
         }
       } catch (error) {
         console.error('Failed to load top products:', error)
+        setTopProducts([])
       }
     }
 
