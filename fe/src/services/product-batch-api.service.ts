@@ -1,4 +1,5 @@
 import { localApiClient } from '@/shared/api/http'
+import { useAuthStore } from '@/store/auth.store'
 
 export interface ProductBatchFromAPI {
   id: string
@@ -110,12 +111,23 @@ export class ProductBatchAPIService {
 
   static async adjustBatchQuantity(body: AdjustBatchQuantityDTO): Promise<boolean> {
     try {
-      const response = await localApiClient.post(`/ProductBatch/batch/adjust-quantity`, {
-        batchId: body.batchId,
-        actualQuantity: body.actualQuantity,
-        locationType: body.locationType,
-        locationId: body.locationId,
-        reason: body.reason,
+      // ProductBatch API is on port 5003, not the default API_BASE_URL port
+      const baseURL = typeof window !== 'undefined' ? 'http://13.229.29.52:5003' : process.env.NEXT_PUBLIC_INVENTORY_URL || 'http://13.229.29.52:5003'
+      const token = typeof window !== 'undefined' ? (useAuthStore.getState?.().token || '') : ''
+      
+      const response = await fetch(`${baseURL}/api/ProductBatch/batch/adjust-quantity`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          batchId: body.batchId,
+          actualQuantity: body.actualQuantity,
+          locationType: body.locationType,
+          locationId: body.locationId,
+          reason: body.reason,
+        }),
       })
       return response.status >= 200 && response.status < 300
     } catch (error) {
