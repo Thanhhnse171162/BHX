@@ -305,7 +305,7 @@ export default function WarehouseManagerDashboard() {
               <p className="text-sm text-gray-600 mt-1">5 yêu cầu cấp hàng mới nhất</p>
             </div>
             <button
-              onClick={() => router.push('/warehouse-manager/replenishment-admin')}
+              onClick={() => router.push('/warehouse-manager/requests')}
               className="flex items-center gap-2 px-3 py-2 text-[#2d6e3e] hover:bg-emerald-50 rounded-lg transition-colors text-sm font-medium"
             >
               Xem tất cả
