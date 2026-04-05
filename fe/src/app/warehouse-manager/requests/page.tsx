@@ -1257,17 +1257,37 @@ export default function WarehouseManagerRequestsPage() {
               >
                 {'<'}
               </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => (
-                <button
-                  key={num}
-                  onClick={() => setPage(num)}
-                  className={`w-8 h-8 rounded-md text-sm font-semibold ${
-                    page === num ? 'bg-[#f97316] text-white' : 'border border-gray-200 text-gray-600'
-                  }`}
-                >
-                  {num}
-                </button>
-              ))}
+              {(() => {
+                const startPage = Math.max(1, page - 2)
+                const endPage = Math.min(totalPages, page + 2)
+                const pages = []
+                
+                if (startPage > 1) pages.push(1)
+                if (startPage > 2) pages.push('...')
+                
+                for (let i = startPage; i <= endPage; i++) {
+                  pages.push(i)
+                }
+                
+                if (endPage < totalPages - 1) pages.push('...')
+                if (endPage < totalPages) pages.push(totalPages)
+                
+                return pages.map((num, idx) => (
+                  typeof num === 'string' ? (
+                    <span key={`ellipsis-${idx}`} className="text-gray-400">...</span>
+                  ) : (
+                    <button
+                      key={num}
+                      onClick={() => setPage(num)}
+                      className={`w-8 h-8 rounded-md text-sm font-semibold ${
+                        page === num ? 'bg-[#f97316] text-white' : 'border border-gray-200 text-gray-600'
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  )
+                ))
+              })()}
               <button
                 onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
                 className="w-8 h-8 rounded-md border border-gray-200 text-gray-500 disabled:opacity-40"
@@ -1471,17 +1491,37 @@ export default function WarehouseManagerRequestsPage() {
               >
                 {'<'}
               </button>
-              {Array.from({ length: incomingDerived.totalPages }, (_, i) => i + 1).slice(0, 7).map((num) => (
-                <button
-                  key={num}
-                  onClick={() => setIncomingPage(num)}
-                  className={`w-8 h-8 rounded-md text-sm font-semibold ${
-                    incomingDerived.page === num ? 'bg-[#f97316] text-white' : 'border border-gray-200 text-gray-600'
-                  }`}
-                >
-                  {num}
-                </button>
-              ))}
+              {(() => {
+                const startPage = Math.max(1, incomingDerived.page - 2)
+                const endPage = Math.min(incomingDerived.totalPages, incomingDerived.page + 2)
+                const pages = []
+                
+                if (startPage > 1) pages.push(1)
+                if (startPage > 2) pages.push('...')
+                
+                for (let i = startPage; i <= endPage; i++) {
+                  pages.push(i)
+                }
+                
+                if (endPage < incomingDerived.totalPages - 1) pages.push('...')
+                if (endPage < incomingDerived.totalPages) pages.push(incomingDerived.totalPages)
+                
+                return pages.map((num, idx) => (
+                  typeof num === 'string' ? (
+                    <span key={`ellipsis-${idx}`} className="text-gray-400">...</span>
+                  ) : (
+                    <button
+                      key={num}
+                      onClick={() => setIncomingPage(num)}
+                      className={`w-8 h-8 rounded-md text-sm font-semibold ${
+                        incomingDerived.page === num ? 'bg-[#f97316] text-white' : 'border border-gray-200 text-gray-600'
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  )
+                ))
+              })()}
               <button
                 onClick={() => setIncomingPage((p) => Math.min(incomingDerived.totalPages, p + 1))}
                 className="w-8 h-8 rounded-md border border-gray-200 text-gray-500 disabled:opacity-40"
