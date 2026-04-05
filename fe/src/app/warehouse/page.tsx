@@ -279,7 +279,7 @@ export default function WarehouseDashboard() {
       const dailyMap = new Map<string, WeeklyDataPoint>()
       const today = new Date()
 
-      for (let offset = 5; offset >= 0; offset -= 1) {
+      for (let offset = 6; offset >= 0; offset -= 1) {
         const date = new Date(today)
         date.setDate(today.getDate() - offset)
         const key = date.toISOString().slice(0, 10)
