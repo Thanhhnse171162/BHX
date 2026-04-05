@@ -125,13 +125,6 @@ function LineChart({ data }: { data: number[] }) {
     return DAY_LABELS[slotIndex] || `Ngày ${slotIndex + 1}`
   }
   
-  // Get label for data point (used when showing data)
-  const getDataLabel = (dataIndex: number) => {
-    if (data.length === 1) return 'Hôm nay'
-    if (data.length === 2) return dataIndex === 0 ? 'Hôm qua' : 'Hôm nay'
-    return DAY_LABELS[dataIndex] || `Ngày ${dataIndex + 1}`
-  }
-  
   // Generate points for the line - only for data that exists
   const points = data.map((val, dataIndex) => {
     const slotIndex = slotMapping[dataIndex]
