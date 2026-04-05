@@ -21,8 +21,10 @@ interface DamageReportView {
   quality: number
   status: StatusType
   reportedBy?: string
+  reportedByName?: string
   reportedDate: string
   approvedBy?: string
+  approvedByName?: string
   approvedDate?: string
   description: string
   photos: string[]
@@ -158,8 +160,10 @@ function mapReportToView(report: DamageReportFromAPI, products: ProductFromAPI[]
     quality: Number(report.quality || 0),
     status: normalizeStatus(report.status),
     reportedBy: report.reportedBy || undefined,
+    reportedByName: report.reportedByName || undefined,
     reportedDate: report.reportedDate || report.createdAt || '',
     approvedBy: report.approvedBy || undefined,
+    approvedByName: report.approvedByName || undefined,
     approvedDate: report.approvedDate || undefined,
     description: String(report.description || ''),
     photos: extractReportPhotos(report),
@@ -193,6 +197,7 @@ function DetailModal({
           ...report,
           status: normalizeStatus(approvedData.status),
           approvedBy: approvedData.approvedBy || report.approvedBy,
+          approvedByName: approvedData.approvedByName || report.approvedByName,
           approvedDate: approvedData.approvedDate || report.approvedDate,
         }
         onApproved?.(updatedReport)
@@ -205,23 +210,31 @@ function DetailModal({
     }
   }
 
-  const getDisplayName = (id: string | undefined): React.ReactNode => {
+  const getDisplayName = (id: string | undefined, name: string | undefined): React.ReactNode => {
+    // If we already have the name from the API, use it
+    if (name && name.trim()) {
+      return name.trim()
+    }
+    
+    // Otherwise, try to look it up from the map
     if (!id) return <span className="text-slate-400">—</span>
     
     // Try exact match first
-    let name = userNameMap.get(id)
+    let foundName = userNameMap.get(id)
     
     // Try case-insensitive match if exact match fails
-    if (!name) {
+    if (!foundName) {
       for (const [key, value] of userNameMap) {
         if (key.toLowerCase() === id.toLowerCase()) {
-          name = value
+          foundName = value
           break
         }
       }
     }
     
-    return name || id
+    console.log('[getDisplayName] Looking up id:', id, '| provided name:', name, '| found name:', foundName, '| map size:', userNameMap.size)
+    
+    return foundName || id
   }
 
   return (
@@ -247,8 +260,8 @@ function DetailModal({
               { label: 'Loại thiệt hại', value: <DamageTypeBadge type={report.damageType} /> },
               { label: 'Trạng thái', value: <StatusBadge status={report.status} /> },
               { label: 'Số lượng', value: report.quality },
-              { label: 'Người báo cáo', value: getDisplayName(report.reportedBy) },
-              { label: 'Người duyệt', value: getDisplayName(report.approvedBy) },
+              { label: 'Người báo cáo', value: getDisplayName(report.reportedBy, report.reportedByName) },
+              { label: 'Người duyệt', value: getDisplayName(report.approvedBy, report.approvedByName) },
               { label: 'Ngày duyệt', value: report.approvedDate ? formatDateTime(report.approvedDate) : <span className="text-slate-400">—</span> },
             ].map(({ label, value }) => (
               <div key={label} className="bg-slate-50 rounded-xl p-3">
@@ -553,7 +566,8 @@ export default function DamageReportsPage() {
         ])
 
         setProducts(productRows)
-        setReports(reportRows.map((row) => mapReportToView(row, productRows)))
+        const mappedReports = reportRows.map((row) => mapReportToView(row, productRows))
+        setReports(mappedReports)
 
         // Build user name map
         const idToNameMap = new Map<string, string>()

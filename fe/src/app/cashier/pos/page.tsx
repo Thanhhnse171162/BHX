@@ -9,7 +9,6 @@ import {
 } from 'lucide-react'
 import { ProductAPIService, ProductFromAPI } from '@/services/product-api.service'
 import { InventoryAPIService, InventoryItem } from '@/services/inventory-api.service'
-import { ReportsAPIService, ManagerDashboardResponse } from '@/services/reports-api.service'
 import { useAuthStore } from '@/store/auth.store'
 
 interface Product {
@@ -352,7 +351,6 @@ export default function POSPage() {
   const [products, setProducts]               = useState<Product[]>([])
   const [loadingProducts, setLoadingProducts] = useState(true)
   const [productError, setProductError]       = useState<string | null>(null)
-  const [dashboard, setDashboard]             = useState<ManagerDashboardResponse | null>(null)
   const [query, setQuery]                     = useState('')
   const [category, setCategory]               = useState('Tất cả')
   const [cart, setCart]                       = useState<CartItem[]>([])
@@ -441,26 +439,6 @@ export default function POSPage() {
 
     return () => { cancelled = true }
   }, [hydrated, user?.workplaceId, user?.workplaceType])
-
-  // Fetch dashboard data
-  useEffect(() => {
-    if (!hydrated) return
-    let cancelled = false
-
-    const fetchDashboard = async () => {
-      try {
-        const data = await ReportsAPIService.getManagerDashboard()
-        if (!cancelled) setDashboard(data)
-      } catch (err: unknown) {
-        if (!cancelled) {
-          console.error('Error fetching dashboard:', err)
-        }
-      }
-    }
-
-    fetchDashboard()
-    return () => { cancelled = true }
-  }, [hydrated])
 
   useEffect(() => { if (scanning) scanRef.current?.focus() }, [scanning])
 
@@ -827,39 +805,6 @@ export default function POSPage() {
             Xóa đơn
           </button>
         </div>
-
-        {/* Dashboard Widget */}
-        {dashboard && (
-          <div className="px-5 py-3 border-b border-gray-100 bg-gradient-to-br from-green-50 to-blue-50">
-            <p className="text-xs font-semibold text-gray-700 mb-3">Dashboard (7 ngày)</p>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-white rounded-lg p-2.5 border border-green-100">
-                <p className="text-[11px] text-gray-500 font-medium">Doanh thu</p>
-                <p className="text-sm font-bold text-green-700 mt-1">
-                  {fmt(dashboard.revenue.totalRevenue)}
-                </p>
-              </div>
-              <div className="bg-white rounded-lg p-2.5 border border-blue-100">
-                <p className="text-[11px] text-gray-500 font-medium">Đơn hàng</p>
-                <p className="text-sm font-bold text-blue-700 mt-1">
-                  {dashboard.revenue.totalOrders}
-                </p>
-              </div>
-              <div className="bg-white rounded-lg p-2.5 border border-orange-100">
-                <p className="text-[11px] text-gray-500 font-medium">Sản phẩm bán</p>
-                <p className="text-sm font-bold text-orange-700 mt-1">
-                  {dashboard.revenue.totalProductsSold}
-                </p>
-              </div>
-              <div className="bg-white rounded-lg p-2.5 border border-red-100">
-                <p className="text-[11px] text-gray-500 font-medium">Hết hàng</p>
-                <p className="text-sm font-bold text-red-700 mt-1">
-                  {dashboard.inventorySummary.outOfStock}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Cart items */}
         <div className="flex-1 overflow-y-auto px-3 py-2">

@@ -25,32 +25,37 @@ function getForwardAuthHeader(request: NextRequest): string {
 
 function isToday(dateStr: string): boolean {
   try {
-    // Parse date string more robustly
-    // Handle formats like: "2026-04-02T10:30:00", "2026-04-02", "2026-04-02T10:30:00Z", etc.
+    if (!dateStr) return false
+
     let date: Date
-    
-    if (dateStr.includes('T')) {
-      // ISO format with time
+
+    // Try parsing as ISO string first
+    if (typeof dateStr === 'string' && (dateStr.includes('T') || dateStr.includes('Z'))) {
       date = new Date(dateStr)
-    } else {
+    } else if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
       // Date-only format (YYYY-MM-DD)
-      // Parse manually to avoid timezone issues
       const [year, month, day] = dateStr.split('-').map(Number)
       if (!year || !month || !day) return false
-      date = new Date(year, month - 1, day)
+      // Create date at midnight to avoid timezone issues
+      date = new Date(year, month - 1, day, 0, 0, 0, 0)
+    } else {
+      return false
     }
 
     if (isNaN(date.getTime())) return false
 
+    // Get today's date at midnight (local timezone)
     const today = new Date()
+    today.setHours(0, 0, 0, 0)
 
-    // Compare using local dates to avoid timezone issues
-    return (
-      date.getFullYear() === today.getFullYear() &&
-      date.getMonth() === today.getMonth() &&
-      date.getDate() === today.getDate()
-    )
-  } catch {
+    // Get the passed date at midnight
+    const compareDate = new Date(date)
+    compareDate.setHours(0, 0, 0, 0)
+
+    // Compare timestamps
+    return compareDate.getTime() === today.getTime()
+  } catch (error) {
+    console.error('[DEBUG] Error in isToday:', error, 'dateStr:', dateStr)
     return false
   }
 }
@@ -86,20 +91,32 @@ export async function GET(request: NextRequest) {
           const data = response.data
           const sales = Array.isArray(data) ? data : data?.data || []
 
-          // Count total items sold today
+          if (sales.length > 0) {
+            console.log('[DEBUG] Sample sale data:', JSON.stringify(sales[0], null, 2))
+            console.log('[DEBUG] First few saleDate values:', sales.slice(0, 3).map((s: SaleFromApi) => s.saleDate))
+            console.log('[DEBUG] Today date:', new Date().toISOString())
+          }
+
+          // Count total items sold today - matching invoices/list logic
           count = sales
-            .filter((sale: SaleFromApi) => isToday(sale.saleDate))
+            .filter((sale: SaleFromApi) => {
+              const isT = isToday(sale.saleDate)
+              console.log(`[DEBUG] Sale ${sale.id} saleDate=${sale.saleDate} isToday=${isT}`)
+              return isT
+            })
             .reduce((total: number, sale: SaleFromApi) => {
-              // Try multiple possible field names for items/products
+              // Try multiple possible field names for items/products - same as invoices/list
               const itemsArray = sale.items || (sale as any)?.lineItems || (sale as any)?.products || []
               const itemCount = itemsArray.reduce((sum: number, item: any) => {
-                // Handle various possible quantity field names
+                // Handle various possible quantity field names - same as invoices/list
                 const qty = item.quantity || item.qty || item.amount || item.quantity_ordered || 1
                 return sum + Number(qty)
               }, 0)
+              console.log(`[DEBUG] Sale ${sale.id} itemCount=${itemCount}`)
               return total + itemCount
             }, 0)
 
+          console.log('[DEBUG] Final product count:', count)
           found = true
           break
         }

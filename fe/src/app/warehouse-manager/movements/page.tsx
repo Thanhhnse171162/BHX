@@ -89,11 +89,13 @@ function MovementDetailModal({
   row,
   productNameById,
   batchNameById,
+  batchUnitById,
   onClose,
 }: {
   row: StockMovementFromAPI | null
   productNameById: Record<string, string>
   batchNameById: Record<string, string>
+  batchUnitById: Record<string, string>
   onClose: () => void
 }) {
   if (!row) return null
@@ -157,11 +159,15 @@ function MovementDetailModal({
                     ? batchNameById[normalizeId(item.batchId)] || item.batchId
                     : '—'
 
+                  const unitDisplay = item.batchId
+                    ? batchUnitById[normalizeId(item.batchId)] || item.unit || '—'
+                    : item.unit || '—'
+
                   return (
                     <tr key={item.id} className="border-t border-gray-100">
                     <td className="px-4 py-3 text-gray-800">{productDisplayName}</td>
                     <td className="px-4 py-3 text-gray-600">{batchDisplayName}</td>
-                    <td className="px-4 py-3 text-gray-600">{item.unit || '—'}</td>
+                    <td className="px-4 py-3 text-gray-600">{unitDisplay}</td>
                     <td className="px-4 py-3 text-right text-gray-900 font-semibold">{Number(item.quantity ?? 0).toLocaleString()}</td>
                   </tr>
                   )
@@ -191,6 +197,7 @@ export default function WarehouseManagerMovementsPage() {
   const [rows, setRows] = useState<StockMovementFromAPI[]>([])
   const [productNameById, setProductNameById] = useState<Record<string, string>>({})
   const [batchNameById, setBatchNameById] = useState<Record<string, string>>({})
+  const [batchUnitById, setBatchUnitById] = useState<Record<string, string>>({})
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<UiStatus>('ALL')
@@ -228,12 +235,18 @@ export default function WarehouseManagerMovementsPage() {
       setProductNameById(nextProductNameById)
 
       const nextBatchNameById: Record<string, string> = {}
+      const nextBatchUnitById: Record<string, string> = {}
       for (const batch of batches ?? []) {
         const id = normalizeId((batch as any)?.id)
         const batchNumber = String((batch as any)?.batchNumber ?? '').trim()
-        if (id && batchNumber) nextBatchNameById[id] = batchNumber
+        const unit = String((batch as any)?.unit ?? (batch as any)?.Unit ?? '').trim()
+        if (id && batchNumber) {
+          nextBatchNameById[id] = batchNumber
+          if (unit) nextBatchUnitById[id] = unit
+        }
       }
       setBatchNameById(nextBatchNameById)
+      setBatchUnitById(nextBatchUnitById)
 
       const normalizedWarehouseId = normalizeId(currentWarehouseId)
       const filteredByLocation = (Array.isArray(data) ? data : []).filter((row) => {
@@ -246,6 +259,7 @@ export default function WarehouseManagerMovementsPage() {
       setRows([])
       setProductNameById({})
       setBatchNameById({})
+      setBatchUnitById({})
       setError(err?.response?.data?.message || err?.message || 'Không thể tải dữ liệu di chuyển hàng.')
     } finally {
       setLoading(false)
@@ -510,6 +524,7 @@ export default function WarehouseManagerMovementsPage() {
         row={selected}
         productNameById={productNameById}
         batchNameById={batchNameById}
+        batchUnitById={batchUnitById}
         onClose={() => setSelected(null)}
       />
     </div>
