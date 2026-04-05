@@ -423,6 +423,10 @@ export default function DashboardPage() {
               ngay:    [sevenDayData[6] || 0],
               hom_qua: [sevenDayData[5] || 0],
             })
+            
+            // Calculate and set total revenue
+            const totalRev = revenueValues.reduce((sum: number, val: number) => sum + val, 0)
+            setTotalRevenue(totalRev > 0 ? totalRev : null)
           }
         } else {
           console.error(`[Revenue Trend API] Error: ${response.status} ${response.statusText}`)
@@ -496,6 +500,32 @@ export default function DashboardPage() {
     }
 
     loadTopProducts()
+  }, [])
+
+  // Fetch total inventory stock
+  useEffect(() => {
+    async function loadInventoryData() {
+      try {
+        const response = await fetch('/api/inventory')
+        if (response.ok) {
+          const data = await response.json()
+          const inventoryItems = Array.isArray(data) ? data : data?.data || []
+          
+          // Calculate total quantity
+          const totalQty = inventoryItems.reduce((sum: number, item: any) => {
+            const qty = item.quantity || item.availableQuantity || item.qty || 0
+            return sum + (typeof qty === 'string' ? parseFloat(qty) : qty)
+          }, 0)
+          
+          setTotalStock(totalQty > 0 ? totalQty : 0)
+        }
+      } catch (error) {
+        console.error('Failed to load inventory data:', error)
+        setTotalStock(0)
+      }
+    }
+
+    loadInventoryData()
   }, [])
 
   return (
