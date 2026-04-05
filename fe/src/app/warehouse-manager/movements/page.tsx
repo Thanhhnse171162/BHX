@@ -155,13 +155,15 @@ function MovementDetailModal({
                     productNameById[normalizeId(item.productId)] ||
                     item.productId
 
+                  // Try normalized ID first, then original ID
+                  const batchLookupId = normalizeId(item.batchId || '')
                   const batchDisplayName = item.batchId
-                    ? batchNameById[normalizeId(item.batchId)] || item.batchId
+                    ? (batchNameById[batchLookupId] || batchNameById[item.batchId] || item.batchId)
                     : '—'
 
                   const unitDisplay = item.batchId
-                    ? batchUnitById[normalizeId(item.batchId)] || item.unit || '—'
-                    : item.unit || '—'
+                    ? (batchUnitById[batchLookupId] || batchUnitById[item.batchId] || item.unit || '—')
+                    : (item.unit || '—')
 
                   return (
                     <tr key={item.id} className="border-t border-gray-100">
@@ -234,26 +236,70 @@ export default function WarehouseManagerMovementsPage() {
       }
       setProductNameById(nextProductNameById)
 
+      // Build initial batch mapping from warehouse batch data
       const nextBatchNameById: Record<string, string> = {}
       const nextBatchUnitById: Record<string, string> = {}
       for (const batch of batches ?? []) {
-        const id = normalizeId((batch as any)?.id)
-        const batchNumber = String((batch as any)?.batchNumber ?? '').trim()
+        const batchId = String((batch as any)?.id ?? (batch as any)?.batchId ?? '').trim()
+        const batchNumber = String((batch as any)?.batchNumber ?? (batch as any)?.name ?? '').trim()
         const unit = String((batch as any)?.unit ?? (batch as any)?.Unit ?? '').trim()
-        if (id && batchNumber) {
-          nextBatchNameById[id] = batchNumber
-          if (unit) nextBatchUnitById[id] = unit
+        
+        if (batchId && batchNumber) {
+          const normalizedId = normalizeId(batchId)
+          nextBatchNameById[normalizedId] = batchNumber
+          nextBatchNameById[batchId] = batchNumber // Use original ID too
+          if (unit) {
+            nextBatchUnitById[normalizedId] = unit
+            nextBatchUnitById[batchId] = unit
+          }
         }
       }
-      setBatchNameById(nextBatchNameById)
-      setBatchUnitById(nextBatchUnitById)
 
-      const normalizedWarehouseId = normalizeId(currentWarehouseId)
+      // Extract batch IDs from stock movement items to fill any missing data
+      const missingBatchIds = new Set<string>()
       const filteredByLocation = (Array.isArray(data) ? data : []).filter((row) => {
         const rowLocationId = normalizeId(row.locationId)
         const rowLocationType = normalizeType(row.locationType)
-        return rowLocationId === normalizedWarehouseId && rowLocationType === 'WAREHOUSE'
+        if (rowLocationId === normalizeId(currentWarehouseId) && rowLocationType === 'WAREHOUSE') {
+          // Collect batch IDs from items
+          for (const item of row.items ?? []) {
+            if (item.batchId && !nextBatchNameById[normalizeId(item.batchId)] && !nextBatchNameById[item.batchId]) {
+              missingBatchIds.add(item.batchId)
+            }
+          }
+          return true
+        }
+        return false
       })
+
+      // Try to fetch missing batch details
+      if (missingBatchIds.size > 0) {
+        const batchPromises = Array.from(missingBatchIds).map((batchId) =>
+          ProductBatchAPIService.getById(batchId).catch(() => null)
+        )
+        const batchDetails = await Promise.all(batchPromises)
+        
+        for (const batchDetail of batchDetails) {
+          if (batchDetail) {
+            const batchId = String(batchDetail.id ?? '').trim()
+            const batchNumber = String(batchDetail.batchNumber ?? '').trim()
+            const unit = String(batchDetail.unit ?? batchDetail.Unit ?? '').trim()
+            
+            if (batchId && batchNumber) {
+              const normalizedId = normalizeId(batchId)
+              nextBatchNameById[normalizedId] = batchNumber
+              nextBatchNameById[batchId] = batchNumber
+              if (unit) {
+                nextBatchUnitById[normalizedId] = unit
+                nextBatchUnitById[batchId] = unit
+              }
+            }
+          }
+        }
+      }
+
+      setBatchNameById(nextBatchNameById)
+      setBatchUnitById(nextBatchUnitById)
       setRows(filteredByLocation)
     } catch (err: any) {
       setRows([])
