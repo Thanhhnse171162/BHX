@@ -162,7 +162,7 @@ function LineChart({ data }: { data: number[] }) {
             fill="#9ca3af"
             fontWeight="500"
           >
-            {yVal >= 1000 ? `${(yVal / 1000).toFixed(0)}B` : yVal >= 1 ? `${yVal.toFixed(0)}M` : '0'}
+            {yVal >= 1000 ? `${(yVal / 1000).toFixed(0)}` : yVal >= 1 ? `${yVal.toFixed(0)}M` : '0'}
           </text>
         )
       })}
@@ -216,7 +216,7 @@ function LineChart({ data }: { data: number[] }) {
             fill={PRIMARY}
             fontWeight="700"
           >
-            {p.val >= 1000 ? `${(p.val / 1000).toFixed(1)}B` : p.val >= 1 ? `${p.val}M` : '0'}
+            {p.val >= 1000 ? `${(p.val / 1000).toFixed(1)}` : p.val >= 1 ? `${p.val}M` : '0'}
           </text>
         </g>
       ))}
