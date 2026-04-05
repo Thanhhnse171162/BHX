@@ -60,6 +60,12 @@ export default function ShipmentsApiPage() {
   const [receiveBatchId, setReceiveBatchId] = useState('')
   const [receiveQuantity, setReceiveQuantity] = useState<number>(0)
 
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [editBatch, setEditBatch] = useState<ProductBatchFromAPI | null>(null)
+  const [editQuantity, setEditQuantity] = useState<number>(0)
+  const [editReason, setEditReason] = useState('')
+  const [editLoading, setEditLoading] = useState(false)
+
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
@@ -270,6 +276,42 @@ export default function ShipmentsApiPage() {
     await fetchBatches()
   }
 
+  const openEditModal = (batch: ProductBatchFromAPI) => {
+    setEditBatch(batch)
+    setEditQuantity(Number(batch.quantity || 0))
+    setEditReason('')
+    setIsEditOpen(true)
+  }
+
+  const submitEdit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!editBatch || editQuantity < 0) {
+      showToast('Vui lòng nhập số lượng hợp lệ.')
+      return
+    }
+    setEditLoading(true)
+    try {
+      const ok = await ProductBatchAPIService.adjustBatchQuantity({
+        batchId: editBatch.id,
+        actualQuantity: editQuantity,
+        locationType: 'WAREHOUSE',
+        locationId: workplaceId,
+        reason: editReason.trim(),
+      })
+      setEditLoading(false)
+      if (!ok) {
+        showToast('Chỉnh sửa số lượng thất bại.')
+        return
+      }
+      setIsEditOpen(false)
+      showToast('Chỉnh sửa số lượng và inventory thành công.')
+      await fetchBatches()
+    } catch (err) {
+      setEditLoading(false)
+      showToast(err instanceof Error ? err.message : 'Lỗi khi chỉnh sửa.')
+    }
+  }
+
   const productNameOf = (productId?: string) => {
     const id = normalizeId(productId)
     if (!id) return '—'
@@ -369,6 +411,12 @@ export default function ShipmentsApiPage() {
                         className="px-2.5 py-1 border border-slate-200 rounded-md text-xs hover:bg-slate-50"
                       >
                         Chi tiết
+                      </button>
+                      <button
+                        onClick={() => openEditModal(b)}
+                        className="px-2.5 py-1 border border-blue-300 text-blue-700 rounded-md text-xs hover:bg-blue-50"
+                      >
+                        Chỉnh sửa
                       </button>
                       <button
                         onClick={() => openAllocate(b)}
@@ -540,6 +588,50 @@ export default function ShipmentsApiPage() {
               <button type="button" onClick={() => setReceiveOpen(false)} className="px-4 py-2 border rounded-lg text-sm">Hủy</button>
               <button disabled={receiveLoading} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm">
                 {receiveLoading ? 'Đang gửi...' : 'Nhập kho'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {isEditOpen && editBatch && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <form onSubmit={submitEdit} className="w-full max-w-lg bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+            <h3 className="font-semibold text-slate-800">Chỉnh sửa số lượng lô hàng</h3>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm space-y-1">
+              <p><span className="text-slate-500">Mã lô:</span> {editBatch.batchNumber || editBatch.id}</p>
+              <p><span className="text-slate-500">Sản phẩm:</span> {productNameOf(editBatch.productId)}</p>
+              <p><span className="text-slate-500">Kho:</span> {warehouseNameOf(editBatch.warehouseId)}</p>
+              <p>
+                <span className="text-slate-500">Số lượng hiện tại:</span> {Number(editBatch.quantity || 0).toLocaleString()}
+                {unitOf(editBatch) ? ` ${unitOf(editBatch)}` : ''}
+              </p>
+            </div>
+            <div>
+              <label className="text-sm text-slate-600 font-medium">Số lượng thực tế</label>
+              <input
+                type="number"
+                min={0}
+                value={editQuantity}
+                onChange={(e) => setEditQuantity(Number(e.target.value) || 0)}
+                placeholder="Nhập số lượng"
+                className="w-full h-10 border border-slate-200 rounded-lg px-3 text-sm mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-slate-600 font-medium">Lý do / Ghi chú</label>
+              <textarea
+                value={editReason}
+                onChange={(e) => setEditReason(e.target.value)}
+                placeholder="Nhập lý do chỉnh sửa"
+                rows={3}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none mt-1"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button type="button" onClick={() => setIsEditOpen(false)} className="px-4 py-2 border rounded-lg text-sm">Hủy</button>
+              <button disabled={editLoading} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">
+                {editLoading ? 'Đang gửi...' : 'Xác nhận chỉnh sửa'}
               </button>
             </div>
           </form>
