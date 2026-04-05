@@ -494,7 +494,8 @@ export default function DashboardPage() {
 
         const headers: HeadersInit = { Authorization: `Bearer ${token}` }
         const params = new URLSearchParams()
-        // Use actual Period values from API
+        
+        // Map activeTab to API period values
         let periodValue = 'LAST_7_DAYS'
         if (activeTab === 'ngay') periodValue = 'Today'
         else if (activeTab === 'hom_qua') periodValue = 'Yesterday'
@@ -518,21 +519,36 @@ export default function DashboardPage() {
           const revenueValues = overallProducts.map((p: any) => p.revenue || 0)
           
           if (revenueValues.length > 0) {
-            // For weekly view, pad to 7 days if needed
-            let weekData = [...revenueValues]
-            while (weekData.length < 7) {
-              weekData.push(0)
+            if (activeTab === 'tuan') {
+              // For weekly view, pad to 7 days if needed
+              let weekData = [...revenueValues]
+              while (weekData.length < 7) {
+                weekData.push(0)
+              }
+              weekData = weekData.slice(0, 7)
+              
+              setChartData({
+                tuan: weekData,
+                ngay: [],
+                hom_qua: [],
+              })
+            } else if (activeTab === 'ngay') {
+              // For today, just use the revenue values
+              setChartData({
+                tuan: [],
+                ngay: revenueValues,
+                hom_qua: [],
+              })
+            } else if (activeTab === 'hom_qua') {
+              // For yesterday, just use the revenue values
+              setChartData({
+                tuan: [],
+                ngay: [],
+                hom_qua: revenueValues,
+              })
             }
-            weekData = weekData.slice(0, 7)
             
-            // Update chart data with actual API data (no padding for single days)
-            setChartData({
-              tuan:    weekData,
-              ngay:    revenueValues.length > 0 ? [revenueValues[0]] : [],
-              hom_qua: revenueValues.length > 1 ? [revenueValues[1]] : [],
-            })
-            
-            // Calculate and set total revenue
+            // Calculate and set total revenue for current tab
             const totalRev = revenueValues.reduce((sum: number, val: number) => sum + val, 0)
             setTotalRevenue(totalRev > 0 ? totalRev : null)
           }
