@@ -359,9 +359,8 @@ export default function DashboardPage() {
 
       const headers: HeadersInit = { Authorization: `Bearer ${token}` }
       const baseParams = new URLSearchParams()
-      // Send both period and range like store-manager does
       baseParams.set('period', 'LAST_7_DAYS')
-      baseParams.set('range', 'LAST_7_DAYS')
+      baseParams.set('groupBy', 'DAY')
 
       // Fetch revenue trend
       const fetchRevenueTrend = fetch(
@@ -395,7 +394,7 @@ export default function DashboardPage() {
 
       // Fetch inventory summary
       const fetchInventory = fetch(
-        `/api/inventory?${baseParams.toString()}`,
+        `/api/reports/inventory-summary?${baseParams.toString()}`,
         { headers, signal: AbortSignal.timeout(10000) }
       )
         .then(res => {

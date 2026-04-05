@@ -161,9 +161,10 @@ export default function StoreManagerInventoryCheckPage() {
 
     return items.filter((check) => {
       const checkNumber = String(check.checkNumber || '').toLowerCase()
+      const checkId = String(check.id || '').toLowerCase()
       const locationId = String(check.locationId || '').toLowerCase()
       const locationName = String(locationNameMap.get(check.locationId) || '').toLowerCase()
-      return checkNumber.includes(keyword) || locationId.includes(keyword) || locationName.includes(keyword)
+      return checkNumber.includes(keyword) || checkId.includes(keyword) || locationId.includes(keyword) || locationName.includes(keyword)
     })
   }, [items, locationNameMap, search])
 

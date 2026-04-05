@@ -77,6 +77,5 @@ export async function GET(request: NextRequest) {
     console.error('❌ [Revenue Trend API] Unexpected error:', error.message)
     // Return empty array instead of error to prevent UI breaking
     return NextResponse.json([])
-
   }
 }

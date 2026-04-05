@@ -590,7 +590,7 @@ export default function WarehouseRequestsPage() {
   const filtered = useMemo(() => {
     return requests.filter(r => {
       const q = search.toLowerCase()
-      const matchSearch = r.requestNumber.toLowerCase().includes(q) || (r.notes ?? '').toLowerCase().includes(q)
+      const matchSearch = r.requestNumber.toLowerCase().includes(q) || r.id.toLowerCase().includes(q) || (r.notes ?? '').toLowerCase().includes(q)
       const matchStatus = statusFilter === 'ALL' || r.status === statusFilter
       const matchPriority = priorityFilter === 'ALL' || r.priority === priorityFilter
       return matchSearch && matchStatus && matchPriority
@@ -601,6 +601,7 @@ export default function WarehouseRequestsPage() {
     const q = transferSearch.toLowerCase()
     return transfers.filter(t => {
       const matchSearch = t.transferNumber?.toLowerCase().includes(q) ||
+        t.id?.toLowerCase().includes(q) ||
         (t.restockRequestId || '').toLowerCase().includes(q)
       const matchStatus = transferStatusFilter === 'ALL' || t.status === transferStatusFilter
       return matchSearch && matchStatus
