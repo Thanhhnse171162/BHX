@@ -520,27 +520,27 @@ export default function WarehouseDashboard() {
               {chartGeometry.incomingPoints.map((point, index) => (
                 <circle key={`in-${index}`} cx={point.x} cy={point.y} r="3.5" fill="#22C55E" />
               ))}
-            </svg>
 
-            <div className="relative mt-2" style={{ height: '24px' }}>
-              <div className="relative w-full h-full" style={{ paddingLeft: '60px', paddingRight: '40px' }}>
-                {throughputData.map((item, idx) => {
-                  const totalWidth = 1200 - 60 - 40
-                  const step = throughputData.length > 1 ? totalWidth / (throughputData.length - 1) : 0
-                  const offsetPercent = throughputData.length > 1 ? (step * idx) / (1200 - 60 - 40) * 100 : 0
-                  
-                  return (
-                    <span
-                      key={`${item.day}-${idx}`}
-                      className="text-xs text-gray-600 font-medium uppercase absolute transform -translate-x-1/2"
-                      style={{ left: `calc(${offsetPercent}% + 60px)` }}
-                    >
-                      {item.day}
-                    </span>
-                  )
-                })}
-              </div>
-            </div>
+              {/* Day labels below chart */}
+              {throughputData.map((item, idx) => {
+                const step = throughputData.length > 1 ? chartGeometry.drawWidth / (throughputData.length - 1) : 0
+                const x = chartGeometry.leftPad + step * idx
+                return (
+                  <text
+                    key={`day-${idx}`}
+                    x={x}
+                    y={chartGeometry.height - 2}
+                    textAnchor="middle"
+                    fontSize="11"
+                    fill="#6B7280"
+                    fontWeight="500"
+                    className="uppercase text-xs"
+                  >
+                    {item.day}
+                  </text>
+                )
+              })}
+            </svg>
           </div>
         </div>
       </div>

@@ -43,6 +43,12 @@ export interface ExpiredOutboundDTO {
   quantity: number
 }
 
+export interface AdjustBatchQuantityDTO {
+  batchId: string
+  newQuantity: number
+  reason?: string
+}
+
 export class ProductBatchAPIService {
   static async getByWarehouse(warehouseId: string): Promise<ProductBatchFromAPI[]> {
     try {
@@ -96,6 +102,19 @@ export class ProductBatchAPIService {
       return response.status >= 200 && response.status < 300
     } catch (error) {
       console.error('Error creating outbound for expired batch:', error)
+      return false
+    }
+  }
+
+  static async adjustBatchQuantity(body: AdjustBatchQuantityDTO): Promise<boolean> {
+    try {
+      const response = await localApiClient.patch(`/product-batch/${body.batchId}/quantity`, {
+        newQuantity: body.newQuantity,
+        reason: body.reason,
+      })
+      return response.status >= 200 && response.status < 300
+    } catch (error) {
+      console.error('Error adjusting batch quantity:', error)
       return false
     }
   }
