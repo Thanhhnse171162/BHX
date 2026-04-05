@@ -68,19 +68,11 @@ function exportToExcel(storeName: string, dateRange: string, stores: Store[], pr
 // ─── Line Chart ──────────────────────────────────────────────────────────────
 
 function LineChart({ data }: { data: number[] }) {
-  if (!data || data.length === 0) {
-    return (
-      <div className="w-full h-[300px] flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100">
-        <div className="text-center">
-          <div className="text-sm text-gray-400">Không có dữ liệu</div>
-          <div className="text-xs text-gray-300 mt-1">Dữ liệu sẽ hiển thị khi có giao dịch</div>
-        </div>
-      </div>
-    )
-  }
-
-  const max = Math.max(...data, 1)
-  const min = Math.min(...data, 0)
+  // Always show chart - even with no data, show flat line at bottom
+  const displayData = (!data || data.length === 0) ? [] : data
+  
+  const max = displayData.length > 0 ? Math.max(...displayData, 1) : 1
+  const min = displayData.length > 0 ? Math.min(...displayData, 0) : 0
   const range = max - min || 1
   
   // Fixed sizing - always like weekly view
@@ -104,13 +96,13 @@ function LineChart({ data }: { data: number[] }) {
   // Map data to slot indices
   // "Hôm nay" goes to slot 6, "Hôm qua" to slot 5, "Tuần rồi" spreads across all
   let slotMapping: number[] = []
-  if (data.length === 1) {
+  if (displayData.length === 1) {
     // Today - place at the end (slot 6)
     slotMapping = [6]
-  } else if (data.length === 2) {
+  } else if (displayData.length === 2) {
     // Today & Yesterday - place at slots 5 and 6
     slotMapping = [5, 6]
-  } else {
+  } else if (displayData.length > 2) {
     // Weekly - all 7 slots
     slotMapping = [0, 1, 2, 3, 4, 5, 6]
   }
@@ -126,7 +118,7 @@ function LineChart({ data }: { data: number[] }) {
   }
   
   // Generate points for the line - only for data that exists
-  const points = data.map((val, dataIndex) => {
+  const points = displayData.map((val, dataIndex) => {
     const slotIndex = slotMapping[dataIndex]
     const x = allSlotPositions[slotIndex]
     const y = padT + chartH - ((val - min) / range) * chartH
