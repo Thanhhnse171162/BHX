@@ -70,7 +70,7 @@ function exportToExcel(storeName: string, dateRange: string, stores: Store[], pr
 function LineChart({ data }: { data: number[] }) {
   if (!data || data.length === 0) {
     return (
-      <div className="w-full h-[250px] flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100">
+      <div className="w-full h-[300px] flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100">
         <div className="text-center">
           <div className="text-sm text-gray-400">Không có dữ liệu</div>
           <div className="text-xs text-gray-300 mt-1">Dữ liệu sẽ hiển thị khi có giao dịch</div>
@@ -83,69 +83,68 @@ function LineChart({ data }: { data: number[] }) {
   const min = Math.min(...data, 0)
   const range = max - min || 1
   
-  // Responsive sizing
-  let chartH: number
-  let padL: number
-  let padR: number
-  let padB: number
-  let padT: number
-  let pointRadius: number
-  let labelFontSize: number
-  let valueFontSize: number
+  // Fixed sizing - always like weekly view
+  const chartH = 260
+  const padL = 50
+  const padR = 40
+  const padB = 70
+  const padT = 40
+  const pointRadius = 6
+  const labelFontSize = 12
+  const valueFontSize = 13
   
-  if (data.length === 1) {
-    chartH = 220
-    padL = 40
-    padR = 30
-    padB = 60
-    padT = 30
-    pointRadius = 6
-    labelFontSize = 12
-    valueFontSize = 12
-  } else if (data.length === 2) {
-    chartH = 220
-    padL = 40
-    padR = 30
-    padB = 60
-    padT = 30
-    pointRadius = 5
-    labelFontSize = 11
-    valueFontSize = 11
-  } else {
-    // Weekly view
-    chartH = 220
-    padL = 40
-    padR = 30
-    padB = 60
-    padT = 30
-    pointRadius = 4
-    labelFontSize = 10
-    valueFontSize = 10
-  }
-  
-  const chartW = 100 * (data.length - 1 || 1)
+  // Fixed chart width for consistent layout
+  const chartW = 600
   const totalW = padL + chartW + padR
   const totalH = chartH + padB + padT
   
-  // Custom labels
-  const getLabel = (index: number) => {
-    if (data.length === 1) return 'Hôm nay'
-    if (data.length === 2) return index === 0 ? 'Hôm nay' : 'Hôm qua'
-    return DAY_LABELS[index] || `Ngày ${index + 1}`
+  // Always 7 slots (like a week)
+  const numSlots = 7
+  
+  // Map data to slot indices
+  // "Hôm nay" goes to slot 6, "Hôm qua" to slot 5, "Tuần rồi" spreads across all
+  let slotMapping: number[] = []
+  if (data.length === 1) {
+    // Today - place at the end (slot 6)
+    slotMapping = [6]
+  } else if (data.length === 2) {
+    // Today & Yesterday - place at slots 5 and 6
+    slotMapping = [5, 6]
+  } else {
+    // Weekly - all 7 slots
+    slotMapping = [0, 1, 2, 3, 4, 5, 6]
   }
   
-  // Generate points for the line
-  const points = data.map((val, i) => {
-    const x = padL + (chartW > 0 ? (i / (data.length - 1)) * chartW : 0)
+  // Calculate all slot positions
+  const allSlotPositions = Array.from({ length: numSlots }, (_, i) => 
+    padL + (i / (numSlots - 1)) * chartW
+  )
+  
+  // Custom labels for all 7 slots
+  const getSlotLabel = (slotIndex: number) => {
+    return DAY_LABELS[slotIndex] || `Ngày ${slotIndex + 1}`
+  }
+  
+  // Get label for data point (used when showing data)
+  const getDataLabel = (dataIndex: number) => {
+    if (data.length === 1) return 'Hôm nay'
+    if (data.length === 2) return dataIndex === 0 ? 'Hôm qua' : 'Hôm nay'
+    return DAY_LABELS[dataIndex] || `Ngày ${dataIndex + 1}`
+  }
+  
+  // Generate points for the line - only for data that exists
+  const points = data.map((val, dataIndex) => {
+    const slotIndex = slotMapping[dataIndex]
+    const x = allSlotPositions[slotIndex]
     const y = padT + chartH - ((val - min) / range) * chartH
-    return { x, y, val, i }
+    return { x, y, val, dataIndex, slotIndex }
   })
   
   // Build path string
   const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
 
   return (
-    <svg width="100%" viewBox={`0 0 ${totalW} ${totalH}`} style={{ overflow: 'visible' }} className="mx-auto">
+    <svg width="100%" viewBox={`0 0 ${totalW} ${totalH}`} style={{ overflow: 'visible' }} className="mx-auto" preserveAspectRatio="xMidYMid meet">
       {/* Grid lines */}
       {[0, 0.25, 0.5, 0.75, 1].map(ratio => (
         <line
@@ -161,9 +160,9 @@ function LineChart({ data }: { data: number[] }) {
       ))}
       
       {/* Y-axis */}
-      <line x1={padL} y1={padT} x2={padL} y2={padT + chartH} stroke="#e5e7eb" strokeWidth="1" />
+      <line x1={padL} y1={padT} x2={padL} y2={padT + chartH} stroke="#e5e7eb" strokeWidth="1.5" />
       {/* X-axis */}
-      <line x1={padL} y1={padT + chartH} x2={padL + chartW} y2={padT + chartH} stroke="#e5e7eb" strokeWidth="1" />
+      <line x1={padL} y1={padT + chartH} x2={padL + chartW} y2={padT + chartH} stroke="#e5e7eb" strokeWidth="1.5" />
       
       {/* Y-axis labels */}
       {[0, 0.25, 0.5, 0.75, 1].map(ratio => {
@@ -171,30 +170,48 @@ function LineChart({ data }: { data: number[] }) {
         return (
           <text
             key={`ylabel-${ratio}`}
-            x={padL - 8}
-            y={padT + chartH - ratio * chartH + 4}
+            x={padL - 12}
+            y={padT + chartH - ratio * chartH + 5}
             textAnchor="end"
-            fontSize="10"
+            fontSize="11"
             fill="#9ca3af"
+            fontWeight="500"
           >
             {yVal >= 1000 ? `${(yVal / 1000).toFixed(0)}B` : yVal >= 1 ? `${yVal.toFixed(0)}M` : '0'}
           </text>
         )
       })}
       
-      {/* Line path */}
-      <path
-        d={pathD}
-        fill="none"
-        stroke={PRIMARY}
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      {/* All day labels on X-axis */}
+      {allSlotPositions.map((x, slotIndex) => (
+        <text
+          key={`dayLabel-${slotIndex}`}
+          x={x}
+          y={padT + chartH + padB - 20}
+          textAnchor="middle"
+          fontSize={labelFontSize}
+          fill="#9ca3af"
+          fontWeight="500"
+        >
+          {getSlotLabel(slotIndex)}
+        </text>
+      ))}
       
-      {/* Points and labels */}
+      {/* Line path - only if we have more than 1 point */}
+      {points.length > 1 && (
+        <path
+          d={pathD}
+          fill="none"
+          stroke={PRIMARY}
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
+      
+      {/* Points and labels - only for data points */}
       {points.map((p) => (
-        <g key={`point-${p.i}`}>
+        <g key={`point-${p.dataIndex}`}>
           {/* Point circle */}
           <circle
             cx={p.x}
@@ -202,31 +219,19 @@ function LineChart({ data }: { data: number[] }) {
             r={pointRadius}
             fill="#fff"
             stroke={PRIMARY}
-            strokeWidth="2"
+            strokeWidth="2.5"
           />
           
           {/* Value label above point */}
           <text
             x={p.x}
-            y={p.y - 12}
+            y={p.y - 18}
             textAnchor="middle"
             fontSize={valueFontSize}
             fill={PRIMARY}
-            fontWeight="600"
+            fontWeight="700"
           >
             {p.val >= 1000 ? `${(p.val / 1000).toFixed(1)}B` : p.val >= 1 ? `${p.val}M` : '0'}
-          </text>
-          
-          {/* Day label below */}
-          <text
-            x={p.x}
-            y={padT + chartH + padB - 12}
-            textAnchor="middle"
-            fontSize={labelFontSize}
-            fill={PRIMARY}
-            fontWeight="600"
-          >
-            {getLabel(p.i)}
           </text>
         </g>
       ))}
