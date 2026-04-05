@@ -81,50 +81,124 @@ function BarChart({ data }: { data: number[] }) {
     )
   }
 
-  const max    = Math.max(...data)
-  // Responsive sizing based on number of bars
-  const isCompact = data.length <= 2  // Today/Yesterday - single/dual bars
-  const isWeekly = data.length === 7   // Weekly - 7 bars
+  const max = Math.max(...data, 1)
   
-  const chartH = isCompact ? 80 : 120
-  const barW   = isCompact ? 20 : isWeekly ? 20 : 36
-  const gap    = isCompact ? 8 : isWeekly ? 7 : 16
-  const padL   = isCompact ? 15 : isWeekly ? 8 : 6
-  const padB   = isCompact ? 20 : 25
-  const padT   = isCompact ? 15 : 20
-  const totalW = Math.max(padL + data.length * (barW + gap) - gap + 8, isCompact ? 80 : 150)
+  // Responsive sizing based on number of bars
+  const isSingleOrDual = data.length <= 2
+  const isWeekly = data.length === 7
+  
+  // Chart dimensions - single/dual bars should be much larger
+  let chartH: number
+  let barW: number
+  let gap: number
+  let padL: number
+  let padB: number
+  let padT: number
+  let labelFontSize: number
+  let valueFontSize: number
+  
+  if (data.length === 1) {
+    // Single bar - make it prominent
+    chartH = 200
+    barW = 70
+    gap = 12
+    padL = 20
+    padB = 50
+    padT = 20
+    labelFontSize = 12
+    valueFontSize = 12
+  } else if (isSingleOrDual) {
+    // Two bars
+    chartH = 160
+    barW = 55
+    gap = 30
+    padL = 20
+    padB = 50
+    padT = 20
+    labelFontSize = 11
+    valueFontSize = 11
+  } else if (isWeekly) {
+    // Seven bars - optimized for week view
+    chartH = 150
+    barW = 32
+    gap = 10
+    padL = 12
+    padB = 50
+    padT = 20
+    labelFontSize = 10
+    valueFontSize = 10
+  } else {
+    // Default
+    chartH = 140
+    barW = 40
+    gap = 12
+    padL = 15
+    padB = 45
+    padT = 20
+    labelFontSize = 10
+    valueFontSize = 10
+  }
+  
+  const totalW = Math.max(padL + data.length * (barW + gap) - gap + 16, 150)
+  
+  // Custom labels for single/dual bar views
+  const getLabel = (index: number) => {
+    if (data.length === 1) return 'Hôm nay'
+    if (data.length === 2) return index === 0 ? 'Hôm nay' : 'Hôm qua'
+    return DAY_LABELS[index] || `Ngày ${index + 1}`
+  }
 
   return (
-    <svg width="100%" viewBox={`0 0 ${totalW} ${chartH + padB + padT}`} style={{ overflow: 'visible' }}>
+    <svg width="100%" viewBox={`0 0 ${totalW} ${chartH + padB + padT}`} style={{ overflow: 'visible' }} className="mx-auto">
+      {/* Grid lines */}
       {[0, 0.25, 0.5, 0.75, 1].map(ratio => (
         <line
           key={ratio}
-          x1={padL} y1={padT + chartH - ratio * chartH}
-          x2={totalW} y2={padT + chartH - ratio * chartH}
-          stroke="#f0f0f0" strokeWidth="1"
+          x1={padL}
+          y1={padT + chartH - ratio * chartH}
+          x2={totalW - 8}
+          y2={padT + chartH - ratio * chartH}
+          stroke="#f0f0f0"
+          strokeWidth="1"
         />
       ))}
+      
+      {/* Bars and labels */}
       {data.map((val, i) => {
-        const barH     = (val / max) * chartH
-        const x        = padL + i * (barW + gap)
-        const y        = padT + chartH - barH
-        const isLast   = i === data.length - 1
-        const isMax    = val === max
-        const fill     = isLast ? PRIMARY : isMax ? PRIMARY_MID : BAR_DEFAULT
-        const lblColor = isLast || isMax ? PRIMARY : '#9ca3af'
+        const barH = (val / max) * chartH
+        const x = padL + i * (barW + gap)
+        const y = padT + chartH - barH
+        const isMax = val === max
+        const fill = isMax ? PRIMARY : BAR_DEFAULT
+        const lblColor = isMax ? PRIMARY : '#9ca3af'
+        
         return (
           <g key={i}>
-            <rect x={x} y={y} width={barW} height={barH} fill={fill} rx="5" />
-            <text x={x + barW / 2} y={y - 5} textAnchor="middle" fontSize="10" fill={lblColor} fontWeight="500">
-              {val >= 1000 ? `${(val / 1000).toFixed(1)}B` : `${val}M`}
-            </text>
+            {/* Bar */}
+            <rect x={x} y={y} width={barW} height={barH} fill={fill} rx="6" />
+            
+            {/* Value label above bar */}
             <text
-              x={x + barW / 2} y={chartH + padT + padB - 8}
-              textAnchor="middle" fontSize="10"
-              fill={isLast ? PRIMARY : '#9ca3af'}
-              fontWeight={isLast ? '500' : '400'}
+              x={x + barW / 2}
+              y={y - 8}
+              textAnchor="middle"
+              fontSize={valueFontSize}
+              fill={lblColor}
+              fontWeight="600"
             >
-              {DAY_LABELS[i]}
+              {val >= 1000 ? `${(val / 1000).toFixed(1)}B` : val >= 1 ? `${val}M` : '0'}
+            </text>
+            
+            {/* Day label below */}
+            <text
+              x={x + barW / 2}
+              y={chartH + padT + padB - 28}
+              textAnchor="middle"
+              fontSize={labelFontSize}
+              fill={lblColor}
+              fontWeight={isMax ? '600' : '500'}
+            >
+              {getLabel(i)}
             </text>
           </g>
         )
