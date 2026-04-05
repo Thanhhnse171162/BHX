@@ -65,6 +65,13 @@ export default function InventoryAuxPage() {
   const [allocatedQuantity, setAllocatedQuantity] = useState<number>(0)
   const [splitNotes, setSplitNotes] = useState('')
   const [toast, setToast] = useState('')
+  
+  // Edit quantity modal state
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [editBatch, setEditBatch] = useState<ProductBatchFromAPI | null>(null)
+  const [editQuantity, setEditQuantity] = useState<number>(0)
+  const [editReason, setEditReason] = useState('')
+  const [editLoading, setEditLoading] = useState(false)
 
   const workplaceId =
     user?.workplaceId ||
@@ -218,6 +225,42 @@ export default function InventoryAuxPage() {
     await fetchData()
   }
 
+  const openEditModal = (batch: ProductBatchFromAPI) => {
+    setEditBatch(batch)
+    setEditQuantity(Number(batch.quantity || 0))
+    setEditReason('')
+    setIsEditOpen(true)
+  }
+
+  const submitEdit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!editBatch || editQuantity < 0) {
+      showToast('Vui lòng nhập số lượng hợp lệ.')
+      return
+    }
+    setEditLoading(true)
+    try {
+      const ok = await ProductBatchAPIService.adjustBatchQuantity({
+        batchId: editBatch.id,
+        actualQuantity: editQuantity,
+        locationType: 'STORE',
+        locationId: workplaceId,
+        reason: editReason.trim(),
+      })
+      setEditLoading(false)
+      if (!ok) {
+        showToast('Chỉnh sửa số lượng thất bại.')
+        return
+      }
+      setIsEditOpen(false)
+      showToast('Chỉnh sửa số lượng và inventory thành công.')
+      await fetchData()
+    } catch (err) {
+      setEditLoading(false)
+      showToast(err instanceof Error ? err.message : 'Lỗi khi chỉnh sửa.')
+    }
+  }
+
   return (
     <div className="p-6 space-y-4 bg-[#f5f7fb] min-h-screen">
       <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -365,14 +408,24 @@ export default function InventoryAuxPage() {
                         {row.receivedAt ? new Date(row.receivedAt).toLocaleString('vi-VN') : '—'}
                       </td>
                       <td className="py-3 px-4">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openSplitModal(row)}
-                          className="border-green-200 text-green-700 hover:bg-green-50"
-                        >
-                          Tách lô
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openEditModal(row)}
+                            className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                          >
+                            Chỉnh sửa
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openSplitModal(row)}
+                            className="border-green-200 text-green-700 hover:bg-green-50"
+                          >
+                            Tách lô
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -458,6 +511,61 @@ export default function InventoryAuxPage() {
               </Button>
               <Button type="submit" className="bg-[#2d6e3e] hover:bg-[#245a31]" disabled={splitLoading}>
                 {splitLoading ? 'Đang gửi...' : 'Xác nhận tách lô'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {isEditOpen && editBatch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <form onSubmit={submitEdit} className="w-full max-w-xl rounded-xl border border-gray-200 bg-white p-5 space-y-4">
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">Chỉnh sửa số lượng lô hàng</h3>
+              <p className="text-sm text-gray-500 mt-1">Cập nhật số lượng thực tế cho lô hàng.</p>
+            </div>
+
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm space-y-1">
+              <p><span className="text-gray-500">Mã lô:</span> {editBatch.batchNumber || editBatch.id}</p>
+              <p><span className="text-gray-500">Sản phẩm:</span> {productMap[normalizeId(editBatch.productId)]?.name || editBatch.productId}</p>
+              <p>
+                <span className="text-gray-500">Số lượng hiện tại:</span>{' '}
+                {formatNumber(Math.max(0, Number(editBatch.quantity || 0)))}
+                {resolveBatchUnit(editBatch, productMap[normalizeId(editBatch.productId)])
+                  ? ` ${resolveBatchUnit(editBatch, productMap[normalizeId(editBatch.productId)])}`
+                  : ''}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Số lượng thực tế</label>
+              <Input
+                type="number"
+                min={0}
+                value={editQuantity}
+                onChange={(e) => setEditQuantity(Number(e.target.value) || 0)}
+                placeholder="Nhập số lượng"
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Lý do / Ghi chú</label>
+              <textarea
+                value={editReason}
+                onChange={(e) => setEditReason(e.target.value)}
+                placeholder="Nhập lý do chỉnh sửa"
+                rows={3}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
+                Hủy
+              </Button>
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={editLoading}>
+                {editLoading ? 'Đang gửi...' : 'Xác nhận chỉnh sửa'}
               </Button>
             </div>
           </form>

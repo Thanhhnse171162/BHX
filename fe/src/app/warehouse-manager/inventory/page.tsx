@@ -5,7 +5,7 @@ import axios from 'axios'
 import { useAuth } from '@/shared/hooks/useAuth'
 import { InventoryAPIService, InventoryItem } from '@/services/inventory-api.service'
 import { ProductAPIService } from '@/services/product-api.service'
-import { Package, AlertTriangle, Search, Filter, RefreshCw, Edit2, Package2 } from 'lucide-react'
+import { Package, AlertTriangle, Search, Filter, RefreshCw, Edit2 } from 'lucide-react'
 import Modal from '@/shared/ui/Modal'
 import { Input } from '@/shared/ui/Input'
 import { useAuthStore } from '@/store/auth.store'
@@ -45,14 +45,6 @@ export default function WarehouseManagerInventoryPage() {
   const [exportExpiredError, setExportExpiredError] = useState<string | null>(null)
   const [exportExpiredSuccess, setExportExpiredSuccess] = useState<string | null>(null)
   const [isNoExpiredBatchesModalOpen, setIsNoExpiredBatchesModalOpen] = useState(false)
-  
-  // Edit quantity modal state
-  const [isEditQuantityModalOpen, setIsEditQuantityModalOpen] = useState(false)
-  const [editQuantityItemId, setEditQuantityItemId] = useState<string | null>(null)
-  const [editQuantityValue, setEditQuantityValue] = useState(0)
-  const [editQuantityReason, setEditQuantityReason] = useState('')
-  const [isUpdatingQuantity, setIsUpdatingQuantity] = useState(false)
-  const [editQuantityError, setEditQuantityError] = useState<string | null>(null)
 
   const fetchInventory = useCallback(async () => {
     if (!user?.workplaceId) {
@@ -150,65 +142,6 @@ export default function WarehouseManagerInventoryPage() {
     setMinStockEditingId(null)
     setMinStockEditValue(0)
     setMinStockError(null)
-  }
-
-  const handleEditQuantityClick = (inventoryId: string, currentValue: number) => {
-    setEditQuantityItemId(inventoryId)
-    setEditQuantityValue(currentValue)
-    setEditQuantityReason('')
-    setEditQuantityError(null)
-    setIsEditQuantityModalOpen(true)
-  }
-
-  const handleCloseEditQuantityModal = () => {
-    setIsEditQuantityModalOpen(false)
-    setEditQuantityItemId(null)
-    setEditQuantityValue(0)
-    setEditQuantityReason('')
-    setEditQuantityError(null)
-  }
-
-  const handleSaveEditQuantity = async () => {
-    if (!editQuantityItemId) return
-    
-    setIsUpdatingQuantity(true)
-    setEditQuantityError(null)
-
-    try {
-      const token = useAuthStore.getState().token
-      const response = await axios.patch(
-        `http://13.229.29.52:5003/api/inventory/${editQuantityItemId}/quantity`,
-        {
-          newQuantity: editQuantityValue,
-          reason: editQuantityReason.trim(),
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          }
-        }
-      )
-
-      if (response.status === 200 || response.status === 204) {
-        // Update local state
-        setInventory(
-          inventory.map((item) =>
-            item.id === editQuantityItemId
-              ? { ...item, quantity: editQuantityValue, availableQuantity: Math.max(0, editQuantityValue - (item.reservedQuantity || 0)) }
-              : item
-          )
-        )
-        handleCloseEditQuantityModal()
-      } else {
-        setEditQuantityError('Cập nhật thất bại')
-      }
-    } catch (err: any) {
-      console.error('Error updating quantity:', err)
-      setEditQuantityError(err?.response?.data?.message || 'Không thể cập nhật số lượng')
-    } finally {
-      setIsUpdatingQuantity(false)
-    }
   }
 
   const handleExportExpiredBatches = async () => {
@@ -529,13 +462,6 @@ export default function WarehouseManagerInventoryPage() {
                             {item.minStockLevel}{unit ? ` ${unit}` : ''} / {item.maxStockLevel}{unit ? ` ${unit}` : ''}
                           </span>
                           <button
-                            onClick={() => handleEditQuantityClick(item.id, item.quantity)}
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-md text-blue-600 hover:bg-blue-100 hover:text-blue-900 transition-colors flex-shrink-0"
-                            title="Chỉnh sửa số lượng"
-                          >
-                            <Package2 size={16} />
-                          </button>
-                          <button
                             onClick={() => handleEditMinStockClick(item.id, item.minStockLevel)}
                             className="inline-flex items-center justify-center w-8 h-8 rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors flex-shrink-0"
                             title="Edit minimum stock level"
@@ -789,79 +715,6 @@ export default function WarehouseManagerInventoryPage() {
             <p className="text-sm text-green-900">
               ✓ Tồn kho của bạn đang ở trạng thái tốt!
             </p>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Edit Quantity Modal */}
-      <Modal
-        isOpen={isEditQuantityModalOpen}
-        onClose={handleCloseEditQuantityModal}
-        title="Chỉnh sửa số lượng"
-        size="sm"
-        footer={
-          <div className="flex flex-col gap-3">
-            {editQuantityError && (
-              <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
-                {editQuantityError}
-              </div>
-            )}
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={handleCloseEditQuantityModal}
-                disabled={isUpdatingQuantity}
-                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={handleSaveEditQuantity}
-                disabled={isUpdatingQuantity}
-                className="px-4 py-2 rounded-lg bg-[#2d6e3e] text-white hover:bg-[#1e4d2b] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {isUpdatingQuantity ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Đang lư...
-                  </>
-                ) : (
-                  'Lưu thay đổi'
-                )}
-              </button>
-            </div>
-          </div>
-        }
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Dùng để kiểm kê lại số lượng khi phát hiện thiếu hàng hoặc dư hàng.
-          </p>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Số lượng mới
-            </label>
-            <Input
-              type="number"
-              min="0"
-              value={editQuantityValue}
-              onChange={(e) => setEditQuantityValue(Number(e.target.value) || 0)}
-              placeholder="Nhập số lượng mới"
-              className="w-full"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Lý do chỉnh sửa
-            </label>
-            <textarea
-              value={editQuantityReason}
-              onChange={(e) => setEditQuantityReason(e.target.value)}
-              placeholder="Ví dụ: Kiểm kê phát hiện thiếu 5 cái / Dư hàng khi kiểm kê"
-              rows={3}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            />
           </div>
         </div>
       </Modal>

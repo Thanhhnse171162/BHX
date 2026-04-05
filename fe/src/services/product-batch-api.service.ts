@@ -45,7 +45,9 @@ export interface ExpiredOutboundDTO {
 
 export interface AdjustBatchQuantityDTO {
   batchId: string
-  newQuantity: number
+  actualQuantity: number
+  locationType: string
+  locationId: string
   reason?: string
 }
 
@@ -108,8 +110,10 @@ export class ProductBatchAPIService {
 
   static async adjustBatchQuantity(body: AdjustBatchQuantityDTO): Promise<boolean> {
     try {
-      const response = await localApiClient.patch(`/product-batch/${body.batchId}/quantity`, {
-        newQuantity: body.newQuantity,
+      const response = await localApiClient.patch(`/product-batch/${body.batchId}/adjust-quantity`, {
+        actualQuantity: body.actualQuantity,
+        locationType: body.locationType,
+        locationId: body.locationId,
         reason: body.reason,
       })
       return response.status >= 200 && response.status < 300

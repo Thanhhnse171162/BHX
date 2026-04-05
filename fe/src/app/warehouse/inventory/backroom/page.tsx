@@ -343,7 +343,9 @@ export default function BackroomStockPage() {
     try {
       const ok = await ProductBatchAPIService.adjustBatchQuantity({
         batchId: editBatch.id,
-        newQuantity: editQuantity,
+        actualQuantity: editQuantity,
+        locationType: 'WAREHOUSE',
+        locationId: workplaceId,
         reason: editReason.trim(),
       })
 
@@ -355,7 +357,7 @@ export default function BackroomStockPage() {
       }
 
       setIsEditOpen(false)
-      showToast('Chỉnh sửa số lượng thành công.')
+      showToast('Chỉnh sửa số lượng và inventory thành công.')
       await fetchData()
     } catch (err) {
       setEditLoading(false)
@@ -709,13 +711,13 @@ export default function BackroomStockPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Số lượng mới</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Số lượng thực tế</label>
               <Input
                 type="number"
                 min={0}
                 value={editQuantity || ''}
                 onChange={(e) => setEditQuantity(Number(e.target.value) || 0)}
-                placeholder="Nhập số lượng mới"
+                placeholder="Nhập số lượng thực tế kiểm kê"
                 className="w-full"
               />
             </div>
