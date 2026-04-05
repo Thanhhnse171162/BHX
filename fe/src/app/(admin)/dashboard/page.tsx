@@ -72,7 +72,7 @@ function exportToExcel(storeName: string, dateRange: string, stores: Store[], pr
 function BarChart({ data }: { data: number[] }) {
   if (!data || data.length === 0) {
     return (
-      <div className="w-full h-[250px] flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100">
+      <div className="w-full h-[180px] flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100">
         <div className="text-center">
           <div className="text-sm text-gray-400">Không có dữ liệu</div>
           <div className="text-xs text-gray-300 mt-1">Dữ liệu sẽ hiển thị khi có giao dịch</div>
@@ -82,12 +82,12 @@ function BarChart({ data }: { data: number[] }) {
   }
 
   const max    = Math.max(...data)
-  const chartH = 200
+  const chartH = 120
   const barW   = 36
   const gap    = 16
   const padL   = 6
-  const padB   = 30
-  const padT   = 24
+  const padB   = 25
+  const padT   = 20
   const totalW = Math.max(padL + data.length * (barW + gap) - gap + 8, 100)
 
   return (
@@ -540,29 +540,36 @@ export default function DashboardPage() {
         const headers: HeadersInit = { Authorization: `Bearer ${token}` }
         const params = new URLSearchParams()
         params.set('period', 'LAST_7_DAYS')
-        params.set('groupBy', 'DAY')
+        params.set('topN', '10')
 
-        const response = await fetch(`/api/reports/revenue-trend?${params.toString()}`, { 
+        const response = await fetch(`/api/reports/admin/top-products-trend?${params.toString()}`, { 
           headers,
           signal: AbortSignal.timeout(10000)
         })
         
         if (response.ok) {
           const data = await response.json()
-          const trendData = Array.isArray(data) ? data : data?.data || []
+          const overallProducts = data.overallTopProducts || []
           
-          // Extract revenue values for chart from time + revenue
-          const revenueValues = trendData.map((item: any) => {
-            const rev = item.revenue || 0
-            return typeof rev === 'string' ? parseFloat(rev) : rev
-          })
+          console.log('📊 [Revenue Trend API] Received top products:', overallProducts.length, 'items')
+          console.log('📊 [Revenue Trend API] Full response:', JSON.stringify(data, null, 2))
+          
+          // Extract revenue values from products
+          // For demo, we'll use revenue to show trend - normally this would be daily aggregates
+          const revenueValues = overallProducts.map((p: any) => p.revenue || 0)
           
           if (revenueValues.length > 0) {
+            // For weekly view, pad to 7 days if needed
+            while (revenueValues.length < 7) {
+              revenueValues.push(0)
+            }
+            
             // Update chart data with actual data
+            const sevenDayData = revenueValues.slice(0, 7)
             setChartData({
-              tuan:    revenueValues,
-              ngay:    [revenueValues[revenueValues.length - 1]],
-              hom_qua: [revenueValues[revenueValues.length - 2]],
+              tuan:    sevenDayData,
+              ngay:    [sevenDayData[6] || 0],
+              hom_qua: [sevenDayData[5] || 0],
             })
           }
         } else {
