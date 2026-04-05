@@ -161,9 +161,16 @@ function MovementDetailModal({
                     ? (batchNameById[batchLookupId] || batchNameById[item.batchId] || item.batchId)
                     : '—'
 
-                  const unitDisplay = item.batchId
-                    ? (batchUnitById[batchLookupId] || batchUnitById[item.batchId] || item.unit || '—')
-                    : (item.unit || '—')
+                  // Display unit: prioritize item.unit, then batch unit, then empty dash
+                  let unitDisplay = '—'
+                  if (item.unit?.trim()) {
+                    unitDisplay = item.unit.trim()
+                  } else if (item.batchId) {
+                    const batchUnit = batchUnitById[batchLookupId] || batchUnitById[item.batchId]
+                    if (batchUnit?.trim()) {
+                      unitDisplay = batchUnit.trim()
+                    }
+                  }
 
                   return (
                     <tr key={item.id} className="border-t border-gray-100">
@@ -242,16 +249,22 @@ export default function WarehouseManagerMovementsPage() {
       for (const batch of batches ?? []) {
         const batchId = String((batch as any)?.id ?? (batch as any)?.batchId ?? '').trim()
         const batchNumber = String((batch as any)?.batchNumber ?? (batch as any)?.name ?? '').trim()
-        const unit = String((batch as any)?.unit ?? (batch as any)?.Unit ?? '').trim()
+        // Check multiple possible unit field names
+        const unit = String(
+          (batch as any)?.unit ??
+          (batch as any)?.Unit ??
+          (batch as any)?.unitName ??
+          (batch as any)?.displayUnit ??
+          ''
+        ).trim()
         
         if (batchId && batchNumber) {
           const normalizedId = normalizeId(batchId)
           nextBatchNameById[normalizedId] = batchNumber
-          nextBatchNameById[batchId] = batchNumber // Use original ID too
-          if (unit) {
-            nextBatchUnitById[normalizedId] = unit
-            nextBatchUnitById[batchId] = unit
-          }
+          nextBatchNameById[batchId] = batchNumber
+          // Always store unit if present, even if empty string to differentiate from undefined
+          nextBatchUnitById[normalizedId] = unit
+          nextBatchUnitById[batchId] = unit
         }
       }
 
@@ -283,16 +296,21 @@ export default function WarehouseManagerMovementsPage() {
           if (batchDetail) {
             const batchId = String(batchDetail.id ?? '').trim()
             const batchNumber = String(batchDetail.batchNumber ?? '').trim()
-            const unit = String(batchDetail.unit ?? batchDetail.Unit ?? '').trim()
+            // Check multiple possible unit field names
+            const unit = String(
+              batchDetail.unit ??
+              batchDetail.Unit ??
+              (batchDetail as any)?.unitName ??
+              (batchDetail as any)?.displayUnit ??
+              ''
+            ).trim()
             
             if (batchId && batchNumber) {
               const normalizedId = normalizeId(batchId)
               nextBatchNameById[normalizedId] = batchNumber
               nextBatchNameById[batchId] = batchNumber
-              if (unit) {
-                nextBatchUnitById[normalizedId] = unit
-                nextBatchUnitById[batchId] = unit
-              }
+              nextBatchUnitById[normalizedId] = unit
+              nextBatchUnitById[batchId] = unit
             }
           }
         }
