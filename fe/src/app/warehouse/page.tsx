@@ -522,15 +522,24 @@ export default function WarehouseDashboard() {
               ))}
             </svg>
 
-            <div
-              className="mt-2 grid text-center"
-              style={{ gridTemplateColumns: `repeat(${throughputData.length}, minmax(0, 1fr))`, paddingLeft: '60px', paddingRight: '40px' }}
-            >
-              {throughputData.map((item, idx) => (
-                <span key={`${item.day}-${idx}`} className="text-xs text-gray-600 font-medium uppercase">
-                  {item.day}
-                </span>
-              ))}
+            <div className="relative mt-2" style={{ height: '24px' }}>
+              <div className="relative w-full h-full" style={{ paddingLeft: '60px', paddingRight: '40px' }}>
+                {throughputData.map((item, idx) => {
+                  const totalWidth = 1200 - 60 - 40
+                  const step = throughputData.length > 1 ? totalWidth / (throughputData.length - 1) : 0
+                  const offsetPercent = throughputData.length > 1 ? (step * idx) / (1200 - 60 - 40) * 100 : 0
+                  
+                  return (
+                    <span
+                      key={`${item.day}-${idx}`}
+                      className="text-xs text-gray-600 font-medium uppercase absolute transform -translate-x-1/2"
+                      style={{ left: `calc(${offsetPercent}% + 60px)` }}
+                    >
+                      {item.day}
+                    </span>
+                  )
+                })}
+              </div>
             </div>
           </div>
         </div>
