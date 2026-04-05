@@ -181,7 +181,7 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* Form Card */
+          {/* Form Card */}
           <div className="bg-white rounded-2xl shadow-xl p-8 lg:p-10">
             <div className="mb-8 flex flex-col items-center justify-center text-center">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">
