@@ -341,10 +341,32 @@ export default function StoreManagerDashboard() {
       if (Array.isArray(trendData) && trendData.length > 0) {
         console.log('[Frontend] Processing trend data:', trendData.length, 'items')
         console.log('[Frontend] FULL Trend data:', JSON.stringify(trendData, null, 2))
-        const transformedData = trendData.map((item: any) => ({
-          day: item.time || item.date || item.day || '',
-          value: typeof item.revenue === 'number' ? item.revenue : 0,
-        }))
+        const transformedData = trendData.map((item: any) => {
+          // Try multiple field names for value
+          let value = 0
+          if (typeof item.revenue === 'number') {
+            value = item.revenue
+          } else if (typeof item.revenue === 'string') {
+            value = parseFloat(item.revenue) || 0
+          } else if (typeof item.amount === 'number') {
+            value = item.amount
+          } else if (typeof item.amount === 'string') {
+            value = parseFloat(item.amount) || 0
+          } else if (typeof item.total === 'number') {
+            value = item.total
+          } else if (typeof item.total === 'string') {
+            value = parseFloat(item.total) || 0
+          } else if (typeof item.sales === 'number') {
+            value = item.sales
+          } else if (typeof item.sales === 'string') {
+            value = parseFloat(item.sales) || 0
+          }
+          
+          return {
+            day: item.time || item.date || item.day || '',
+            value: value,
+          }
+        })
         setChartData(transformedData)
         
         // Calculate total revenue from trend data
