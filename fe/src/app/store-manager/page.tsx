@@ -256,6 +256,8 @@ export default function StoreManagerDashboard() {
       // Build query parameters
       const baseParams = new URLSearchParams()
       baseParams.set('storeId', selectedStoreId)
+      baseParams.set('warehouseId', selectedStoreId)  // Also set warehouseId as backup
+      baseParams.set('locationId', selectedStoreId)   // Also set locationId as backup
       if (selectedStaffId) {
         baseParams.set('staffId', selectedStaffId)
       }
@@ -388,20 +390,33 @@ export default function StoreManagerDashboard() {
       }
       
       if (inventoryItems.length > 0) {
-        console.log('Processing inventory data:', inventoryItems.length, 'items')
+        console.log('Processing inventory data:', inventoryItems.length, 'items (before store filtering)')
         
-        const lowStockItems = inventoryItems.filter((i: any) => {
+        // Filter inventory items to only include items for the selected store
+        // Items should have locationId matching the selected store
+        const storeInventoryItems = inventoryItems.filter((i: any) => {
+          // If items have locationId field, filter by it
+          if (i.locationId !== undefined) {
+            return i.locationId === selectedStoreId
+          }
+          // If no locationId field, include the item (assume it's for this store)
+          return true
+        })
+        
+        console.log(`🏪 Filtered to ${storeInventoryItems.length} items for store ${selectedStoreId}`)
+        
+        const lowStockItems = storeInventoryItems.filter((i: any) => {
           const qty = i.quantity || i.currentStock || i.stock || 0
           const minStock = i.minimumStock || i.reorderLevel || 10
           return qty > 0 && qty < minStock
         })
         
-        const outStockItems = inventoryItems.filter((i: any) => {
+        const outStockItems = storeInventoryItems.filter((i: any) => {
           const qty = i.quantity || i.currentStock || i.stock || 0
           return qty === 0
         })
         
-        const totalStock = inventoryItems.reduce((sum: number, i: any) => {
+        const totalStock = storeInventoryItems.reduce((sum: number, i: any) => {
           return sum + (i.quantity || i.currentStock || i.stock || i.totalQuantity || 0)
         }, 0)
         
