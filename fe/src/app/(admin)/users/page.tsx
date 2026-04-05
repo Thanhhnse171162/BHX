@@ -31,8 +31,16 @@ interface Location {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const STORE_ROLES  = ['Store Manager', 'Nhân viên']
-const WAREHOUSE_ROLES = ['Warehouse Manager', 'Warehouse Staff', 'Warehouse Admin']
+// Include all variations of role names (English & Vietnamese)
+const STORE_ROLES  = [
+  'Store Manager', 'Store Staff', 'Nhân viên', 'Quản lý cửa hàng',
+  'STORE_MANAGER', 'STORE_STAFF', 'STAFF'
+]
+const WAREHOUSE_ROLES = [
+  'Warehouse Manager', 'Warehouse Staff', 'Warehouse Admin',
+  'Quản lý kho', 'Nhân viên kho', 'Admin kho',
+  'WAREHOUSE_MANAGER', 'WAREHOUSE_STAFF', 'WAREHOUSE_ADMIN'
+]
 const ROLES_NEEDING_LOCATION = [...STORE_ROLES, ...WAREHOUSE_ROLES]
 const HIDDEN_ROLES = ['CUSTOMER', 'Customer']
 
@@ -61,13 +69,32 @@ function getLocationsForRole(
   stores: Location[],
   warehouses: Location[]
 ): Location[] {
-  if (STORE_ROLES.includes(roleName))     return stores
-  if (WAREHOUSE_ROLES.includes(roleName)) return warehouses
+  // Normalize role name for comparison (lowercase, remove extra spaces)
+  const normalized = String(roleName || '').toLowerCase().trim().replace(/\s+/g, ' ')
+  
+  const isStoreRole = STORE_ROLES.some(r => 
+    normalized === r.toLowerCase().replace(/\s+/g, ' ') ||
+    normalized.includes(r.toLowerCase().replace(/\s+/g, ' '))
+  )
+  if (isStoreRole) return stores
+
+  const isWarehouseRole = WAREHOUSE_ROLES.some(r =>
+    normalized === r.toLowerCase().replace(/\s+/g, ' ') ||
+    normalized.includes(r.toLowerCase().replace(/\s+/g, ' '))
+  )
+  if (isWarehouseRole) return warehouses
+  
   return []
 }
 
 function needsLocation(roleName: string): boolean {
-  return ROLES_NEEDING_LOCATION.includes(roleName)
+  // Normalize role name for comparison
+  const normalized = String(roleName || '').toLowerCase().trim().replace(/\s+/g, ' ')
+  
+  return ROLES_NEEDING_LOCATION.some(r =>
+    normalized === r.toLowerCase().replace(/\s+/g, ' ') ||
+    normalized.includes(r.toLowerCase().replace(/\s+/g, ' '))
+  )
 }
 
 // ── Mapper ───────────────────────────────────────────────────────────────────

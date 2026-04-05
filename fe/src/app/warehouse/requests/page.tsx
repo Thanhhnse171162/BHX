@@ -535,7 +535,9 @@ export default function WarehouseRequestsPage() {
         missingBatchIds.map(async (id) => {
           try {
             const detail = await ProductBatchAPIService.getById(id)
-            return [id, String(detail?.batchNumber ?? '').trim()] as const
+            // Extract batch number from API response
+            const batchNo = String(detail?.batchNumber || '').trim()
+            return [id, batchNo] as const
           } catch {
             return [id, ''] as const
           }
@@ -1656,11 +1658,16 @@ export default function WarehouseRequestsPage() {
                         const productName = item.productName || product?.name || 'Sản phẩm chưa đồng bộ'
                         const batchId = String(item.batchId ?? '').trim()
                         const batch = batches.find(b => normalizeId(b.id) === normalizeId(batchId))
+                        
+                        // Extract batch number from API response
+                        const apiBatchNumber = String(item.batchNumber || '').trim()
+                        
                         const batchName =
-                          String(item.batchNumber || '').trim() ||
+                          apiBatchNumber ||
                           String(batch?.batchNumber || '').trim() ||
                           String(batchNumberMap[batchId] || '').trim() ||
-                          (batchId ? 'Lô chưa đồng bộ' : '—')
+                          (batchId ? '(Lô #' + batchId.slice(-6) + ')' : '—')
+                        
                         return (
                           <tr key={item.id} className={idx !== selectedTransfer.items.length - 1 ? 'border-b border-gray-100' : ''}>
                             <td className="px-4 py-3 font-medium text-gray-800">{productName}</td>
