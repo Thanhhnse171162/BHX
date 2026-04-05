@@ -194,8 +194,8 @@ export default function WarehouseManagerDashboard() {
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">Lịch sử xuất kho gần đây</h2>
-                <p className="text-sm text-gray-600 mt-1">5 lần xuất kho mới nhất</p>
+                <h2 className="text-lg font-bold text-gray-900">Di chuyển hàng gần đây</h2>
+                <p className="text-sm text-gray-600 mt-1">5 lần di chuyển hàng mới nhất</p>
               </div>
               <button
                 onClick={() => router.push('/warehouse-manager/inventory')}
@@ -246,8 +246,8 @@ export default function WarehouseManagerDashboard() {
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">Dự chuyển hàng gần đây</h2>
-                <p className="text-sm text-gray-600 mt-1">5 lần di chuyển hàng mới nhất</p>
+                <h2 className="text-lg font-bold text-gray-900">Lịch sử xuất kho gần đây</h2>
+                <p className="text-sm text-gray-600 mt-1">5 lần xuất kho mới nhất</p>
               </div>
               <button
                 onClick={() => router.push('/warehouse-manager/transfers')}
