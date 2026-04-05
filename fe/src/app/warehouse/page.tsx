@@ -324,7 +324,7 @@ export default function WarehouseDashboard() {
 
     const today = new Date()
     const fallback: WeeklyDataPoint[] = []
-    for (let offset = 5; offset >= 0; offset -= 1) {
+    for (let offset = 6; offset >= 0; offset -= 1) {
       const date = new Date(today)
       date.setDate(today.getDate() - offset)
       fallback.push({ day: WEEKDAY_LABELS[date.getDay()], incoming: 0, outgoing: 0 })
@@ -339,7 +339,7 @@ export default function WarehouseDashboard() {
   }, [throughputData])
 
   const chartGeometry = useMemo(() => {
-    const width = 960
+    const width = 1000
     const height = 220
     const leftPad = 56
     const rightPad = 24
