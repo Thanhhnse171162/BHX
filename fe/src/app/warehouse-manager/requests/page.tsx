@@ -651,7 +651,7 @@ export default function WarehouseManagerRequestsPage() {
   const filtered = useMemo(
     () => {
       let result = requests.filter(
-        (item) => item.type === activeTab && (activeTab === 'warehouse' || item.status !== 'Đã giao')
+        (item) => item.type === activeTab
       )
       
       // Apply status filter
