@@ -111,11 +111,9 @@ export class ProductBatchAPIService {
 
   static async adjustBatchQuantity(body: AdjustBatchQuantityDTO): Promise<boolean> {
     try {
-      // ProductBatch API is on port 5003, not the default API_BASE_URL port
-      const baseURL = typeof window !== 'undefined' ? 'http://13.229.29.52:5003' : process.env.NEXT_PUBLIC_INVENTORY_URL || 'http://13.229.29.52:5003'
-      const token = typeof window !== 'undefined' ? (useAuthStore.getState?.().token || '') : ''
+      const token = useAuthStore.getState?.().token || ''
       
-      const response = await fetch(`${baseURL}/api/ProductBatch/batch/adjust-quantity`, {
+      const response = await fetch('/api/proxy/adjust-batch-quantity', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
