@@ -39,7 +39,6 @@ interface Product {
 const DAY_LABELS = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN']
 
 const PRIMARY     = '#1a6b3a'
-const BAR_DEFAULT = '#b6dfc6'
 
 // ─── Excel (CSV) export ───────────────────────────────────────────────────────
 
@@ -66,12 +65,12 @@ function exportToExcel(storeName: string, dateRange: string, stores: Store[], pr
   URL.revokeObjectURL(url)
 }
 
-// ─── Bar Chart (no Y-axis column) ────────────────────────────────────────────
+// ─── Line Chart ──────────────────────────────────────────────────────────────
 
-function BarChart({ data }: { data: number[] }) {
+function LineChart({ data }: { data: number[] }) {
   if (!data || data.length === 0) {
     return (
-      <div className="w-full h-[120px] flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100">
+      <div className="w-full h-[250px] flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100">
         <div className="text-center">
           <div className="text-sm text-gray-400">Không có dữ liệu</div>
           <div className="text-xs text-gray-300 mt-1">Dữ liệu sẽ hiển thị khi có giao dịch</div>
@@ -81,127 +80,156 @@ function BarChart({ data }: { data: number[] }) {
   }
 
   const max = Math.max(...data, 1)
+  const min = Math.min(...data, 0)
+  const range = max - min || 1
   
-  // Responsive sizing based on number of bars
-  const isSingleOrDual = data.length <= 2
-  const isWeekly = data.length === 7
-  
-  // Chart dimensions - single/dual bars should be much larger
+  // Responsive sizing
   let chartH: number
-  let barW: number
-  let gap: number
   let padL: number
+  let padR: number
   let padB: number
   let padT: number
+  let pointRadius: number
   let labelFontSize: number
   let valueFontSize: number
   
   if (data.length === 1) {
-    // Single bar - make it prominent
-    chartH = 200
-    barW = 70
-    gap = 12
-    padL = 20
-    padB = 50
-    padT = 20
+    chartH = 220
+    padL = 40
+    padR = 30
+    padB = 60
+    padT = 30
+    pointRadius = 6
     labelFontSize = 12
     valueFontSize = 12
-  } else if (isSingleOrDual) {
-    // Two bars
-    chartH = 160
-    barW = 55
-    gap = 30
-    padL = 20
-    padB = 50
-    padT = 20
+  } else if (data.length === 2) {
+    chartH = 220
+    padL = 40
+    padR = 30
+    padB = 60
+    padT = 30
+    pointRadius = 5
     labelFontSize = 11
     valueFontSize = 11
-  } else if (isWeekly) {
-    // Seven bars - optimized for week view
-    chartH = 150
-    barW = 32
-    gap = 10
-    padL = 12
-    padB = 50
-    padT = 20
-    labelFontSize = 10
-    valueFontSize = 10
   } else {
-    // Default
-    chartH = 140
-    barW = 40
-    gap = 12
-    padL = 15
-    padB = 45
-    padT = 20
+    // Weekly view
+    chartH = 220
+    padL = 40
+    padR = 30
+    padB = 60
+    padT = 30
+    pointRadius = 4
     labelFontSize = 10
     valueFontSize = 10
   }
   
-  const totalW = Math.max(padL + data.length * (barW + gap) - gap + 16, 150)
+  const chartW = 100 * (data.length - 1 || 1)
+  const totalW = padL + chartW + padR
+  const totalH = chartH + padB + padT
   
-  // Custom labels for single/dual bar views
+  // Custom labels
   const getLabel = (index: number) => {
     if (data.length === 1) return 'Hôm nay'
     if (data.length === 2) return index === 0 ? 'Hôm nay' : 'Hôm qua'
     return DAY_LABELS[index] || `Ngày ${index + 1}`
   }
+  
+  // Generate points for the line
+  const points = data.map((val, i) => {
+    const x = padL + (chartW > 0 ? (i / (data.length - 1)) * chartW : 0)
+    const y = padT + chartH - ((val - min) / range) * chartH
+    return { x, y, val, i }
+  })
+  
+  // Build path string
+  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
 
   return (
-    <svg width="100%" viewBox={`0 0 ${totalW} ${chartH + padB + padT}`} style={{ overflow: 'visible' }} className="mx-auto">
+    <svg width="100%" viewBox={`0 0 ${totalW} ${totalH}`} style={{ overflow: 'visible' }} className="mx-auto">
       {/* Grid lines */}
       {[0, 0.25, 0.5, 0.75, 1].map(ratio => (
         <line
-          key={ratio}
+          key={`grid-${ratio}`}
           x1={padL}
           y1={padT + chartH - ratio * chartH}
-          x2={totalW - 8}
+          x2={padL + chartW}
           y2={padT + chartH - ratio * chartH}
           stroke="#f0f0f0"
           strokeWidth="1"
+          strokeDasharray="4"
         />
       ))}
       
-      {/* Bars and labels */}
-      {data.map((val, i) => {
-        const barH = (val / max) * chartH
-        const x = padL + i * (barW + gap)
-        const y = padT + chartH - barH
-        const isMax = val === max
-        const fill = isMax ? PRIMARY : BAR_DEFAULT
-        const lblColor = isMax ? PRIMARY : '#9ca3af'
-        
+      {/* Y-axis */}
+      <line x1={padL} y1={padT} x2={padL} y2={padT + chartH} stroke="#e5e7eb" strokeWidth="1" />
+      {/* X-axis */}
+      <line x1={padL} y1={padT + chartH} x2={padL + chartW} y2={padT + chartH} stroke="#e5e7eb" strokeWidth="1" />
+      
+      {/* Y-axis labels */}
+      {[0, 0.25, 0.5, 0.75, 1].map(ratio => {
+        const yVal = min + ratio * range
         return (
-          <g key={i}>
-            {/* Bar */}
-            <rect x={x} y={y} width={barW} height={barH} fill={fill} rx="6" />
-            
-            {/* Value label above bar */}
-            <text
-              x={x + barW / 2}
-              y={y - 8}
-              textAnchor="middle"
-              fontSize={valueFontSize}
-              fill={lblColor}
-              fontWeight="600"
-            >
-              {val >= 1000 ? `${(val / 1000).toFixed(1)}B` : val >= 1 ? `${val}M` : '0'}
-            </text>
-            
-            {/* Day label below */}
-            <text
-              x={x + barW / 2}
-              y={chartH + padT + padB - 28}
-              textAnchor="middle"
-              fontSize={labelFontSize}
-              fill={lblColor}
-              fontWeight={isMax ? '600' : '500'}
-            >
-              {getLabel(i)}
-            </text>
-          </g>
+          <text
+            key={`ylabel-${ratio}`}
+            x={padL - 8}
+            y={padT + chartH - ratio * chartH + 4}
+            textAnchor="end"
+            fontSize="10"
+            fill="#9ca3af"
+          >
+            {yVal >= 1000 ? `${(yVal / 1000).toFixed(0)}B` : yVal >= 1 ? `${yVal.toFixed(0)}M` : '0'}
+          </text>
         )
       })}
+      
+      {/* Line path */}
+      <path
+        d={pathD}
+        fill="none"
+        stroke={PRIMARY}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      
+      {/* Points and labels */}
+      {points.map((p) => (
+        <g key={`point-${p.i}`}>
+          {/* Point circle */}
+          <circle
+            cx={p.x}
+            cy={p.y}
+            r={pointRadius}
+            fill="#fff"
+            stroke={PRIMARY}
+            strokeWidth="2"
+          />
+          
+          {/* Value label above point */}
+          <text
+            x={p.x}
+            y={p.y - 12}
+            textAnchor="middle"
+            fontSize={valueFontSize}
+            fill={PRIMARY}
+            fontWeight="600"
+          >
+            {p.val >= 1000 ? `${(p.val / 1000).toFixed(1)}B` : p.val >= 1 ? `${p.val}M` : '0'}
+          </text>
+          
+          {/* Day label below */}
+          <text
+            x={p.x}
+            y={padT + chartH + padB - 12}
+            textAnchor="middle"
+            fontSize={labelFontSize}
+            fill={PRIMARY}
+            fontWeight="600"
+          >
+            {getLabel(p.i)}
+          </text>
+        </g>
+      ))}
     </svg>
   )
 }
@@ -672,7 +700,7 @@ export default function DashboardPage() {
               ))}
             </div>
           </div>
-          <BarChart data={chartData[activeTab]} />
+          <LineChart data={chartData[activeTab]} />
         </div>
       </div>
 
