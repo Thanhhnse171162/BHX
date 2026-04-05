@@ -285,7 +285,7 @@ export default function WarehouseManagerInventoryPage() {
             }}
             className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
           >
-            <Package2 className="w-4 h-4" />
+            <Package className="w-4 h-4" />
             Xuất lô hết hạn
           </button>
           <button
@@ -659,7 +659,7 @@ export default function WarehouseManagerInventoryPage() {
                   </>
                 ) : (
                   <>
-                    <Package2 className="w-4 h-4" />
+                    <Package className="w-4 h-4" />
                     Xuất ngay
                   </>
                 )}
