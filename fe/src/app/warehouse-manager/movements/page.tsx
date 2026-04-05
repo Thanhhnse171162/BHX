@@ -88,12 +88,14 @@ function getStatusLabel(status: UiStatus) {
 function MovementDetailModal({
   row,
   productNameById,
+  productUnitById,
   batchNameById,
   batchUnitById,
   onClose,
 }: {
   row: StockMovementFromAPI | null
   productNameById: Record<string, string>
+  productUnitById: Record<string, string>
   batchNameById: Record<string, string>
   batchUnitById: Record<string, string>
   onClose: () => void
@@ -161,7 +163,7 @@ function MovementDetailModal({
                     ? (batchNameById[batchLookupId] || batchNameById[item.batchId] || item.batchId)
                     : '—'
 
-                  // Display unit: prioritize item.unit, then batch unit, then empty dash
+                  // Display unit: prioritize item.unit, then batch unit, then product unit, then dash
                   let unitDisplay = '—'
                   if (item.unit?.trim()) {
                     unitDisplay = item.unit.trim()
@@ -169,6 +171,16 @@ function MovementDetailModal({
                     const batchUnit = batchUnitById[batchLookupId] || batchUnitById[item.batchId]
                     if (batchUnit?.trim()) {
                       unitDisplay = batchUnit.trim()
+                    } else {
+                      const productUnit = productUnitById[normalizeId(item.productId)]
+                      if (productUnit?.trim()) {
+                        unitDisplay = productUnit.trim()
+                      }
+                    }
+                  } else {
+                    const productUnit = productUnitById[normalizeId(item.productId)]
+                    if (productUnit?.trim()) {
+                      unitDisplay = productUnit.trim()
                     }
                   }
 
@@ -205,6 +217,7 @@ export default function WarehouseManagerMovementsPage() {
   const [error, setError] = useState('')
   const [rows, setRows] = useState<StockMovementFromAPI[]>([])
   const [productNameById, setProductNameById] = useState<Record<string, string>>({})
+  const [productUnitById, setProductUnitById] = useState<Record<string, string>>({})
   const [batchNameById, setBatchNameById] = useState<Record<string, string>>({})
   const [batchUnitById, setBatchUnitById] = useState<Record<string, string>>({})
 
@@ -236,12 +249,18 @@ export default function WarehouseManagerMovementsPage() {
       ])
 
       const nextProductNameById: Record<string, string> = {}
+      const nextProductUnitById: Record<string, string> = {}
       for (const product of products ?? []) {
         const id = normalizeId((product as any)?.id)
         const name = String((product as any)?.name ?? '').trim()
-        if (id && name) nextProductNameById[id] = name
+        const unit = String((product as any)?.unit ?? '').trim()
+        if (id && name) {
+          nextProductNameById[id] = name
+          if (unit) nextProductUnitById[id] = unit
+        }
       }
       setProductNameById(nextProductNameById)
+      setProductUnitById(nextProductUnitById)
 
       // Build initial batch mapping from warehouse batch data
       const nextBatchNameById: Record<string, string> = {}
@@ -322,6 +341,7 @@ export default function WarehouseManagerMovementsPage() {
     } catch (err: any) {
       setRows([])
       setProductNameById({})
+      setProductUnitById({})
       setBatchNameById({})
       setBatchUnitById({})
       setError(err?.response?.data?.message || err?.message || 'Không thể tải dữ liệu di chuyển hàng.')
@@ -587,6 +607,7 @@ export default function WarehouseManagerMovementsPage() {
       <MovementDetailModal
         row={selected}
         productNameById={productNameById}
+        productUnitById={productUnitById}
         batchNameById={batchNameById}
         batchUnitById={batchUnitById}
         onClose={() => setSelected(null)}
