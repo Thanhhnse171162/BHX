@@ -39,7 +39,6 @@ interface Product {
 const DAY_LABELS = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN']
 
 const PRIMARY     = '#1a6b3a'
-const PRIMARY_MID = '#2d9e5f'
 const BAR_DEFAULT = '#b6dfc6'
 
 // ─── Excel (CSV) export ───────────────────────────────────────────────────────
