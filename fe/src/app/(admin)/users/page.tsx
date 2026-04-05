@@ -39,21 +39,21 @@ const HIDDEN_ROLES = ['CUSTOMER', 'Customer']
 // Nới lỏng filter: chấp nhận cả tên không bắt đầu đúng chuẩn
 // Chỉ dựa vào status ACTIVE và isDeleted === false, sau đó phân loại bằng keyword linh hoạt hơn
 function classifyLocations(raw: Location[]) {
- const active = raw.filter((l) => l.status?.toUpperCase() === 'ACTIVE' && !l.isDeleted)
-  return {
-    // Giữ startsWith cũ nhưng thêm fallback: những item không khớp store/warehouse keyword
-    // sẽ được xét riêng nếu cần — hiện tại nới bằng case-insensitive includes
-    stores:     active.filter((l) =>
-      l.name.startsWith('Cửa Hàng') ||
-      l.name.toLowerCase().includes('cửa hàng') ||
-      l.name.toLowerCase().includes('store')
-    ),
-    warehouses: active.filter((l) =>
-      l.name.startsWith('Kho') ||
-      l.name.toLowerCase().includes('kho') ||
-      l.name.toLowerCase().includes('warehouse')
-    ),
-  }
+  const active = raw.filter((l) => l.status?.toUpperCase() === 'ACTIVE' && !l.isDeleted)
+  
+  // Classify by explicit warehouse keywords first
+  const warehouses = active.filter((l) =>
+    l.name.startsWith('Kho') ||
+    l.name.toLowerCase().includes('kho') ||
+    l.name.toLowerCase().includes('warehouse') ||
+    l.name.toLowerCase().includes('kho')
+  )
+  
+  // Everything else that's not a warehouse is considered a store
+  // This is more flexible and ensures store staff can always find stores
+  const stores = active.filter((l) => !warehouses.includes(l))
+  
+  return { stores, warehouses }
 }
 
 function getLocationsForRole(
