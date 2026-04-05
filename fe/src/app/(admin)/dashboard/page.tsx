@@ -82,15 +82,17 @@ function BarChart({ data }: { data: number[] }) {
   }
 
   const max    = Math.max(...data)
-  // Responsive sizing - smaller for single/dual bars (today/yesterday)
-  const isCompact = data.length <= 2
+  // Responsive sizing based on number of bars
+  const isCompact = data.length <= 2  // Today/Yesterday - single/dual bars
+  const isWeekly = data.length === 7   // Weekly - 7 bars
+  
   const chartH = isCompact ? 80 : 120
-  const barW   = isCompact ? 20 : 36
-  const gap    = isCompact ? 8 : 16
-  const padL   = isCompact ? 15 : 6
+  const barW   = isCompact ? 20 : isWeekly ? 20 : 36
+  const gap    = isCompact ? 8 : isWeekly ? 7 : 16
+  const padL   = isCompact ? 15 : isWeekly ? 8 : 6
   const padB   = isCompact ? 20 : 25
   const padT   = isCompact ? 15 : 20
-  const totalW = Math.max(padL + data.length * (barW + gap) - gap + 8, isCompact ? 80 : 100)
+  const totalW = Math.max(padL + data.length * (barW + gap) - gap + 8, isCompact ? 80 : 150)
 
   return (
     <svg width="100%" viewBox={`0 0 ${totalW} ${chartH + padB + padT}`} style={{ overflow: 'visible' }}>
@@ -576,8 +578,8 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Chart + Top 7 stores */}
-      <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: '1fr 300px' }}>
+      {/* Chart */}
+      <div className="grid gap-4 mb-4">
 
         <div className="bg-white border border-gray-100 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
@@ -598,23 +600,6 @@ export default function DashboardPage() {
             </div>
           </div>
           <BarChart data={chartData[activeTab]} />
-        </div>
-
-        {/* Top 7 stores list */}
-        <div className="bg-white border border-gray-100 rounded-xl p-5">
-          <div className="text-sm font-medium text-gray-900 mb-3">Top cửa hàng</div>
-          {topStores.map(s => (
-            <div key={s.rank} className="flex items-center gap-2.5 py-2 border-b border-gray-50 last:border-0">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-medium flex-shrink-0 ${s.rank === 1 ? 'bg-[#1a6b3a] text-white' : 'bg-[#e8f5ed] text-[#1a6b3a]'}`}>
-                {s.rank}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-medium text-gray-800 truncate">{s.name}</div>
-                <div className="text-[10px] text-gray-400">{s.loc}</div>
-              </div>
-              <div className="text-xs font-medium text-gray-800 whitespace-nowrap">{s.rev}</div>
-            </div>
-          ))}
         </div>
       </div>
 
