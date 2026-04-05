@@ -12,6 +12,7 @@ interface SaleItemFromApi {
 interface SaleFromApi {
   id: string
   saleDate: string
+  storeId?: string
   items?: SaleItemFromApi[]
 }
 
@@ -27,33 +28,25 @@ function isToday(dateStr: string): boolean {
   try {
     if (!dateStr) return false
 
-    let date: Date
+    // Extract YYYY-MM-DD part from any date string
+    const dateMatch = String(dateStr).match(/(\d{4})-(\d{2})-(\d{2})/)
+    if (!dateMatch) return false
 
-    // Try parsing as ISO string first
-    if (typeof dateStr === 'string' && (dateStr.includes('T') || dateStr.includes('Z'))) {
-      date = new Date(dateStr)
-    } else if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
-      // Date-only format (YYYY-MM-DD)
-      const [year, month, day] = dateStr.split('-').map(Number)
-      if (!year || !month || !day) return false
-      // Create date at midnight to avoid timezone issues
-      date = new Date(year, month - 1, day, 0, 0, 0, 0)
-    } else {
-      return false
-    }
+    const [, yearStr, monthStr, dayStr] = dateMatch
+    const year = parseInt(yearStr, 10)
+    const month = parseInt(monthStr, 10)
+    const day = parseInt(dayStr, 10)
 
-    if (isNaN(date.getTime())) return false
+    if (!year || !month || !day || isNaN(year) || isNaN(month) || isNaN(day)) return false
 
-    // Get today's date at midnight (local timezone)
+    // Get today's date in UTC
     const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    const todayYear = today.getUTCFullYear()
+    const todayMonth = today.getUTCMonth() + 1
+    const todayDay = today.getUTCDate()
 
-    // Get the passed date at midnight
-    const compareDate = new Date(date)
-    compareDate.setHours(0, 0, 0, 0)
-
-    // Compare timestamps
-    return compareDate.getTime() === today.getTime()
+    // Compare only the date part
+    return year === todayYear && month === todayMonth && day === todayDay
   } catch (error) {
     console.error('[DEBUG] Error in isToday:', error, 'dateStr:', dateStr)
     return false
@@ -101,14 +94,16 @@ export async function GET(request: NextRequest) {
           count = sales
             .filter((sale: SaleFromApi) => {
               const isT = isToday(sale.saleDate)
-              console.log(`[DEBUG] Sale ${sale.id} saleDate=${sale.saleDate} isToday=${isT}`)
-              return isT
+              // Also filter by storeId if provided
+              const matchesStore = !storeId || sale.storeId === storeId || (sale as any).storeId === storeId
+              console.log(`[DEBUG] Sale ${sale.id} saleDate=${sale.saleDate} isToday=${isT} storeId=${(sale as any).storeId || sale.storeId} matchesStore=${matchesStore}`)
+              return isT && matchesStore
             })
             .reduce((total: number, sale: SaleFromApi) => {
-              // Try multiple possible field names for items/products - same as invoices/list
-              const itemsArray = sale.items || (sale as any)?.lineItems || (sale as any)?.products || []
+              // Try multiple possible field names for items/products
+              const itemsArray = sale.items || (sale as any)?.lineItems || (sale as any)?.products || (sale as any)?.details || []
               const itemCount = itemsArray.reduce((sum: number, item: any) => {
-                // Handle various possible quantity field names - same as invoices/list
+                // Handle various possible quantity field names
                 const qty = item.quantity || item.qty || item.amount || item.quantity_ordered || 1
                 return sum + Number(qty)
               }, 0)
