@@ -78,15 +78,15 @@ function LineChart({ data }: { data: number[] }) {
   // Fixed sizing - always like weekly view
   const chartH = 260
   const padL = 50
-  const padR = 40
+  const padR = 50
   const padB = 70
   const padT = 40
   const pointRadius = 6
   const labelFontSize = 12
   const valueFontSize = 13
   
-  // Fixed chart width for consistent layout
-  const chartW = 600
+  // Fixed chart width for consistent layout - increased to fit all 7 days
+  const chartW = 700
   const totalW = padL + chartW + padR
   const totalH = chartH + padB + padT
   
