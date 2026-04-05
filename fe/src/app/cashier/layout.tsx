@@ -137,14 +137,14 @@ export default function CashierLayout({ children }: CashierLayoutProps) {
           <div className="flex items-center gap-3">
             <Image
               src="/logocty.png"
-              alt="Bách Hóa Xanh Logo"
+              alt="GR-SCMS Logo"
               width={40}
               height={40}
               className="rounded-xl object-contain"
             />
             <div>
               <p className="text-[17px] font-bold text-gray-900 leading-tight font-sans tracking-tight">
-                Bách Hóa Xanh
+                GR-SCMS
               </p>
               <p className="text-[13px] text-green-600 font-medium font-sans mt-0.5">
                 Nhân viên cửa hàng

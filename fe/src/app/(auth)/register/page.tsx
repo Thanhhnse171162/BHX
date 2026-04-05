@@ -124,7 +124,7 @@ export default function RegisterPage() {
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
               </svg>
-              BÁCH HÓA XANH
+              GR-SCMS
             </div>
 
             <h1 className="text-5xl font-bold leading-tight">
@@ -177,11 +177,11 @@ export default function RegisterPage() {
               <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
               </svg>
-              BÁCH HÓA XANH
+              GR-SCMS
             </div>
           </div>
 
-          {/* Form Card */}
+          {/* Form Card */
           <div className="bg-white rounded-2xl shadow-xl p-8 lg:p-10">
             <div className="mb-8 flex flex-col items-center justify-center text-center">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">

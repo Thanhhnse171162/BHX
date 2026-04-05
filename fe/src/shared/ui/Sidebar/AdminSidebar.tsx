@@ -90,7 +90,7 @@ export function AdminSidebar({ navigation, isCollapsed, onToggleCollapse }: Admi
             </div>
             <div>
               <h2 className="text-lg font-bold text-white">Bảng điều hành</h2>
-              <p className="text-xs text-slate-400">Bách Hóa Xanh</p>
+              <p className="text-xs text-slate-400">GR-SCMS</p>
             </div>
           </div>
         )}

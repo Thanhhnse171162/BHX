@@ -91,7 +91,7 @@ export default function ForgotPasswordPage() {
             <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
             </svg>
-            BÁCH HÓA XANH
+            GR-SCMS
           </div>
         </div>
 

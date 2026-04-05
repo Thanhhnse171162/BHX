@@ -155,7 +155,7 @@ export function WarehouseSidebar() {
               <Warehouse className="text-[#2d6e3e]" size={20} />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white">Bách hóa xanh</h2>
+              <h2 className="text-sm font-bold text-white">GR-SCMS</h2>
               <p className="text-xs text-white/70 uppercase">Quản trị trung tâm</p>
             </div>
           </div>

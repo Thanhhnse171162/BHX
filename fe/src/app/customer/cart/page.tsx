@@ -144,7 +144,7 @@ export default function CartPage() {
               BH
             </div>
             <div>
-              <h3 className="font-bold text-white">Bách Hóa XANH Quận 1</h3>
+              <h3 className="font-bold text-white">GR-SCMS Quận 1</h3>
               <p className="text-sm text-gray-400">127 Nguyễn Huệ, Q1, TP HCM</p>
             </div>
           </div>
