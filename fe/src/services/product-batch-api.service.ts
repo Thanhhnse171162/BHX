@@ -110,7 +110,7 @@ export class ProductBatchAPIService {
 
   static async adjustBatchQuantity(body: AdjustBatchQuantityDTO): Promise<boolean> {
     try {
-      const response = await localApiClient.post(`/api/ProductBatch/batch/adjust-quantity`, {
+      const response = await localApiClient.post(`/ProductBatch/batch/adjust-quantity`, {
         batchId: body.batchId,
         actualQuantity: body.actualQuantity,
         locationType: body.locationType,
