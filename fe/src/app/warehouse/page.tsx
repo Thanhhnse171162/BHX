@@ -339,10 +339,10 @@ export default function WarehouseDashboard() {
   }, [throughputData])
 
   const chartGeometry = useMemo(() => {
-    const width = 1000
+    const width = 1200
     const height = 220
-    const leftPad = 56
-    const rightPad = 24
+    const leftPad = 60
+    const rightPad = 40
     const topPad = 12
     const bottomPad = 20
     const drawWidth = width - leftPad - rightPad
@@ -524,7 +524,7 @@ export default function WarehouseDashboard() {
 
             <div
               className="mt-2 grid text-center"
-              style={{ gridTemplateColumns: `repeat(${throughputData.length}, minmax(0, 1fr))`, paddingLeft: '56px', paddingRight: '24px' }}
+              style={{ gridTemplateColumns: `repeat(${throughputData.length}, minmax(0, 1fr))`, paddingLeft: '60px', paddingRight: '40px' }}
             >
               {throughputData.map((item, idx) => (
                 <span key={`${item.day}-${idx}`} className="text-xs text-gray-600 font-medium uppercase">
