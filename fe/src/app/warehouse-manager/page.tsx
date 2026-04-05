@@ -297,8 +297,6 @@ export default function WarehouseManagerDashboard() {
           </div>
         </div>
 
-        </div>
-
         {/* Recent Store Requests - Full Width */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
