@@ -72,7 +72,7 @@ function exportToExcel(storeName: string, dateRange: string, stores: Store[], pr
 function BarChart({ data }: { data: number[] }) {
   if (!data || data.length === 0) {
     return (
-      <div className="w-full h-[180px] flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100">
+      <div className="w-full h-[120px] flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100">
         <div className="text-center">
           <div className="text-sm text-gray-400">Không có dữ liệu</div>
           <div className="text-xs text-gray-300 mt-1">Dữ liệu sẽ hiển thị khi có giao dịch</div>
@@ -82,13 +82,15 @@ function BarChart({ data }: { data: number[] }) {
   }
 
   const max    = Math.max(...data)
-  const chartH = 120
-  const barW   = 36
-  const gap    = 16
-  const padL   = 6
-  const padB   = 25
-  const padT   = 20
-  const totalW = Math.max(padL + data.length * (barW + gap) - gap + 8, 100)
+  // Responsive sizing - smaller for single/dual bars (today/yesterday)
+  const isCompact = data.length <= 2
+  const chartH = isCompact ? 80 : 120
+  const barW   = isCompact ? 20 : 36
+  const gap    = isCompact ? 8 : 16
+  const padL   = isCompact ? 15 : 6
+  const padB   = isCompact ? 20 : 25
+  const padT   = isCompact ? 15 : 20
+  const totalW = Math.max(padL + data.length * (barW + gap) - gap + 8, isCompact ? 80 : 100)
 
   return (
     <svg width="100%" viewBox={`0 0 ${totalW} ${chartH + padB + padT}`} style={{ overflow: 'visible' }}>
@@ -391,7 +393,12 @@ export default function DashboardPage() {
 
         const headers: HeadersInit = { Authorization: `Bearer ${token}` }
         const params = new URLSearchParams()
-        params.set('period', 'LAST_7_DAYS')
+        // Use actual Period values from API
+        let periodValue = 'LAST_7_DAYS'
+        if (activeTab === 'ngay') periodValue = 'Today'
+        else if (activeTab === 'hom_qua') periodValue = 'Yesterday'
+        
+        params.set('period', periodValue)
         params.set('topN', '10')
 
         const response = await fetch(`/api/reports/admin/top-products-trend?${params.toString()}`, { 
@@ -406,22 +413,22 @@ export default function DashboardPage() {
           console.log('📊 [Revenue Trend API] Received top products:', overallProducts.length, 'items')
           console.log('📊 [Revenue Trend API] Full response:', JSON.stringify(data, null, 2))
           
-          // Extract revenue values from products
-          // For demo, we'll use revenue to show trend - normally this would be daily aggregates
+          // Extract revenue values from products - real data from API
           const revenueValues = overallProducts.map((p: any) => p.revenue || 0)
           
           if (revenueValues.length > 0) {
             // For weekly view, pad to 7 days if needed
-            while (revenueValues.length < 7) {
-              revenueValues.push(0)
+            let weekData = [...revenueValues]
+            while (weekData.length < 7) {
+              weekData.push(0)
             }
+            weekData = weekData.slice(0, 7)
             
-            // Update chart data with actual data
-            const sevenDayData = revenueValues.slice(0, 7)
+            // Update chart data with actual API data (no padding for single days)
             setChartData({
-              tuan:    sevenDayData,
-              ngay:    [sevenDayData[6] || 0],
-              hom_qua: [sevenDayData[5] || 0],
+              tuan:    weekData,
+              ngay:    revenueValues.length > 0 ? [revenueValues[0]] : [],
+              hom_qua: revenueValues.length > 1 ? [revenueValues[1]] : [],
             })
             
             // Calculate and set total revenue
@@ -447,7 +454,7 @@ export default function DashboardPage() {
     }
 
     loadRevenueTrend()
-  }, [])
+  }, [activeTab])
 
   // Fetch top products data
   useEffect(() => {
