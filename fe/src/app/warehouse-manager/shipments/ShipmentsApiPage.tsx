@@ -165,15 +165,17 @@ export default function ShipmentsApiPage() {
     return batches.filter((b) => {
       const st = mapStatus(b.status)
       const matchesStatus = status === 'all' || st === status
+      const productId = String(b.productId || '').trim().toLowerCase()
+      const productName = productNameMap[productId] || productId
       const matchesSearch =
         !q ||
         String(b.id).toLowerCase().includes(q) ||
         String(b.batchNumber).toLowerCase().includes(q) ||
-        String(b.productId).toLowerCase().includes(q) ||
+        String(productName).toLowerCase().includes(q) ||
         String(b.supplier).toLowerCase().includes(q)
       return matchesStatus && matchesSearch
     })
-  }, [batches, search, status])
+  }, [batches, search, status, productNameMap])
 
   // Reset to page 1 when filters change
   useEffect(() => {
