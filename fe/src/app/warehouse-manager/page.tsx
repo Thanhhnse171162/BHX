@@ -187,114 +187,117 @@ export default function WarehouseManagerDashboard() {
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 gap-6">
-        {/* Recent Stock Exports */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-lg font-bold text-gray-900">Lịch sử xuất kho gần đây</h2>
-              <p className="text-sm text-gray-600 mt-1">5 lần xuất kho mới nhất</p>
+      <div className="space-y-6">
+        {/* Top Section - 2 Columns */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Recent Stock Exports */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Lịch sử xuất kho gần đây</h2>
+                <p className="text-sm text-gray-600 mt-1">5 lần xuất kho mới nhất</p>
+              </div>
+              <button
+                onClick={() => router.push('/warehouse-manager/inventory')}
+                className="flex items-center gap-2 px-3 py-2 text-[#2d6e3e] hover:bg-emerald-50 rounded-lg transition-colors text-sm font-medium"
+              >
+                Xem tất cả
+                <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
-            <button
-              onClick={() => router.push('/warehouse-manager/inventory')}
-              className="flex items-center gap-2 px-3 py-2 text-[#2d6e3e] hover:bg-emerald-50 rounded-lg transition-colors text-sm font-medium"
-            >
-              Xem tất cả
-              <ArrowRight className="w-4 h-4" />
-            </button>
+
+            <div className="space-y-2">
+              {stockMovements.slice(0, 5).length > 0 ? (
+                stockMovements.slice(0, 5).map((movement: any, index: number) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-emerald-600" />
+                        <p className="font-medium text-gray-900">{movement.movementNumber}</p>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1">
+                        {movement.totalItems} mặt hàng • {new Date(movement.movementDate).toLocaleDateString('vi-VN')}
+                      </p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      movement.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700'
+                      : movement.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700'
+                      : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {movement.status === 'COMPLETED' ? 'Hoàn thành'
+                      : movement.status === 'PENDING' ? 'Chờ xử lý'
+                      : 'Đang xử lý'}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  Chưa có lịch sử xuất kho
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="space-y-2">
-            {stockMovements.slice(0, 5).length > 0 ? (
-              stockMovements.slice(0, 5).map((movement: any, index: number) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-emerald-600" />
-                      <p className="font-medium text-gray-900">{movement.movementNumber}</p>
-                    </div>
-                    <p className="text-xs text-gray-600 mt-1">
-                      {movement.totalItems} mặt hàng • {new Date(movement.movementDate).toLocaleDateString('vi-VN')}
-                    </p>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    movement.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700'
-                    : movement.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700'
-                    : 'bg-blue-100 text-blue-700'
-                  }`}>
-                    {movement.status === 'COMPLETED' ? 'Hoàn thành'
-                    : movement.status === 'PENDING' ? 'Chờ xử lý'
-                    : 'Đang xử lý'}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                Chưa có lịch sử xuất kho
+          {/* Recent Transfers */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Dự chuyển hàng gần đây</h2>
+                <p className="text-sm text-gray-600 mt-1">5 lần di chuyển hàng mới nhất</p>
               </div>
-            )}
+              <button
+                onClick={() => router.push('/warehouse-manager/transfers')}
+                className="flex items-center gap-2 px-3 py-2 text-[#2d6e3e] hover:bg-emerald-50 rounded-lg transition-colors text-sm font-medium"
+              >
+                Xem tất cả
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {transfers.slice(0, 5).length > 0 ? (
+                transfers.slice(0, 5).map((transfer: any, index: number) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <Package className="w-4 h-4 text-blue-600" />
+                        <p className="font-medium text-gray-900">{transfer.transferNumber}</p>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1">
+                        {transfer.items?.length || 0} mặt hàng • {new Date(transfer.transferDate).toLocaleDateString('vi-VN')}
+                      </p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      transfer.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700'
+                      : transfer.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700'
+                      : transfer.status === 'IN_TRANSIT' ? 'bg-blue-100 text-blue-700'
+                      : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {transfer.status === 'COMPLETED' ? 'Hoàn thành'
+                      : transfer.status === 'PENDING' ? 'Chờ gửi'
+                      : transfer.status === 'IN_TRANSIT' ? 'Đang vận chuyển'
+                      : transfer.status}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  Chưa có dự chuyển hàng
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Recent Transfers */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-lg font-bold text-gray-900">Dự chuyển hàng gần đây</h2>
-              <p className="text-sm text-gray-600 mt-1">5 lần di chuyển hàng mới nhất</p>
-            </div>
-            <button
-              onClick={() => router.push('/warehouse-manager/transfers')}
-              className="flex items-center gap-2 px-3 py-2 text-[#2d6e3e] hover:bg-emerald-50 rounded-lg transition-colors text-sm font-medium"
-            >
-              Xem tất cả
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="space-y-2">
-            {transfers.slice(0, 5).length > 0 ? (
-              transfers.slice(0, 5).map((transfer: any, index: number) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <Package className="w-4 h-4 text-blue-600" />
-                      <p className="font-medium text-gray-900">{transfer.transferNumber}</p>
-                    </div>
-                    <p className="text-xs text-gray-600 mt-1">
-                      {transfer.items?.length || 0} mặt hàng • {new Date(transfer.transferDate).toLocaleDateString('vi-VN')}
-                    </p>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    transfer.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700'
-                    : transfer.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700'
-                    : transfer.status === 'IN_TRANSIT' ? 'bg-blue-100 text-blue-700'
-                    : 'bg-gray-100 text-gray-700'
-                  }`}>
-                    {transfer.status === 'COMPLETED' ? 'Hoàn thành'
-                    : transfer.status === 'PENDING' ? 'Chờ gửi'
-                    : transfer.status === 'IN_TRANSIT' ? 'Đang vận chuyển'
-                    : transfer.status}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                Chưa có dự chuyển hàng
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Recent Store Requests */}
+        {/* Recent Store Requests - Full Width */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
