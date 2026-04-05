@@ -34,19 +34,49 @@ function isMockData(data: any): boolean {
 
 // ─── Custom SVG Revenue Chart ─────────────────────────────────────────────────
 function RevenueChart({ chartData }: { chartData: ChartPoint[] }) {
-  if (!chartData.length) {
-    return (
-      <div className="flex h-full items-center justify-center text-sm text-[#9aaa8e]">
-        Đang tải biểu đồ...
-      </div>
-    )
-  }
-
   const width = 500
   const height = 240
   const padding = { top: 20, right: 30, bottom: 30, left: 50 }
   const chartWidth = width - padding.left - padding.right
   const chartHeight = height - padding.top - padding.bottom
+
+  if (!chartData.length) {
+    // Show empty chart structure
+    return (
+      <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} className="mx-auto">
+        {/* Grid lines */}
+        {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => {
+          const y = padding.top + chartHeight * (1 - ratio)
+          return (
+            <line key={i} x1={padding.left} y1={y} x2={width - padding.right} y2={y} stroke="#e4edd9" strokeWidth="1" />
+          )
+        })}
+
+        {/* Y Axis labels */}
+        {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => {
+          const maxValue = 1000000
+          const minValue = 0
+          const value = minValue + (maxValue - minValue) * ratio
+          const y = padding.top + chartHeight * (1 - ratio)
+          const label = value >= 1_000_000 ? `${(value / 1_000_000).toFixed(0)}M` : 
+                        value >= 1_000 ? `${(value / 1_000).toFixed(0)}K` : 
+                        value.toFixed(0)
+          return (
+            <text
+              key={`y-${i}`}
+              x={padding.left - 10}
+              y={y + 4}
+              textAnchor="end"
+              fontSize="11"
+              fill="#9aaa8e"
+            >
+              {label}
+            </text>
+          )
+        })}
+      </svg>
+    )
+  }
 
   const values = chartData.map(d => d.value)
   const maxValue = Math.max(...values, 1)
@@ -338,44 +368,65 @@ export default function StoreManagerDashboard() {
       ])
 
       // Process revenue trend
-      if (Array.isArray(trendData) && trendData.length > 0) {
-        console.log('[Frontend] Processing trend data:', trendData.length, 'items')
-        console.log('[Frontend] FULL Trend data:', JSON.stringify(trendData, null, 2))
-        const transformedData = trendData.map((item: any) => {
-          // Try multiple field names for value
-          let value = 0
-          if (typeof item.revenue === 'number') {
-            value = item.revenue
-          } else if (typeof item.revenue === 'string') {
-            value = parseFloat(item.revenue) || 0
-          } else if (typeof item.amount === 'number') {
-            value = item.amount
-          } else if (typeof item.amount === 'string') {
-            value = parseFloat(item.amount) || 0
-          } else if (typeof item.total === 'number') {
-            value = item.total
-          } else if (typeof item.total === 'string') {
-            value = parseFloat(item.total) || 0
-          } else if (typeof item.sales === 'number') {
-            value = item.sales
-          } else if (typeof item.sales === 'string') {
-            value = parseFloat(item.sales) || 0
-          }
-          
-          return {
-            day: item.time || item.date || item.day || '',
-            value: value,
-          }
-        })
-        setChartData(transformedData)
+      if (trendData) {
+        let dataArray: any[] = []
         
-        // Calculate total revenue from trend data
-        const totalRevenue = transformedData.reduce((sum, item) => sum + item.value, 0)
-        setRevenue(totalRevenue.toLocaleString('vi-VN'))
-        console.log('[Frontend] Total revenue calculated:', totalRevenue)
+        // Handle different response formats
+        if (Array.isArray(trendData)) {
+          dataArray = trendData
+        } else if (trendData.data && Array.isArray(trendData.data)) {
+          dataArray = trendData.data
+        } else if (trendData.result && Array.isArray(trendData.result)) {
+          dataArray = trendData.result
+        } else if (trendData.items && Array.isArray(trendData.items)) {
+          dataArray = trendData.items
+        }
+        
+        console.log('[Frontend] Processing trend data:', dataArray.length, 'items')
+        console.log('[Frontend] FULL Trend data:', JSON.stringify(dataArray, null, 2))
+        
+        if (dataArray && dataArray.length > 0) {
+          const transformedData = dataArray.map((item: any) => {
+            // Try multiple field names for value
+            let value = 0
+            if (typeof item.revenue === 'number') {
+              value = item.revenue
+            } else if (typeof item.revenue === 'string') {
+              value = parseFloat(item.revenue) || 0
+            } else if (typeof item.amount === 'number') {
+              value = item.amount
+            } else if (typeof item.amount === 'string') {
+              value = parseFloat(item.amount) || 0
+            } else if (typeof item.total === 'number') {
+              value = item.total
+            } else if (typeof item.total === 'string') {
+              value = parseFloat(item.total) || 0
+            } else if (typeof item.sales === 'number') {
+              value = item.sales
+            } else if (typeof item.sales === 'string') {
+              value = parseFloat(item.sales) || 0
+            }
+            
+            return {
+              day: item.time || item.date || item.day || item.hour || '',
+              value: value,
+            }
+          })
+          setChartData(transformedData)
+          
+          // Calculate total revenue from trend data
+          const totalRevenue = transformedData.reduce((sum, item) => sum + item.value, 0)
+          setRevenue(totalRevenue.toLocaleString('vi-VN'))
+          console.log('[Frontend] Total revenue calculated:', totalRevenue)
+        } else {
+          console.warn('[Frontend] Trend data array is empty after processing')
+          setRevenue('0')
+          setChartData([])
+        }
       } else {
         console.warn('[Frontend] No trend data received')
         setRevenue('0')
+        setChartData([])
       }
 
       // Process top products
@@ -768,13 +819,7 @@ export default function StoreManagerDashboard() {
             </span>
           </div>
           <div className="h-56">
-            {loading ? (
-              <div className="flex h-full items-center justify-center text-xs text-[#9aaa8e]">
-                Đang tải...
-              </div>
-            ) : (
-              <RevenueChart chartData={chartData} />
-            )}
+            <RevenueChart chartData={chartData} />
           </div>
         </div>
 
