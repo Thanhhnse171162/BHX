@@ -24,6 +24,7 @@ export default function WarehouseManagementPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const [searchTerm, setSearchTerm] = useState('')
   const itemsPerPage = 10
   const [formData, setFormData] = useState<CreateWarehouseForm>({
     name: '',
@@ -216,6 +217,10 @@ export default function WarehouseManagementPage() {
     Inactive: 'bg-gray-100 text-gray-800',
   }
 
+  const filteredWarehouses = warehouses.filter(warehouse =>
+    warehouse.name.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
   const columns = [
     {
       key: 'name' as keyof AdminWarehouse,
@@ -275,10 +280,30 @@ export default function WarehouseManagementPage() {
           </div>
         )}
 
+        <div className="mb-6 bg-white rounded-lg shadow p-4">
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium text-gray-700">Tìm kiếm theo tên kho:</label>
+            <Input
+              type="text"
+              placeholder="Nhập tên kho..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value)
+                setCurrentPage(1)
+              }}
+              className="flex-1 max-w-md"
+            />
+          </div>
+        </div>
+
         {loading ? (
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <p className="mt-2 text-gray-600">Đang tải...</p>
+          </div>
+        ) : filteredWarehouses.length === 0 && warehouses.length > 0 ? (
+          <div className="text-center py-12 bg-white rounded-lg shadow">
+            <p className="text-gray-600">Không tìm thấy kho nào phù hợp với "{searchTerm}"</p>
           </div>
         ) : warehouses.length === 0 ? (
           <EmptyState
@@ -290,16 +315,16 @@ export default function WarehouseManagementPage() {
             {/* Data Table */}
             <DataTable 
               columns={columns} 
-              data={warehouses.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)} 
+              data={filteredWarehouses.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)} 
             />
 
             {/* Pagination Controls */}
-            {warehouses.length > 0 && (
+            {filteredWarehouses.length > 0 && (
               <div className="mt-6 flex items-center justify-between bg-white rounded-lg shadow p-4">
                 <div className="text-sm text-gray-600">
                   Hiển thị <span className="font-semibold">{(currentPage - 1) * itemsPerPage + 1}</span> đến&nbsp;
-                  <span className="font-semibold">{Math.min(currentPage * itemsPerPage, warehouses.length)}</span> trong&nbsp;
-                  <span className="font-semibold">{warehouses.length}</span> kho
+                  <span className="font-semibold">{Math.min(currentPage * itemsPerPage, filteredWarehouses.length)}</span> trong&nbsp;
+                  <span className="font-semibold">{filteredWarehouses.length}</span> kho
                 </div>
                 
                 <div className="flex items-center gap-2">
@@ -313,9 +338,9 @@ export default function WarehouseManagementPage() {
                   </Button>
                   
                   <div className="flex items-center gap-1">
-                    {Array.from({ length: Math.ceil(warehouses.length / itemsPerPage) }, (_, i) => i + 1)
+                    {Array.from({ length: Math.ceil(filteredWarehouses.length / itemsPerPage) }, (_, i) => i + 1)
                       .filter(page => {
-                        const totalPages = Math.ceil(warehouses.length / itemsPerPage)
+                        const totalPages = Math.ceil(filteredWarehouses.length / itemsPerPage)
                         if (totalPages <= 5) return true
                         if (page === 1 || page === totalPages) return true
                         if (Math.abs(page - currentPage) <= 1) return true
@@ -341,8 +366,8 @@ export default function WarehouseManagementPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(warehouses.length / itemsPerPage)))}
-                    disabled={currentPage === Math.ceil(warehouses.length / itemsPerPage)}
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredWarehouses.length / itemsPerPage)))}
+                    disabled={currentPage === Math.ceil(filteredWarehouses.length / itemsPerPage)}
                   >
                     Trang sau →
                   </Button>

@@ -24,12 +24,12 @@ function isInboundType(type?: string): boolean {
 
 function movementTypeLabel(type?: string): string {
   const value = String(type || '').toUpperCase()
-  if (value === 'INBOUND') return 'Stock In'
-  if (value === 'TRANSFER') return 'Transfer'
-  if (value === 'ADJUSTMENT') return 'Adjustment'
-  if (value === 'TRANSFER_IN') return 'Transfer In'
-  if (value === 'TRANSFER_OUT') return 'Transfer Out'
-  return value || 'Unknown'
+  if (value === 'INBOUND') return 'Nhập Hàng'
+  if (value === 'TRANSFER') return 'Chuyển Kho'
+  if (value === 'ADJUSTMENT') return 'Điều Chỉnh'
+  if (value === 'TRANSFER_IN') return 'Nhập Chuyển'
+  if (value === 'TRANSFER_OUT') return 'Xuất Chuyển'
+  return value || 'Không Xác Định'
 }
 
 interface EnrichedMovement extends StockMovementFromAPI {
@@ -213,10 +213,10 @@ export default function StockMovementPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Stock In / Stock Out</h1>
-          <p className="text-gray-600 mt-1">Record and track inventory movements</p>
+          <h1 className="text-2xl font-bold text-gray-900">Xuất Nhập Hàng</h1>
+          <p className="text-gray-600 mt-1">Ghi lại và theo dõi các chuyển động hàng hóa</p>
           {workplaceId && (
-            <p className="text-xs text-gray-500 mt-1">Location: {warehouseName || workplaceId}</p>
+            <p className="text-xs text-gray-500 mt-1">Vị trí: {warehouseName || workplaceId}</p>
           )}
         </div>
         <Button variant="outline" onClick={fetchData} disabled={loading} className="h-9 px-4">
@@ -228,9 +228,9 @@ export default function StockMovementPage() {
         <div className="bg-white rounded-xl shadow-sm border-l-4 border-green-600 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm font-medium mb-1">Total Stock In</p>
+              <p className="text-gray-600 text-sm font-medium mb-1">Tổng Nhập Hàng</p>
               <p className="text-3xl font-bold text-green-600">{stats.inCount}</p>
-              <p className="text-xs text-gray-500 mt-1">transactions</p>
+              <p className="text-xs text-gray-500 mt-1">giao dịch</p>
             </div>
             <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
               <TrendingUp className="text-green-600" size={24} />
@@ -241,9 +241,9 @@ export default function StockMovementPage() {
         <div className="bg-white rounded-xl shadow-sm border-l-4 border-red-600 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm font-medium mb-1">Total Stock Out</p>
+              <p className="text-gray-600 text-sm font-medium mb-1">Tổng Xuất Hàng</p>
               <p className="text-3xl font-bold text-red-600">{stats.outCount}</p>
-              <p className="text-xs text-gray-500 mt-1">transactions</p>
+              <p className="text-xs text-gray-500 mt-1">giao dịch</p>
             </div>
             <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center">
               <TrendingDown className="text-red-600" size={24} />
@@ -254,11 +254,11 @@ export default function StockMovementPage() {
         <div className="bg-white rounded-xl shadow-sm border-l-4 border-blue-500 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm font-medium mb-1">Net Movement</p>
+              <p className="text-gray-600 text-sm font-medium mb-1">Chuyển Động Ròng</p>
               <p className={`text-3xl font-bold ${stats.net >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {Math.abs(stats.net)}
               </p>
-              <p className="text-xs text-gray-500 mt-1">transactions</p>
+              <p className="text-xs text-gray-500 mt-1">giao dịch</p>
             </div>
             <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center">
               <ArrowDownUp className="text-gray-600" size={24} />
@@ -270,42 +270,42 @@ export default function StockMovementPage() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Tìm Kiếm</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
               <Input
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Movement number, product, notes, supplier"
+                placeholder="Mã di chuyển, tên hàng, ghi chú, nhà cung cấp"
                 className="pl-10"
               />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Movement Type</label>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Loại Di Chuyển</label>
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
               className="w-full h-9 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6e3e] bg-white"
             >
-              <option value="all">All Types</option>
+              <option value="all">Tất Cả Loại</option>
               {movementTypes.map((type) => (
                 <option key={type} value={type}>{movementTypeLabel(type)}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">From Date</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Từ Ngày</label>
             <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} max={endDate || undefined} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">To Date</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Đến Ngày</label>
             <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} min={startDate || undefined} />
           </div>
         </div>
 
         <div className="mt-4 text-sm text-gray-600">
-          Showing <span className="font-bold text-[#2d6e3e]">{filteredRows.length}</span> transaction{filteredRows.length !== 1 ? 's' : ''} • 10 items/page
+          Hiển thị <span className="font-bold text-[#2d6e3e]">{filteredRows.length}</span> giao dịch • 10 mục/trang
         </div>
       </div>
 
@@ -321,19 +321,19 @@ export default function StockMovementPage() {
             onClick={() => setActiveTab('all')}
             className={`flex-1 px-6 py-4 font-medium transition-colors ${activeTab === 'all' ? 'bg-[#2d6e3e] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
           >
-            All Movements
+            Tất Cả Di Chuyển
           </button>
           <button
             onClick={() => setActiveTab('in')}
             className={`flex-1 px-6 py-4 font-medium transition-colors ${activeTab === 'in' ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
           >
-            Stock In
+            Nhập Hàng
           </button>
           <button
             onClick={() => setActiveTab('out')}
             className={`flex-1 px-6 py-4 font-medium transition-colors ${activeTab === 'out' ? 'bg-red-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
           >
-            Stock Out
+            Xuất Hàng
           </button>
         </div>
 
@@ -341,13 +341,13 @@ export default function StockMovementPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Movement</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Product</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Type</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Quantity</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Date</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Notes</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Di Chuyển</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Sản Phẩm</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Loại</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Số Lượng</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Ngày</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Trạng Thái</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Ghi Chú</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -357,7 +357,7 @@ export default function StockMovementPage() {
                 </tr>
               ) : paginatedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-10 text-center text-gray-500">No transactions found</td>
+                  <td colSpan={7} className="p-10 text-center text-gray-500">Không tìm thấy giao dịch</td>
                 </tr>
               ) : (
                 paginatedRows.map((movement) => {
@@ -370,7 +370,7 @@ export default function StockMovementPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-medium text-gray-900">{movement.productText}</div>
-                        <div className="text-xs text-gray-500">{movement.itemCount} items</div>
+                        <div className="text-xs text-gray-500">{movement.itemCount} mục</div>
                       </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1 text-gray-700">
@@ -403,9 +403,9 @@ export default function StockMovementPage() {
           <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-600">
-                Showing <span className="font-medium text-gray-900">{startIndex + 1}</span> to{' '}
-                <span className="font-medium text-gray-900">{Math.min(endIndex, filteredRows.length)}</span> of{' '}
-                <span className="font-medium text-gray-900">{filteredRows.length}</span> transactions
+                Hiển thị <span className="font-medium text-gray-900">{startIndex + 1}</span> đến{' '}
+                <span className="font-medium text-gray-900">{Math.min(endIndex, filteredRows.length)}</span> trong{' '}
+                <span className="font-medium text-gray-900">{filteredRows.length}</span> giao dịch
               </div>
 
               <div className="flex items-center gap-2">
