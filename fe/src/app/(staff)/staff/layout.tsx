@@ -73,7 +73,7 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
             <div className="flex items-center gap-3">
               <Image
                 src="/logocty.png"
-                alt="Bách Hóa Xanh Logo"
+                alt="GR-SCMS Logo"
                 width={44}
                 height={44}
                 className="rounded-lg"

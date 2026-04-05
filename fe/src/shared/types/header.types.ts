@@ -1,5 +1,5 @@
 /**
- * Header Types for Bách Hóa XANH E-commerce Platform
+ * Header Types for GR-SCMS E-commerce Platform
  * Defines interfaces for search, location, cart, and notification features
  */
 

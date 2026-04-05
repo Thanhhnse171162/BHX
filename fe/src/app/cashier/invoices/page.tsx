@@ -105,7 +105,7 @@ interface InvoicePrintData {
 const PAGE_SIZE = 7
 
 const STORE_NAME_BY_ID: Record<string, string> = {
-  'b0000001-0001-0001-0001-000000000001': 'Bách Hóa Xanh',
+  'b0000001-0001-0001-0001-000000000001': 'GR-SCMS',
 }
 
 const statusCfg: Record<OrderStatus, { label: string; cls: string; icon: React.ReactNode }> = {
@@ -472,7 +472,7 @@ export default function InvoicesPage() {
 
   const resolveStoreName = (storeId: string) => {
     const key = String(storeId || '').toLowerCase()
-    return STORE_NAME_BY_ID[key] || 'Bách Hóa Xanh'
+    return STORE_NAME_BY_ID[key] || 'GR-SCMS'
   }
 
   const resolveCashierName = (cashierId: string) => {

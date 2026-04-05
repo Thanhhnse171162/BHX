@@ -54,7 +54,7 @@ export default function CustomerPage() {
             </div>
           </div>
           <div className="mt-8 pt-8 border-t border-gray-700 text-center text-sm text-gray-400">
-            <p>© 2024 Bách Hóa Xanh. All rights reserved.</p>
+            <p>© 2024 GR-SCMS. All rights reserved.</p>
           </div>
         </div>
       </footer>

@@ -104,10 +104,10 @@ export default function StoreManagerLayout({ children }: StoreManagerLayoutProps
         <div className="px-5 py-5 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 bg-white">
-              <Image src="/logocty.png" alt="Bách Hóa Xanh" width={36} height={36} className="w-full h-full object-contain" />
+              <Image src="/logocty.png" alt="GR-SCMS" width={36} height={36} className="w-full h-full object-contain" />
             </div>
             <div className="min-w-0">
-              <p className="text-[13px] font-bold text-gray-900 leading-tight">Bách Hóa Xanh</p>
+              <p className="text-[13px] font-bold text-gray-900 leading-tight">GR-SCMS</p>
               <p className="text-[10px] text-gray-400 mt-0.5">Quản Lý Cửa Hàng</p>
             </div>
           </div>

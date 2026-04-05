@@ -297,7 +297,7 @@ GET /api/categories
   "data": [
     {
       "id": "F314BF7B-E68F-4219-9F24-C1683F3C6E63",
-      "name": "Bách Hóa Xanh",
+      "name": "GR-SCMS",
       "is_active": true,
       "display_order": 1,
       ...

@@ -692,7 +692,7 @@ export default function POSPage() {
         {/* Top bar */}
         <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-4 shadow-sm">
           <div className="flex-shrink-0">
-            <p className="text-base font-bold text-gray-900 leading-tight">Bách Hóa Xanh</p>
+            <p className="text-base font-bold text-gray-900 leading-tight">GR-SCMS</p>
             <p className="text-xs text-green-600 font-semibold">POS Bán hàng</p>
           </div>
           <div className="flex-1 relative max-w-xl">

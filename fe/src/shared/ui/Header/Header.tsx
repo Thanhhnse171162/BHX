@@ -173,7 +173,7 @@ export function Header({ hideDeliveryAndCart = false }: HeaderProps) {
                 <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-white group-hover:scale-105 transition-all duration-300">
                   <Image
                     src="/logocty.png"
-                    alt="Bách Hóa Xanh"
+                    alt="GR-SCMS"
                     width={48}
                     height={48}
                     className="object-cover w-full h-full"
@@ -182,7 +182,7 @@ export function Header({ hideDeliveryAndCart = false }: HeaderProps) {
                 </div>
                 <div className="hidden md:block">
                   <div className="font-extrabold text-[22px] leading-tight tracking-wide whitespace-nowrap">
-                    <span className="text-white">Bách Hóa Xanh </span>
+                    <span className="text-white">GR-SCMS </span>
                   </div>
                 </div>
               </div>

@@ -223,13 +223,13 @@ export default function LoginPage() {
             <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
           </svg>
               </div>
-              <span className="text-shadow">BÁCH HÓA XANH</span>
+              <span className="text-shadow">GR-SCMS</span>
             </div>
 
             {/* Main Content */}
             <div className="space-y-5">
               <h1 className="text-6xl font-extrabold leading-[1.1] tracking-tight drop-shadow-lg">
-          Chào mừng<br />
+          <span className="text-yellow-300/90">Chào mừng</span><br />
           <span className="text-yellow-300/90">quay lại</span>
               </h1>
               
@@ -298,7 +298,7 @@ export default function LoginPage() {
               <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
               </svg>
-              BÁCH HÓA XANH
+              GR-SCMS
             </div>
           </div>
 

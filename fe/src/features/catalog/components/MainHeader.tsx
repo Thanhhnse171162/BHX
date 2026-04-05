@@ -38,7 +38,7 @@ export function MainHeader() {
             <div className="relative w-12 h-12 flex-shrink-0">
               <Image 
                 src="/logocty.png" 
-                alt="Bách Hóa Xanh Logo" 
+                alt="GR-SCMS Logo" 
                 width={48}
                 height={48}
                 className="object-contain rounded-lg"
@@ -54,7 +54,7 @@ export function MainHeader() {
                   letterSpacing: '0.5px'
                 }}
               >
-                Bách Hóa Xanh
+                GR-SCMS
               </span>
               <span 
                 className="text-xs lg:text-sm text-white/90 font-light tracking-wide pl-0.5"
