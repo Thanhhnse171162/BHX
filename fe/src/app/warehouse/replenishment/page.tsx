@@ -1040,38 +1040,6 @@ export default function ReplenishmentPage() {
     setReceiveItems((prev) => prev.map((it, i) => (i === idx ? { ...it, [field]: value as any } : it)))
   }
 
-  const updateReceiveItemSupplier = (idx: number, supplierId: string) => {
-    const selected = suppliers.find((s) => s.id === supplierId)
-    setReceiveItems((prev) =>
-      prev.map((it, i) =>
-        i === idx
-          ? {
-              ...it,
-              supplierId: supplierId,
-              supplierName: selected?.name || '',
-            }
-          : it
-      )
-    )
-  }
-
-  useEffect(() => {
-    if (!receiveOpen) return
-    if (suppliers.length === 0) return
-    const defaultSupplier = suppliers[0]
-    setReceiveItems((prev) =>
-      prev.map((it) =>
-        it.supplierId
-          ? it
-          : {
-              ...it,
-              supplierId: defaultSupplier.id,
-              supplierName: defaultSupplier.name,
-            }
-      )
-    )
-  }, [receiveOpen, suppliers])
-
   const submitReceive = async () => {
     if (!receiveRequest) return
     if (!warehouseId) {
