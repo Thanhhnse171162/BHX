@@ -808,7 +808,6 @@ export default function ReplenishmentPage() {
   const [receiveSubmitting, setReceiveSubmitting] = useState(false)
   const [receiveError, setReceiveError] = useState<string | null>(null)
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([])
-  const [suppliersLoading, setSuppliersLoading] = useState(false)
   const [productNameMap, setProductNameMap] = useState<Record<string, string>>({})
 
   const warehouseId = String(user?.warehouseId ?? user?.workplaceId ?? '').trim()
@@ -866,7 +865,6 @@ export default function ReplenishmentPage() {
 
   useEffect(() => {
     let cancelled = false
-    setSuppliersLoading(true)
     supplierService
       .getSuppliers()
       .then((list) => {
@@ -878,9 +876,6 @@ export default function ReplenishmentPage() {
       })
       .catch(() => {
         if (!cancelled) setSuppliers([])
-      })
-      .finally(() => {
-        if (!cancelled) setSuppliersLoading(false)
       })
 
     return () => {
