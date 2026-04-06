@@ -485,8 +485,35 @@ export default function StockMovementPage() {
 
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Sản Phẩm</p>
-                <p className="text-sm text-gray-900">{selectedMovement.productText || '—'}</p>
-                <p className="text-xs text-gray-500 mt-1">{selectedMovement.itemCount} mục</p>
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Sản Phẩm</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Số Lượng</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {(selectedMovement.items || []).map((item, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                          <td className="px-3 py-2 text-sm text-gray-900">
+                            {productNameMap[normalizeId(item.productId)] || item.productName || item.productId || '—'}
+                          </td>
+                          <td className="px-3 py-2 text-sm font-semibold">
+                            <span className={isInboundType(selectedMovement.movementType) ? 'text-green-600' : 'text-red-600'}>
+                              {Math.abs(Number(item.quantity || 0))}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {(!selectedMovement.items || selectedMovement.items.length === 0) && (
+                    <div className="px-3 py-4 text-center text-sm text-gray-500">
+                      Không có sản phẩm
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
