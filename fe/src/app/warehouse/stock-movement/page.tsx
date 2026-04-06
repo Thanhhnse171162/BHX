@@ -55,7 +55,7 @@ export default function StockMovementPage() {
   const [endDate, setEndDate] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [detailOpen, setDetailOpen] = useState(false)
-  const [selectedMovement, setSelectedMovement] = useState<StockMovementFromAPI | null>(null)
+  const [selectedMovement, setSelectedMovement] = useState<EnrichedMovement | null>(null)
 
   const workplaceId =
     user?.workplaceId ||
