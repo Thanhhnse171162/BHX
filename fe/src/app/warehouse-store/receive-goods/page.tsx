@@ -316,24 +316,6 @@ export default function ReceiveGoodsPage() {
     }
   }
 
-  const handleConfirmCancel = async () => {
-    if (!inspectingOrder) return
-    setSubmitLoading(true)
-    setSubmitError(null)
-
-    try {
-      // TODO: thay bằng API hủy phiếu thực tế
-      setTransfers(prev =>
-        prev.map(t => t.id === inspectingOrder.id ? { ...t, status: 'CANCELLED' } : t)
-      )
-      closeInspection()
-    } catch (err: unknown) {
-      setSubmitError(err instanceof Error ? err.message : 'Lỗi hủy phiếu')
-    } finally {
-      setSubmitLoading(false)
-    }
-  }
-
   // ─── Tabs ─────────────────────────────────────────────────────────────────
   const TABS = [
     { key: 'all', label: 'Tất cả', count: counts.all },
