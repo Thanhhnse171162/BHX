@@ -48,7 +48,9 @@ export default function WarehouseManagerDashboard() {
         setStockMovements([])
       }
 
-      setTransfers(transfersData)
+      // Filter transfers to only show those from the current warehouse
+      const filteredTransfers = transfersData.filter(transfer => transfer.fromLocationId === user.workplaceId)
+      setTransfers(filteredTransfers)
       setRestockRequests(restockData)
     } catch (error) {
       console.error('Error fetching data:', error)
