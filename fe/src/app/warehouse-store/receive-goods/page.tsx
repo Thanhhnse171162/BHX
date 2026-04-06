@@ -139,7 +139,7 @@ export default function ReceiveGoodsPage() {
   const [inspectorNote, setInspectorNote] = useState('')
   const [step, setStep] = useState<'detail' | 'inspect'>('detail')
   const [viewOnly, setViewOnly] = useState(false)
-  const [confirmAction, setConfirmAction] = useState<'complete' | 'cancel' | null>(null)
+  const [confirmAction, setConfirmAction] = useState<'complete' | null>(null)
   const [submitLoading, setSubmitLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [shippedByName, setShippedByName] = useState<string | null>(null)
@@ -826,15 +826,7 @@ export default function ReceiveGoodsPage() {
                 </>
               ) : (
                 <>
-                  <button
-                    onClick={() => setConfirmAction('cancel')}
-                    disabled={submitLoading}
-                    className="flex items-center gap-1.5 px-4 py-2 border border-red-200 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-50"
-                  >
-                    <X size={13} />
-                    Hủy phiếu
-                  </button>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 ml-auto">
                     <button
                       onClick={() => setStep('detail')}
                       disabled={submitLoading}
@@ -843,10 +835,10 @@ export default function ReceiveGoodsPage() {
                       Quay lại
                     </button>
                     <button
-                      disabled={!allItemsFilled || submitLoading}
+                      disabled={!allItemsFilled || hasDiscrepancy || submitLoading}
                       onClick={() => setConfirmAction('complete')}
                       className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                        allItemsFilled && !submitLoading
+                        allItemsFilled && !hasDiscrepancy && !submitLoading
                           ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
                           : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                       }`}
@@ -862,25 +854,17 @@ export default function ReceiveGoodsPage() {
         </div>
       )}
 
-      {confirmAction !== null && inspectingOrder !== null && (
+      {confirmAction === 'complete' && inspectingOrder !== null && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-[2px]">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 border border-slate-200">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4 ${
-              confirmAction === 'complete' ? 'bg-emerald-100' : 'bg-red-100'
-            }`}>
-              {confirmAction === 'complete'
-                ? <CheckCircle2 size={22} className="text-emerald-600" />
-                : <AlertTriangle size={22} className="text-red-500" />
-              }
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4 bg-emerald-100">
+              <CheckCircle2 size={22} className="text-emerald-600" />
             </div>
             <h3 className="text-sm font-bold text-slate-800 text-center mb-2">
-              {confirmAction === 'complete' ? 'Xác nhận xuất kho?' : 'Hủy phiếu xuất hàng?'}
+              Xác nhận xuất kho?
             </h3>
             <p className="text-xs text-slate-500 text-center mb-5 leading-relaxed">
-              {confirmAction === 'complete'
-                ? `Phiếu ${inspectingOrder.transferNumber} sẽ chuyển sang "Hoàn tất". Hàng hóa được ghi nhận nhập kho chính thức.`
-                : `Phiếu ${inspectingOrder.transferNumber} sẽ bị hủy. Thao tác này không thể hoàn tác.`
-              }
+              Phiếu {inspectingOrder.transferNumber} sẽ chuyển sang "Hoàn tất". Hàng hóa được ghi nhận nhập kho chính thức.
             </p>
             <div className="flex gap-2.5">
               <button
@@ -892,15 +876,11 @@ export default function ReceiveGoodsPage() {
               </button>
               <button
                 disabled={submitLoading}
-                onClick={confirmAction === 'complete' ? handleConfirmComplete : handleConfirmCancel}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-colors disabled:opacity-70 flex items-center justify-center gap-2 ${
-                  confirmAction === 'complete'
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                    : 'bg-red-500 hover:bg-red-600 text-white'
-                }`}
+                onClick={handleConfirmComplete}
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold transition-colors disabled:opacity-70 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
               >
                 {submitLoading && <Loader2 size={14} className="animate-spin" />}
-                {confirmAction === 'complete' ? 'Xác nhận' : 'Hủy phiếu'}
+                Xác nhận
               </button>
             </div>
           </div>
