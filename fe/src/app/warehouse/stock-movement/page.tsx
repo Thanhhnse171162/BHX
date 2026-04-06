@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { TrendingUp, TrendingDown, Search, ArrowDownUp, ChevronLeft, ChevronRight } from 'lucide-react'
+import { TrendingUp, TrendingDown, Search, ArrowDownUp, ChevronLeft, ChevronRight, Eye, X } from 'lucide-react'
 import { Input } from '@/shared/ui/Input'
 import { Button } from '@/shared/ui/Button'
 import useAuthStore from '@/store/auth.store'
@@ -54,6 +54,8 @@ export default function StockMovementPage() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [selectedMovement, setSelectedMovement] = useState<StockMovementFromAPI | null>(null)
 
   const workplaceId =
     user?.workplaceId ||
@@ -348,16 +350,17 @@ export default function StockMovementPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Ngày</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Trạng Thái</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Ghi Chú</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Thao Tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="p-10 text-center text-gray-500">Đang tải dữ liệu...</td>
+                  <td colSpan={8} className="p-10 text-center text-gray-500">Đang tải dữ liệu...</td>
                 </tr>
               ) : paginatedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-10 text-center text-gray-500">Không tìm thấy giao dịch</td>
+                  <td colSpan={8} className="p-10 text-center text-gray-500">Không tìm thấy giao dịch</td>
                 </tr>
               ) : (
                 paginatedRows.map((movement) => {
@@ -390,6 +393,18 @@ export default function StockMovementPage() {
                       <td className="px-4 py-3 text-gray-700">{String(movement.status || '—')}</td>
                       <td className="px-4 py-3 text-gray-700 max-w-[320px] truncate" title={movement.notes || movement.supplierName || ''}>
                         {movement.notes || movement.supplierName || '—'}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => {
+                            setSelectedMovement(movement)
+                            setDetailOpen(true)
+                          }}
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                          title="Xem chi tiết"
+                        >
+                          <Eye size={16} />
+                        </button>
                       </td>
                     </tr>
                   )
@@ -441,6 +456,87 @@ export default function StockMovementPage() {
           </div>
         )}
       </div>
+
+      {/* Detail Modal */}
+      {detailOpen && selectedMovement && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-gray-900">Chi tiết di chuyển hàng</h3>
+              <button
+                onClick={() => setDetailOpen(false)}
+                className="p-1 rounded-lg hover:bg-gray-100 text-gray-400"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Mã Di Chuyển</p>
+                  <p className="text-sm font-medium text-gray-900">{selectedMovement.movementNumber || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">ID</p>
+                  <p className="text-xs font-mono text-gray-600 truncate">{selectedMovement.id || '—'}</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Sản Phẩm</p>
+                <p className="text-sm text-gray-900">{selectedMovement.productText || '—'}</p>
+                <p className="text-xs text-gray-500 mt-1">{selectedMovement.itemCount} mục</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Loại Di Chuyển</p>
+                  <p className="text-sm text-gray-900">{movementTypeLabel(selectedMovement.movementType)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Số Lượng</p>
+                  <p className={`text-sm font-semibold ${isInboundType(selectedMovement.movementType) ? 'text-green-600' : 'text-red-600'}`}>
+                    {selectedMovement.quantityValue}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Ngày Di Chuyển</p>
+                  <p className="text-sm text-gray-900">
+                    {selectedMovement.movementDate ? new Date(selectedMovement.movementDate).toLocaleDateString('vi-VN') : '—'}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {selectedMovement.movementDate ? new Date(selectedMovement.movementDate).toLocaleTimeString('vi-VN') : ''}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Trạng Thái</p>
+                  <p className="text-sm text-gray-900">{selectedMovement.status || '—'}</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Ghi Chú</p>
+                <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3">
+                  {selectedMovement.notes || selectedMovement.supplierName || '—'}
+                </p>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 bg-gray-50 px-6 py-4">
+              <button
+                onClick={() => setDetailOpen(false)}
+                className="w-full px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
