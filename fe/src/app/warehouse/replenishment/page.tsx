@@ -966,6 +966,13 @@ export default function ReplenishmentPage() {
       const ids = initialRows.map((x) => x.productId).filter(Boolean)
       if (ids.length === 0) return
       const detailMap = await ReplenishmentProductAPIService.detailsBatch(ids)
+      
+      // Map product supplier ID to supplier name
+      const supplierMap: Record<string, { id: string; name: string }> = {}
+      for (const supplier of suppliers) {
+        supplierMap[supplier.id] = { id: supplier.id, name: supplier.name }
+      }
+      
       setReceiveItems((prev) =>
         prev.map((row) => {
           const detail = detailMap[row.productId]
@@ -973,9 +980,18 @@ export default function ReplenishmentPage() {
           const existing = String(row.productName || '').trim()
           const nameFromMap = String(productNameMap[row.productId] || '').trim()
           const shouldReplace = !existing || existing === row.productId || looksLikeUuid(existing)
+          
+          // Get supplier from product details
+          const productSupplierId = String(detail?.supplierId || '').trim()
+          const supplierInfo = productSupplierId && supplierMap[productSupplierId] 
+            ? supplierMap[productSupplierId] 
+            : (row.supplierId ? supplierMap[row.supplierId] : null)
+          
           return {
             ...row,
             productName: shouldReplace ? (nameFromApi || nameFromMap || row.productId) : existing,
+            supplierId: productSupplierId || row.supplierId,
+            supplierName: supplierInfo?.name || row.supplierName,
           }
         })
       )
@@ -991,23 +1007,30 @@ export default function ReplenishmentPage() {
         const fetched = await Promise.all(
           unresolved.map(async (pid) => {
             const p = await ReplenishmentProductAPIService.getProductById(pid).catch(() => null)
-            return { id: pid, name: String(p?.name || '').trim() }
+            return { id: pid, name: String(p?.name || '').trim(), supplierId: String(p?.supplierId || '').trim() }
           })
         )
 
         const fallbackMap: Record<string, string> = {}
+        const fallbackSupplierMap: Record<string, { id: string; name: string }> = {}
         for (const f of fetched) {
           if (f.id && f.name) fallbackMap[f.id] = f.name
+          if (f.id && f.supplierId && supplierMap[f.supplierId]) {
+            fallbackSupplierMap[f.id] = supplierMap[f.supplierId]
+          }
         }
 
-        if (Object.keys(fallbackMap).length > 0) {
+        if (Object.keys(fallbackMap).length > 0 || Object.keys(fallbackSupplierMap).length > 0) {
           setReceiveItems((prev) =>
             prev.map((row) => {
               const existing = String(row.productName || '').trim()
               const shouldReplace = !existing || existing === row.productId || looksLikeUuid(existing)
+              const supplierInfo = fallbackSupplierMap[row.productId]
               return {
                 ...row,
                 productName: shouldReplace ? (fallbackMap[row.productId] || row.productName || row.productId) : row.productName,
+                supplierId: supplierInfo?.id || row.supplierId,
+                supplierName: supplierInfo?.name || row.supplierName,
               }
             })
           )
@@ -1071,7 +1094,6 @@ export default function ReplenishmentPage() {
       if (!it.supplierName.trim()) return setReceiveError(`Thiếu supplierName cho sản phẩm ${it.productName}.`)
       if (!it.supplierId.trim()) return setReceiveError(`Thiếu supplierId cho sản phẩm ${it.productName}.`)
       if (!Number.isFinite(it.quantity) || it.quantity <= 0) return setReceiveError(`Số lượng nhận của ${it.productName} phải > 0.`)
-      if (!Number.isFinite(it.unitPrice) || it.unitPrice < 0) return setReceiveError(`Đơn giá của ${it.productName} không hợp lệ.`)
       if (!it.manufacturingDate || !it.expiryDate) return setReceiveError(`Thiếu ngày NSX/HSD cho sản phẩm ${it.productName}.`)
     }
 
@@ -1264,14 +1286,14 @@ export default function ReplenishmentPage() {
 
               <div className="rounded-xl border border-gray-200 overflow-hidden">
                 <div className="overflow-x-auto">
-                  <div className="min-w-[1180px] bg-gray-50 border-b border-gray-200 grid grid-cols-[minmax(300px,1.4fr)_90px_110px_120px_220px_140px_140px] gap-2 px-4 py-2">
-                    {['Sản phẩm', 'SL nhận', 'Batch', 'Đơn giá', 'Nhà cung cấp', 'NSX', 'HSD'].map((h) => (
+                  <div className="min-w-[1060px] bg-gray-50 border-b border-gray-200 grid grid-cols-[minmax(300px,1.4fr)_90px_110px_220px_140px_140px] gap-2 px-4 py-2">
+                    {['Sản phẩm', 'SL nhận', 'Batch', 'Nhà cung cấp', 'NSX', 'HSD'].map((h) => (
                       <span key={h} className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{h}</span>
                     ))}
                   </div>
-                  <div className="min-w-[1180px] divide-y divide-gray-100">
+                  <div className="min-w-[1060px] divide-y divide-gray-100">
                     {receiveItems.map((it, idx) => (
-                      <div key={`${it.productId}-${idx}`} className="grid grid-cols-[minmax(300px,1.4fr)_90px_110px_120px_220px_140px_140px] gap-2 px-4 py-3 items-center">
+                      <div key={`${it.productId}-${idx}`} className="grid grid-cols-[minmax(300px,1.4fr)_90px_110px_220px_140px_140px] gap-2 px-4 py-3 items-center">
                       <div>
                         <p className="text-sm font-semibold text-gray-800 truncate">{it.productName || 'Sản phẩm'}</p>
                         <p className="text-[11px] text-gray-400 truncate">{shortId(it.productId)}</p>
@@ -1289,24 +1311,9 @@ export default function ReplenishmentPage() {
                         placeholder="VD: 12345"
                         className="w-full border border-gray-200 rounded-lg px-2 py-2 text-xs"
                       />
-                      <input
-                        type="number"
-                        min={0}
-                        value={it.unitPrice}
-                        onChange={(e) => updateReceiveItem(idx, 'unitPrice', Number(e.target.value))}
-                        className="w-full border border-gray-200 rounded-lg px-2 py-2 text-xs"
-                      />
-                      <select
-                        value={it.supplierId}
-                        onChange={(e) => updateReceiveItemSupplier(idx, e.target.value)}
-                        className="w-full border border-gray-200 rounded-lg px-2 py-2 text-xs bg-white"
-                      >
-                        {suppliersLoading && <option value="">Đang tải NCC...</option>}
-                        {!suppliersLoading && suppliers.length === 0 && <option value="">Không có NCC</option>}
-                        {!suppliersLoading && suppliers.length > 0 && suppliers.map((s) => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
-                      </select>
+                      <div className="w-full border border-gray-200 rounded-lg px-2 py-2 text-xs bg-gray-50 flex items-center">
+                        <span className="text-gray-700 font-medium">{it.supplierName || '—'}</span>
+                      </div>
                       <input
                         type="date"
                         value={it.manufacturingDate}
