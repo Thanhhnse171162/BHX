@@ -349,6 +349,7 @@ export default function WarehouseRequestsPage() {
     warehouses.filter(w => isWarehouseId(w.id) && managedLocationIds.has(normalizeId(w.id))),
     [warehouses, managedLocationIds]
   )
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const storeOptions = useMemo(() =>
     warehouses.filter(w => !isWarehouseId(w.id) && managedLocationIds.has(normalizeId(w.id))),
     [warehouses, managedLocationIds]
@@ -990,8 +991,18 @@ export default function WarehouseRequestsPage() {
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Kho đi <span className="text-red-400">*</span></label>
-                    <div className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-700 font-medium">
-                      {transferFromLocationId && (transferFromLocationType === 'WAREHOUSE' ? warehouseSourceOptions : storeOptions).find(w => w.id === transferFromLocationId)?.name || transferFromLocationId}
+                    <div className="relative">
+                      <select
+                        value={transferFromLocationId}
+                        onChange={e => setTransferFromLocationId(e.target.value)}
+                        className="w-full appearance-none border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 pr-8"
+                      >
+                        <option value="">Chọn kho đi</option>
+                        {warehouseSourceOptions.map(w => (
+                          <option key={w.id} value={w.id}>{w.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={14} />
                     </div>
                   </div>
                   <div className="flex flex-col gap-1.5">
