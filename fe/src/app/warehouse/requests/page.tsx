@@ -349,11 +349,6 @@ export default function WarehouseRequestsPage() {
     warehouses.filter(w => isWarehouseId(w.id) && managedLocationIds.has(normalizeId(w.id))),
     [warehouses, managedLocationIds]
   )
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const storeOptions = useMemo(() =>
-    warehouses.filter(w => !isWarehouseId(w.id) && managedLocationIds.has(normalizeId(w.id))),
-    [warehouses, managedLocationIds]
-  )
 
   // ── Filtered destination warehouse options based on selected batches ────────
   const filteredTransferDestOptions = useMemo(() => {
