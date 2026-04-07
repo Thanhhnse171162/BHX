@@ -599,7 +599,12 @@ export default function WarehouseRequestsPage() {
   useEffect(() => {
     if (!showTransferModal) return
     const key = transferRestockRequestId.trim().toLowerCase()
-    if (!key) { setTransferSourceRequest(null); setTransferItems([]); return }
+    // Only clear source request if key is empty, but preserve manually-added items
+    if (!key) { 
+      setTransferSourceRequest(null)
+      // Don't clear transferItems here - let user decide when to clear manual entries
+      return 
+    }
     const matched = requests.find(r => r.id.toLowerCase() === key || r.requestNumber.toLowerCase() === key)
     if (matched) {
       setTransferSourceRequest(matched)
