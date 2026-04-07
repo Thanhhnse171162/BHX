@@ -352,43 +352,10 @@ export default function WarehouseRequestsPage() {
 
   // ── Filtered destination warehouse options based on selected batches ────────
   const filteredTransferDestOptions = useMemo(() => {
-    // Get all unique batch IDs and their warehouse IDs from transfer items
-    const selectedBatchIds = new Set<string>()
-    const batchWarehouseMap = new Map<string, Set<string>>() // batchId -> Set of warehouseIds
-    
-    for (const item of transferItems) {
-      if (item.batchId) {
-        selectedBatchIds.add(item.batchId)
-        const batch = batches.find(b => b.id === item.batchId)
-        if (batch) {
-          if (!batchWarehouseMap.has(item.batchId)) {
-            batchWarehouseMap.set(item.batchId, new Set())
-          }
-          batchWarehouseMap.get(item.batchId)!.add(batch.warehouseId)
-        }
-      }
-    }
-    
-    // If no batches selected, show all available destination warehouses only
-    if (selectedBatchIds.size === 0) {
-      return warehouseSourceOptions.filter(w => normalizeId(w.id) !== normalizeId(transferFromLocationId))
-    }
-    
-    // Get intersection of all warehouses that have all selected batches
-    let commonWarehouses: Set<string> | null = null
-    for (const warehouseIds of batchWarehouseMap.values()) {
-      if (commonWarehouses === null) {
-        commonWarehouses = new Set(warehouseIds)
-      } else {
-        const filtered: string[] = Array.from(commonWarehouses).filter(w => warehouseIds.has(w))
-        commonWarehouses = new Set(filtered)
-      }
-    }
-    
-    // Filter destination options to only include warehouses with selected batches
-    const allowedWarehouseIds = commonWarehouses || new Set<string>()
-    return warehouseSourceOptions.filter(w => allowedWarehouseIds.has(w.id) && normalizeId(w.id) !== normalizeId(transferFromLocationId))
-  }, [transferItems, batches, warehouseSourceOptions, transferFromLocationId])
+    // Always show all available destination warehouses except the source warehouse
+    // Regardless of whether batches are selected or not
+    return warehouseSourceOptions.filter(w => normalizeId(w.id) !== normalizeId(transferFromLocationId))
+  }, [warehouseSourceOptions, transferFromLocationId])
 
   // ── Fetch restock requests ─────────────────────────────────────────────────
   const fetchRequests = useCallback(async () => {
