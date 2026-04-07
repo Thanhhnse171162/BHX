@@ -354,6 +354,46 @@ export default function WarehouseRequestsPage() {
     [warehouses, managedLocationIds]
   )
 
+  // ── Filtered destination warehouse options based on selected batches ────────
+  const filteredTransferDestOptions = useMemo(() => {
+    // Get all unique batch IDs and their warehouse IDs from transfer items
+    const selectedBatchIds = new Set<string>()
+    const batchWarehouseMap = new Map<string, Set<string>>() // batchId -> Set of warehouseIds
+    
+    for (const item of transferItems) {
+      if (item.batchId) {
+        selectedBatchIds.add(item.batchId)
+        const batch = batches.find(b => b.id === item.batchId)
+        if (batch) {
+          if (!batchWarehouseMap.has(item.batchId)) {
+            batchWarehouseMap.set(item.batchId, new Set())
+          }
+          batchWarehouseMap.get(item.batchId)!.add(batch.warehouseId)
+        }
+      }
+    }
+    
+    // If no batches selected, show all available destination warehouses only
+    if (selectedBatchIds.size === 0) {
+      return warehouseSourceOptions.filter(w => normalizeId(w.id) !== normalizeId(transferFromLocationId))
+    }
+    
+    // Get intersection of all warehouses that have all selected batches
+    let commonWarehouses: Set<string> | null = null
+    for (const warehouseIds of batchWarehouseMap.values()) {
+      if (commonWarehouses === null) {
+        commonWarehouses = new Set(warehouseIds)
+      } else {
+        const filtered: string[] = Array.from(commonWarehouses).filter(w => warehouseIds.has(w))
+        commonWarehouses = new Set(filtered)
+      }
+    }
+    
+    // Filter destination options to only include warehouses with selected batches
+    const allowedWarehouseIds = commonWarehouses || new Set<string>()
+    return warehouseSourceOptions.filter(w => allowedWarehouseIds.has(w.id) && normalizeId(w.id) !== normalizeId(transferFromLocationId))
+  }, [transferItems, batches, warehouseSourceOptions, transferFromLocationId])
+
   // ── Fetch restock requests ─────────────────────────────────────────────────
   const fetchRequests = useCallback(async () => {
     if (!token) return
@@ -962,8 +1002,18 @@ export default function WarehouseRequestsPage() {
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Kho đến <span className="text-red-400">*</span></label>
-                    <div className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-700 font-medium">
-                      {transferToLocationId && (transferToLocationType === 'WAREHOUSE' ? warehouseSourceOptions : storeOptions).find(w => w.id === transferToLocationId)?.name || transferToLocationId}
+                    <div className="relative">
+                      <select
+                        value={transferToLocationId}
+                        onChange={e => setTransferToLocationId(e.target.value)}
+                        className="w-full appearance-none border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 pr-8"
+                      >
+                        <option value="">Chọn kho đến</option>
+                        {filteredTransferDestOptions.map(w => (
+                          <option key={w.id} value={w.id}>{w.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={14} />
                     </div>
                   </div>
                 </div>
